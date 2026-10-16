@@ -1,0 +1,493 @@
+// UBOS — DRAFT data model v2 (multi-tenant SaaS), for review with the blueprint.
+// Hierarchy: Platform → Tenant (organization) → Workspaces (business lines) → Pipelines.
+// Every tenant-owned table carries tenantId; PostgreSQL row-level security enforces isolation.
+// Provider can be switched to "mysql" or "sqlserver" for dedicated enterprise deployments
+// (RLS policies then fall back to application-level enforcement).
+// Money is stored in paise (Int/BigInt). All timestamps are UTC.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═════════════════════════ PLATFORM (SaaS) ═════════════════════════
+
+model Plan {
+  id               String         @id @default(uuid())
+  code             String         @unique // starter | growth | business | enterprise
+  name             String
+  pricePerUserPaise Int
+  billingPeriods   String[]       // ["monthly","annual"]
+  maxWorkspaces    Int?           // null = unlimited
+  storageGbPerUser Int
+  aiCreditsPerUser Int            @default(0)
+  isPublic         Boolean        @default(true)
+  features         PlanFeature[]
+  subscriptions    Subscription[]
+}
+
+model PlanFeature {
+  planId     String
+  plan       Plan   @relation(fields: [planId], references: [id])
+  featureKey String // e.g. "module.hrms", "module.telephony", "integration.callerdesk"
+
+  @@id([planId, featureKey])
+}
+
+model Tenant {
+  id            String          @id @default(uuid())
+  name          String          // organization name
+  slug          String          @unique // acme → acme.ubos.app
+  status        String          @default("trial") // trial | active | grace | suspended | cancelled
+  industry      String?
+  gstin         String?
+  timezone      String          @default("Asia/Kolkata")
+  currency      String          @default("INR")
+  isInternal    Boolean         @default(false) // true for Tenant #1 (your own company)
+  deployment    String          @default("shared") // shared | dedicated | onprem
+  dbConnectionRef String?       // for dedicated databases
+  createdAt     DateTime        @default(now())
+  domains       TenantDomain[]
+  subscriptions Subscription[]
+  overrides     TenantEntitlement[]
+  workspaces    Workspace[]
+  branches      Branch[]
+  users         User[]
+}
+
+model TenantDomain {
+  id         String  @id @default(uuid())
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id])
+  host       String  @unique // custom domain, e.g. crm.acme.com
+  verified   Boolean @default(false)
+}
+
+model TenantEntitlement {
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id])
+  featureKey String
+  enabled    Boolean // per-tenant override on top of the plan
+
+  @@id([tenantId, featureKey])
+}
+
+model Subscription {
+  id               String    @id @default(uuid())
+  tenantId         String
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+  planId           String
+  plan             Plan      @relation(fields: [planId], references: [id])
+  period           String    // monthly | annual
+  licences         Int
+  status           String    // trialing | active | past_due | cancelled
+  trialEndsAt      DateTime?
+  currentPeriodEnd DateTime
+  gatewayRef       String?   // Razorpay subscription id
+  invoices         PlatformInvoice[]
+}
+
+model PlatformInvoice {
+  id             String       @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+  number         String       @unique
+  amountPaise    Int
+  gstPaise       Int
+  status         String       // draft | issued | paid | overdue | void
+  issuedAt       DateTime
+  paidAt         DateTime?
+}
+
+model UsageRecord {
+  id        BigInt   @id @default(autoincrement())
+  tenantId  String
+  metric    String   // active_users | storage_gb | ai_credits | api_calls | whatsapp_msgs | call_minutes
+  quantity  Decimal
+  periodDay DateTime
+
+  @@index([tenantId, metric, periodDay])
+}
+
+model PlatformUser {
+  id           String  @id @default(uuid())
+  name         String
+  email        String  @unique
+  passwordHash String
+  totpSecret   String? // 2FA becomes mandatory for platform staff in Phase 1
+  role         String  // owner | admin | sales | support | finance | tech
+  isActive     Boolean @default(true)
+}
+
+model SupportAccessGrant {
+  id             String   @id @default(uuid())
+  tenantId       String
+  platformUserId String
+  grantedByUserId String  // tenant admin who consented
+  readOnly       Boolean  @default(true)
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+}
+
+// ═════════════════════════ TENANT: organization & workspaces ═════════════════════════
+
+// A business line inside an organization, e.g. "Course/Software", "Logo Designing", "Vastu Consultation/Audit".
+model Workspace {
+  id        String     @id @default(uuid())
+  tenantId  String
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
+  name      String
+  slug      String
+  template  String?    // education | real_estate | consulting | design_services | software ...
+  invoiceSeries String?
+  gstin     String?    // when a business line bills under a separate entity
+  isArchived Boolean   @default(false)
+  pipelines Pipeline[]
+  leads     Lead[]
+  packages  Package[]
+
+  @@unique([tenantId, slug])
+}
+
+// A process inside a workspace, e.g. Education → Admissions / Renewals; Vastu → Consultation / Site Audit.
+model Pipeline {
+  id          String      @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id])
+  name        String
+  stages      LeadStage[]
+  leads       Lead[]
+}
+
+model LeadStage {
+  id         String   @id @default(uuid())
+  tenantId   String
+  pipelineId String
+  pipeline   Pipeline @relation(fields: [pipelineId], references: [id])
+  name       String
+  position   Int
+  isWon      Boolean  @default(false)
+  isLost     Boolean  @default(false)
+}
+
+// Routes a source (form, WhatsApp number, CallerDesk number, webhook, sheet) to a workspace + pipeline.
+model LeadSourceMapping {
+  id          String @id @default(uuid())
+  tenantId    String
+  sourceType  String // facebook_form | whatsapp_number | callerdesk_number | webhook | google_sheet | website_form
+  sourceRef   String // form id / phone number / endpoint key / sheet id
+  workspaceId String
+  pipelineId  String
+
+  @@unique([tenantId, sourceType, sourceRef])
+}
+
+model Branch {
+  id          String       @id @default(uuid())
+  tenantId    String
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  name        String
+  departments Department[]
+}
+
+model Department {
+  id       String @id @default(uuid())
+  tenantId String
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+  name     String
+  teams    Team[]
+}
+
+model Team {
+  id           String     @id @default(uuid())
+  tenantId     String
+  departmentId String
+  department   Department @relation(fields: [departmentId], references: [id])
+  workspaceId  String?    // sales teams usually belong to one business line
+  name         String
+  members      User[]
+}
+
+model User {
+  id            String     @id @default(uuid())
+  tenantId      String
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  teamId        String?
+  team          Team?      @relation(fields: [teamId], references: [id])
+  reportsToId   String?
+  reportsTo     User?      @relation("Hierarchy", fields: [reportsToId], references: [id])
+  directReports User[]     @relation("Hierarchy")
+  name          String
+  email         String
+  mobile        String?
+  passwordHash  String
+  totpSecret    String?    // encrypted
+  isActive      Boolean    @default(true)
+  roles         UserRole[]
+  employee      Employee?
+  createdAt     DateTime   @default(now())
+
+  @@unique([tenantId, email])
+}
+
+// ═════════════════════════ Roles & permissions (multi-role, per workspace) ═════════════════════════
+
+enum DataScope {
+  OWN
+  TEAM
+  DEPARTMENT
+  BRANCH
+  WORKSPACE
+  ORGANIZATION
+}
+
+model Role {
+  id          String           @id @default(uuid())
+  tenantId    String
+  name        String           // any custom name, e.g. "Content Creator"
+  isTemplate  Boolean          @default(false)
+  permissions RolePermission[]
+  fieldRules  FieldRule[]
+  users       UserRole[]
+
+  @@unique([tenantId, name])
+}
+
+model Permission {
+  id    String           @id @default(uuid())
+  key   String           @unique // e.g. "crm.lead.export"
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId        String
+  role          Role       @relation(fields: [roleId], references: [id])
+  permissionId  String
+  permission    Permission @relation(fields: [permissionId], references: [id])
+  scope         DataScope  @default(OWN)
+  isDeny        Boolean    @default(false)
+  maxExportRows Int?
+
+  @@id([roleId, permissionId])
+}
+
+model FieldRule {
+  id         String @id @default(uuid())
+  roleId     String
+  role       Role   @relation(fields: [roleId], references: [id])
+  entity     String // e.g. "customer"
+  field      String // e.g. "mobile"
+  visibility String // hidden | masked | visible | editable
+}
+
+// A user can hold many roles; each assignment is for one workspace or the whole organization (workspaceId = null).
+model UserRole {
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  user         User      @relation(fields: [userId], references: [id])
+  roleId       String
+  role         Role      @relation(fields: [roleId], references: [id])
+  workspaceId  String?
+  branchId     String?
+  departmentId String?
+  validFrom    DateTime?
+  validTo      DateTime?
+  isPrimary    Boolean   @default(false) // decides default dashboard
+
+  @@unique([userId, roleId, workspaceId, branchId, departmentId])
+}
+
+// ═════════════════════════ CRM ═════════════════════════
+
+// Shared across all workspaces of the organization.
+model Customer {
+  id           String            @id @default(uuid())
+  tenantId     String
+  code         String            // human-readable Customer ID
+  name         String
+  mobile       String?           // E.164
+  email        String?
+  panEncrypted String?
+  panLast4     String?
+  aadhaarLast4 String?           // full number never stored by default
+  primaryRmId  String?
+  customFields Json?
+  leads        Lead[]
+  packages     CustomerPackage[]
+  createdAt    DateTime          @default(now())
+
+  @@unique([tenantId, code])
+  @@index([tenantId, mobile])
+  @@index([tenantId, email])
+}
+
+model Lead {
+  id              String     @id @default(uuid())
+  tenantId        String
+  workspaceId     String
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id])
+  pipelineId      String
+  pipeline        Pipeline   @relation(fields: [pipelineId], references: [id])
+  stageId         String
+  customerId      String
+  customer        Customer   @relation(fields: [customerId], references: [id])
+  source          String     // website, facebook, whatsapp, google_sheets, referral, api, manual, cross_sell...
+  referredFromLeadId String? // cross-sell from another workspace
+  ownerId         String?
+  rating          Int?
+  customFields    Json?
+  lostReason      String?
+  createdAt       DateTime   @default(now())
+  firstResponseAt DateTime?
+  followUps       FollowUp[]
+
+  @@index([tenantId, workspaceId, pipelineId, stageId])
+  @@index([tenantId, ownerId])
+}
+
+model FollowUp {
+  id       String    @id @default(uuid())
+  tenantId String
+  leadId   String
+  lead     Lead      @relation(fields: [leadId], references: [id])
+  dueAt    DateTime
+  doneAt   DateTime?
+  outcome  String?
+  userId   String
+}
+
+model Package {
+  id          String            @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id])
+  name        String            // Elite, BSP, NME, VPM, Logo Basic, Vastu Audit...
+  mrpPaise    Int
+  gstRate     Decimal
+  sales       CustomerPackage[]
+}
+
+model CustomerPackage {
+  id                String   @id @default(uuid())
+  tenantId          String
+  customerId        String
+  customer          Customer @relation(fields: [customerId], references: [id])
+  packageId         String
+  package           Package  @relation(fields: [packageId], references: [id])
+  mrpPaise          Int
+  offerPricePaise   Int
+  discountPaise     Int
+  secondaryRmId     String?
+  secondarySplitPct Int?
+  collectionStatus  String   @default("pending") // pending | partial | paid | refunded
+  soldAt            DateTime @default(now())
+}
+
+// ═════════════════════════ Integrations (per tenant) ═════════════════════════
+
+model IntegrationConnection {
+  id              String    @id @default(uuid())
+  tenantId        String
+  workspaceId     String?   // e.g. a WhatsApp number dedicated to one business line
+  key             String    // callerdesk, whatsapp, google_sheets, razorpay...
+  status          String    @default("inactive") // active | paused | inactive
+  configEncrypted String?   // encrypted with the tenant's data key
+  activatedById   String?
+  activatedAt     DateTime?
+  lastEventAt     DateTime?
+
+  @@index([tenantId, key])
+}
+
+model WebhookInbox {
+  id             String   @id @default(uuid())
+  tenantId       String?
+  integrationKey String
+  headers        Json
+  body           String
+  status         String   @default("received") // received | processed | failed
+  attempts       Int      @default(0)
+  receivedAt     DateTime @default(now())
+}
+
+// ═════════════════════════ HRMS & Assets (organization level) ═════════════════════════
+
+model Employee {
+  id            String            @id @default(uuid())
+  tenantId      String
+  userId        String            @unique
+  user          User              @relation(fields: [userId], references: [id])
+  employeeCode  String
+  joiningDate   DateTime
+  probationEnd  DateTime?
+  exitDate      DateTime?
+  status        String            @default("onboarding") // onboarding | active | notice | exited
+  leaveRequests LeaveRequest[]
+  assets        AssetAssignment[]
+}
+
+model LeaveRequest {
+  id         String   @id @default(uuid())
+  tenantId   String
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  leaveType  String
+  fromDate   DateTime
+  toDate     DateTime
+  status     String   @default("pending")
+  approverId String?
+}
+
+model Asset {
+  id          String            @id @default(uuid())
+  tenantId    String
+  tag         String
+  category    String            // laptop, mobile, sim, headset...
+  serialNo    String?
+  costPaise   Int?
+  warrantyEnd DateTime?
+  condition   String            @default("good")
+  assignments AssetAssignment[]
+}
+
+model AssetAssignment {
+  id              String    @id @default(uuid())
+  tenantId        String
+  assetId         String
+  asset           Asset     @relation(fields: [assetId], references: [id])
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id])
+  issuedAt        DateTime  @default(now())
+  acknowledgedAt  DateTime?
+  returnedAt      DateTime?
+  returnCondition String?
+}
+
+// ═════════════════════════ Audit (append-only) ═════════════════════════
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  tenantId    String?  // null for platform-level events
+  workspaceId String?
+  actorType   String   // tenant_user | platform_user | system | api_key
+  actorId     String?
+  ip          String?
+  entity      String
+  entityId    String
+  action      String
+  oldValue    Json?
+  newValue    Json?
+  reason      String?
+  prevHash    String?
+  hash        String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, entity, entityId])
+}

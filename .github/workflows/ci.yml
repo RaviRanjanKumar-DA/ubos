@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ubos
+          POSTGRES_PASSWORD: ubos
+          POSTGRES_DB: ubos
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ubos" --health-interval 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://ubos:ubos@localhost:5432/ubos
+      APP_DATABASE_URL: postgresql://ubos_app:ubos_app_ci@localhost:5432/ubos
+      PLATFORM_DATABASE_URL: postgresql://ubos_platform:ubos_platform_ci@localhost:5432/ubos
+      JWT_ACCESS_SECRET: ci-access-secret-not-for-production
+      JWT_PLATFORM_SECRET: ci-platform-secret-not-for-production
+      API_PORT: 4000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Create runtime database roles
+        run: |
+          PGPASSWORD=ubos psql -h localhost -U ubos -d ubos -c "CREATE ROLE ubos_app LOGIN PASSWORD 'ubos_app_ci'; CREATE ROLE ubos_platform LOGIN PASSWORD 'ubos_platform_ci' BYPASSRLS;"
+      - run: touch .env
+      - run: npx prisma generate --schema packages/database/prisma/schema.prisma
+      - run: npx prisma migrate deploy --schema packages/database/prisma/schema.prisma
+      - run: npm run build -w @ubos/shared && npm run build -w @ubos/database
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build -w @ubos/api && npm run build -w @ubos/web
+      - run: npx tsx packages/database/prisma/seed.ts
+      - name: Tenant isolation & RBAC end-to-end checks
+        run: |
+          node apps/api/dist/main.js &
+          for i in $(seq 1 30); do curl -sf http://localhost:4000/health && break; sleep 1; done
+          npm run verify:isolation

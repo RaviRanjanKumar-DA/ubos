@@ -1,0 +1,13 @@
+module,super_admin,admin,manager,team_leader,rm,finance,hr,auditor,qa,marketing
+leads,all:CRUDE,all:CRUDE,department:CRUE,team:CRUE,own:CRU,all:R,none,all:R,all:R,all:CR(masked)
+customers,all:CRUDE,all:CRUE,department:RUE,team:RU,own:RU,all:R,none,all:R,all:R,none
+calls_recordings,all:CRUDE,all:CRUDE,department:R,team:R,own:R,none,none,all:R,all:R+score,none
+whatsapp_inbox,all:CRUDE,all:CRUDE,department:CRU,team:CRU,own:CRU,none,none,all:R,all:R,broadcast
+packages_discounts,all:CRUDE,all:CRUDE,department:CRU+approve,team:CRU,own:CRU(limit),all:R,none,all:R,none,none
+finance,all:CRUDE,all:R,department:R,none,own:R,all:CRUE+approve,none,all:RE,none,none
+incentives,all:CRUDE,all:R,team:approve,team:R,own:R,all:verify,all:approve,all:R,none,none
+hrms,all:CRUDE,all:R,team:approve,team:approve,self,payroll:R,all:CRUDE,all:R,self,self
+assets,all:CRUDE,all:CRUDE,team:R,team:R,self,all:R,all:CRUDE,all:R,self,self
+reports_export,all:E,all:E,department:E,team:R,own:R,finance:E,hr:E,all:E,qa:R,source:R
+integrations_settings,all:CRUDE,all:CRUDE,none,none,none,none,none,all:R,none,none
+audit_explorer,all:R,all:R,none,none,none,finance:R,hr:R,all:RE,none,none

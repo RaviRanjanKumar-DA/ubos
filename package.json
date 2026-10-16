@@ -1,0 +1,27 @@
+{
+  "name": "ubos",
+  "private": true,
+  "version": "0.1.0",
+  "description": "UBOS — Unified Business Operating System (multi-tenant SaaS)",
+  "workspaces": [
+    "packages/shared",
+    "packages/database",
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "db:up": "docker compose -f infra/docker-compose.yml up -d postgres",
+    "db:generate": "npm run generate -w @ubos/database",
+    "db:migrate": "npm run migrate -w @ubos/database",
+    "db:seed": "npm run seed -w @ubos/database",
+    "build": "npm run build -w @ubos/shared && npm run build -w @ubos/api && npm run build -w @ubos/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "dev:api": "npm run dev -w @ubos/api",
+    "dev:web": "npm run dev -w @ubos/web",
+    "verify:isolation": "node scripts/verify-isolation.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

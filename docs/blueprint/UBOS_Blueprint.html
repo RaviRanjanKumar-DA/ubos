@@ -1,0 +1,1351 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UBOS Blueprint</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm 14mm; }
+  @page :first { margin: 0; }
+  :root {
+    --brand: #4f2fb8; --brand-2: #7a5cf0; --brand-soft: #efeafd;
+    --ink: #1d1b2e; --muted: #5d5a73; --line: #dcd8ea; --ok: #1f9d55; --warn: #c27c0e; --bad: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Inter, Arial, sans-serif; color: var(--ink); font-size: 10.2pt; line-height: 1.45; margin: 0; background: #fff; }
+  h1 { font-size: 21pt; color: var(--brand); margin: 0 0 6px; border-bottom: 3px solid var(--brand); padding-bottom: 6px; }
+  h2 { font-size: 14pt; color: var(--brand); margin: 18px 0 6px; }
+  h3 { font-size: 11.5pt; margin: 14px 0 4px; color: var(--ink); }
+  h4 { font-size: 10.4pt; margin: 10px 0 3px; color: var(--brand); }
+  p { margin: 4px 0 8px; }
+  ul, ol { margin: 4px 0 8px 18px; padding: 0; }
+  li { margin: 1px 0; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 12px; font-size: 9.2pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: var(--brand); color: #fff; text-align: left; padding: 5px 6px; font-weight: 600; }
+  td { border-bottom: 1px solid var(--line); padding: 4px 6px; vertical-align: top; }
+  tr:nth-child(even) td { background: #faf9fe; }
+  .section { page-break-before: always; }
+  .muted { color: var(--muted); }
+  .small { font-size: 8.8pt; }
+  .tag { display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 8pt; font-weight: 600; background: var(--brand-soft); color: var(--brand); margin: 1px 2px 1px 0; }
+  .tag.ok { background: #e3f6ea; color: var(--ok); } .tag.warn { background: #fdf2dc; color: var(--warn); } .tag.bad { background: #fbe4e1; color: var(--bad); }
+  .box { border: 1px solid var(--line); border-left: 4px solid var(--brand); background: #fbfaff; padding: 8px 12px; margin: 8px 0 12px; border-radius: 4px; page-break-inside: avoid; }
+  .box.warn { border-left-color: var(--warn); background: #fffaf0; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .card { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; page-break-inside: avoid; }
+  .card h4 { margin-top: 0; }
+  .module { border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px 4px; margin: 10px 0; page-break-inside: avoid; }
+  .module .head { display: flex; justify-content: flex-start; align-items: baseline; border-bottom: 1px dashed var(--line); margin-bottom: 4px; }
+  .module .head { gap: 6px; }
+  .module .head b { font-size: 11pt; color: var(--brand); margin-right: auto; }
+  .flow { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin: 6px 0 10px; }
+  .flow span { background: var(--brand-soft); color: var(--brand); border-radius: 4px; padding: 3px 7px; font-size: 8.6pt; font-weight: 600; }
+  .flow i { color: var(--muted); font-style: normal; }
+  code, pre { font-family: Consolas, "Cascadia Mono", monospace; font-size: 8.6pt; }
+  pre { background: #f5f3fb; border: 1px solid var(--line); padding: 8px 10px; border-radius: 4px; white-space: pre-wrap; page-break-inside: avoid; margin: 6px 0 10px; }
+  /* cover */
+  .cover { height: 285mm; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; background: linear-gradient(160deg, #2b176e 0%, #4f2fb8 55%, #7a5cf0 100%); color: #fff; padding: 26mm 18mm; margin: 0; }
+  .cover .kicker { letter-spacing: 3px; font-size: 10pt; opacity: .85; }
+  .cover h1 { color: #fff; border: 0; font-size: 34pt; line-height: 1.1; margin: 10px 0; }
+  .cover .sub { font-size: 14pt; opacity: .92; max-width: 140mm; }
+  .cover .meta td { color: #fff; border-bottom: 1px solid rgba(255,255,255,.25); background: transparent !important; font-size: 10pt; }
+  .toc ol { columns: 2; column-gap: 24px; font-size: 10pt; }
+  .toc li { margin: 3px 0; }
+</style>
+</head>
+<body>
+
+<!-- ============ COVER ============ -->
+<div class="cover">
+  <div>
+    <div class="kicker">PRODUCT BLUEPRINT &middot; VERSION 2.0 (MULTI-TENANT SAAS &middot; DRAFT FOR APPROVAL)</div>
+    <h1>UBOS<br>Unified Business Operating System</h1>
+    <div class="sub">An enterprise-grade, multi-tenant SaaS product: run your own business on it, and sell it to other companies who run theirs &mdash; CRM, Telephony, WhatsApp, HRMS, Assets, Accounting, Incentives, Audit, Reporting and AI in one API-first system, all managed from your Platform Console.</div>
+  </div>
+  <table class="meta">
+    <tr><td>Document</td><td>Structure, Road Map, Requirements, Strategy &amp; Technical Blueprint</td></tr>
+    <tr><td>Status</td><td>Draft &mdash; awaiting owner review &amp; build approval</td></tr>
+    <tr><td>Date</td><td>17 October 2026 (v2.0 &mdash; SaaS model added; v1.0 dated 16 October 2026)</td></tr>
+    <tr><td>Project folder</td><td>C:\Users\ravi\UBOS</td></tr>
+    <tr><td>Build status</td><td>Not started &mdash; no application code until this blueprint is approved</td></tr>
+  </table>
+</div>
+
+<!-- ============ TOC ============ -->
+<div class="section toc">
+  <h1>Contents</h1>
+  <ol>
+    <li>Executive Summary</li>
+    <li>Vision, Objectives &amp; Target Industries</li>
+    <li>SaaS Business Model &amp; Revenue Strategy</li>
+    <li>Platform Console, Tenants &amp; Workspaces</li>
+    <li>Who Uses UBOS &mdash; Teams &amp; Personas</li>
+    <li>Product Structure &mdash; Suites &amp; Module Map</li>
+    <li>Navigation / Site Map</li>
+    <li>Core Platform: Users, Roles, Access, Settings</li>
+    <li>Revenue Suite: Customer, Lead, RM, Packages</li>
+    <li>Communication Suite: Calling, WhatsApp, Support Desk</li>
+    <li>Operations Suite: Tasks, Workflows, Automation, Reminders</li>
+    <li>People Suite: HRMS, Assets, Performance &amp; Celebrations</li>
+    <li>Finance Suite: Accounting &amp; Incentives</li>
+    <li>Audit, Documents &amp; Compliance</li>
+    <li>Intelligence Suite: Reports, Dashboards, Export</li>
+    <li>AI Suite (Gemini, Claude, OpenAI)</li>
+    <li>Integrations Hub (activate / deactivate)</li>
+    <li>Roles &amp; Permission Model (multi-role)</li>
+    <li>Role-Based Dashboards</li>
+    <li>End-to-End Business Workflows</li>
+    <li>Technical Architecture</li>
+    <li>Database Strategy &amp; Data Model</li>
+    <li>API Design (API-first)</li>
+    <li>Security, Privacy &amp; Compliance</li>
+    <li>Non-Functional Requirements</li>
+    <li>DevOps, Environments &amp; Monitoring</li>
+    <li>Road Map &amp; Release Plan</li>
+    <li>Team Structure &amp; Responsibilities</li>
+    <li>Success KPIs (with formulas)</li>
+    <li>Risks &amp; Mitigations</li>
+    <li>Decisions Needed From You</li>
+    <li>Appendix: Project Folder Structure &amp; Glossary</li>
+  </ol>
+  <div class="box">
+    <b>How to read this document.</b> Sections 1&ndash;2 explain <i>what</i> UBOS is. Sections 3&ndash;4 explain <b>how you sell it and manage every customer company</b> (SaaS model, pricing, Platform Console). Sections 5&ndash;7 show how the product is organised. Sections 8&ndash;20 are the detailed functional requirements, module by module. Sections 21&ndash;26 are the technical blueprint for the tech team. Sections 27&ndash;31 cover delivery: road map, team, KPIs, risks and the decisions we need from you before building starts.
+  </div>
+</div>
+
+<!-- ============ 1 EXEC SUMMARY ============ -->
+<div class="section">
+  <h1>1. Executive Summary</h1>
+  <p>UBOS is a <b>multi-tenant SaaS product</b>. You (the <b>Platform Owner</b>) run UBOS as a software business: other companies buy a subscription, get their own private, isolated workspace (a <b>tenant</b>), and run their whole business on it. Your own company is simply <b>Tenant #1</b> &mdash; you use exactly the same product your customers buy, and you manage all customer companies, plans, billing, usage and support from one <b>Platform Console</b>.</p>
+  <p>Inside each tenant, UBOS is a single, web-based (and later mobile) portal that every team in that company logs into. It combines what is today spread across a tele-CRM, a WhatsApp tool, a cloud-calling dashboard, Google Sheets, an HR tool, spreadsheets for assets/incentives, and an accounting package. Every feature is exposed through a documented REST API, so the web app, a future mobile app, partner systems and AI agents all use the same rules.</p>
+  <h3>What makes UBOS different from a plain CRM</h3>
+  <div class="grid2">
+    <div class="card"><h4>One customer, one record</h4>Duplicate detection on mobile/email/PAN merges every enquiry, call, chat, package, payment and document into a single Customer 360&deg; timeline.</div>
+    <div class="card"><h4>Sticky RM ownership</h4>A Primary RM owns the customer permanently; Secondary RMs own individual packages &mdash; with shared notes and separate incentives.</div>
+    <div class="card"><h4>Integrations you switch on/off</h4>WhatsApp, CallerDesk, Google Sheets, Razorpay, Facebook, IndiaMart, JustDial and more live in an Integrations Hub. You activate, configure or deactivate each one yourself.</div>
+    <div class="card"><h4>People + money in the same system</h4>HRMS (onboarding to exit), assets, payslips, ledgers, collections and the incentive engine all read the same lead/package data &mdash; no re-keying.</div>
+    <div class="card"><h4>Flexible, multi-role access</h4>Create any role you need, assign several roles to one person, and control data scope, field visibility and CSV export per role.</div>
+    <div class="card"><h4>Built to be sold</h4>Plans, licences, module entitlements, usage metering, subscription billing, trials, white-label domains and tenant support &mdash; so UBOS earns recurring revenue for you.</div>
+    <div class="card"><h4>You use it too</h4>Your own business runs as Tenant #1, which makes your company the first reference customer and the live test bed for every release.</div>
+    <div class="card"><h4>AI built in, provider of your choice</h4>Gemini, Claude or OpenAI for chatbots, call summaries, lead scoring, message templates, ad copy, images and short-video scripts.</div>
+  </div>
+  <h3>Scope at a glance</h3>
+  <table>
+    <tr><th style="width:26%">Area</th><th>Included in UBOS</th></tr>
+    <tr><td>CRM</td><td>Customer master, lead capture from all sources, assignment (sticky / round-robin / skill / region), stages, follow-ups, views, lists, campaigns, packages</td></tr>
+    <tr><td>Communication</td><td>CallerDesk cloud calling + recordings, SIM calling via mobile app, WhatsApp shared inbox, broadcast, templates, chat widget, email, support desk (call + chat)</td></tr>
+    <tr><td>Automation</td><td>Workflows, schedules, webhooks (in &amp; out), API templates, reminders, escalations, sales forms</td></tr>
+    <tr><td>HRMS</td><td>Onboarding, attendance, leave, payroll &amp; payslips, exit, approvals, HR reminders, asset management, performance, achievements, celebrations</td></tr>
+    <tr><td>Finance</td><td>Customer &amp; package ledgers, invoices, receipts, refunds, credit notes, GST summary, collections, incentive engine</td></tr>
+    <tr><td>Governance</td><td>Audit engine (who / when / what / old value / new value), document vault with versions, login audit, IP restriction, 2FA</td></tr>
+    <tr><td>Intelligence</td><td>Macro &amp; micro reports, role dashboards, permission-controlled CSV export, AI Suite</td></tr>
+    <tr><td>SaaS platform</td><td>Platform Console, multiple workspaces (business lines) per company, tenant provisioning, plans &amp; pricing, subscriptions &amp; GST invoicing to customers, usage metering, trials, white-label, support access, platform revenue dashboard (MRR/ARR/churn)</td></tr>
+    <tr><td>Data</td><td>PostgreSQL for the shared cloud (recommended); MySQL or SQL Server possible for dedicated/on-premise enterprise customers through the data-access layer</td></tr>
+  </table>
+  <div class="box warn"><b>Honest sizing note.</b> This is the scope of several commercial products combined. It is achievable, but only in phases. Section 27 proposes an MVP in ~12 weeks (CRM + Calling + WhatsApp + Sheets + Roles) and the full platform over ~12 months. Building everything at once is the single biggest risk to the project. <b>Multi-tenancy, however, must be built in from day one</b> &mdash; adding it later means rewriting the data layer.</div>
+</div>
+
+<!-- ============ 2 VISION ============ -->
+<div class="section">
+  <h1>2. Vision, Objectives &amp; Target Industries</h1>
+  <h3>Vision</h3>
+  <p>Build an enterprise-grade platform that manages Lead Management, Customer Lifecycle, Sales, Operations, Finance, Incentives, Audit, Reporting, Telephony, WhatsApp, HR, AI Automation and Customer 360&deg; in one system &mdash; and to sell it as a subscription product (SaaS) to companies across India and beyond. The same platform runs our own organisation (Tenant #1) and every customer company, each in its own secure, isolated workspace, all managed and maintained centrally by us.</p>
+  <h3>Two goals, one product</h3>
+  <div class="grid2">
+    <div class="card"><h4>Goal A &mdash; Run our own business</h4>All our teams work in UBOS: sales, ops, finance, HR, legal, audit, tech, data, social media and content.</div>
+    <div class="card"><h4>Goal B &mdash; Build a software revenue stream</h4>Sell UBOS subscriptions, add-ons, usage and services to other companies, and grow recurring revenue (MRR/ARR).</div>
+  </div>
+  <h3>Business objectives &rarr; how UBOS delivers them</h3>
+  <table>
+    <tr><th style="width:4%">#</th><th style="width:28%">Objective</th><th>Delivered by</th></tr>
+    <tr><td>1</td><td>Single Customer View</td><td>Customer Master with unique identifiers, duplicate detection, auto-merge and a unified timeline</td></tr>
+    <tr><td>2</td><td>End-to-end lead journey tracking</td><td>Lead lifecycle with every stage change, call, chat and task stamped on the timeline; funnel reports</td></tr>
+    <tr><td>3</td><td>Sticky RM ownership</td><td>RM Ownership Engine: Primary RM is permanent; re-enquiries route back to the same RM</td></tr>
+    <tr><td>4</td><td>Multi-RM collaboration</td><td>Secondary RM per package, shared notes/activities, separate incentive lines</td></tr>
+    <tr><td>5</td><td>Package management</td><td>Package catalogue (Elite, BSP, NME, VPM&hellip;), MRP/offer/discount, owner RM, collection status</td></tr>
+    <tr><td>6</td><td>Accounting integration</td><td>Ledgers, invoices, receipts, GST; Razorpay payment sync; export / sync to Tally or Zoho Books</td></tr>
+    <tr><td>7</td><td>Incentive automation</td><td>Rule engine (fixed / % / slab), auto-calculation on collection, Finance &rarr; Manager &rarr; HR approval</td></tr>
+    <tr><td>8</td><td>Audit compliance</td><td>Immutable audit log for customers, payments, transfers, discounts, incentives and logins</td></tr>
+    <tr><td>9</td><td>AI-driven insights</td><td>Lead scoring, call summaries, sentiment, follow-up suggestions, forecasting, churn prediction</td></tr>
+    <tr><td>10</td><td>Management reporting</td><td>Role dashboards (CEO, COO, Finance, Sales, Ops, RM, HR, Auditor) and scheduled reports</td></tr>
+    <tr><td>11</td><td>Sell UBOS as SaaS</td><td>Multi-tenant architecture, Platform Console, plans, subscription billing, usage metering, white-label</td></tr>
+    <tr><td>12</td><td>Recurring software revenue</td><td>Subscriptions, add-ons, usage margins, implementation services, partner channel (Section 3)</td></tr>
+  </table>
+  <h3>Target industries &amp; what changes per industry</h3>
+  <p>UBOS is industry-neutral. Industry differences are handled by <b>configuration, not code</b>: custom lead fields, lead stages, package types, call-feedback options and workflow templates.</p>
+  <table>
+    <tr><th style="width:20%">Industry</th><th>Typical configuration</th></tr>
+    <tr><td>Education</td><td>Course packages, counsellor = RM, demo class stage, fee instalments, batch/admission fields</td></tr>
+    <tr><td>Real Estate</td><td>Project/unit fields, site-visit tasks with location check-in, 99acres/Housing/MagicBricks lead sources, booking amount</td></tr>
+    <tr><td>Insurance</td><td>Policy packages, renewal reminders, KYC documents, premium collection schedule</td></tr>
+    <tr><td>Healthcare</td><td>Appointment tasks, consultation packages, consent capture, stricter data-access scopes</td></tr>
+    <tr><td>Finance</td><td>PAN mandatory, KYC workflow, product-wise RM, compliance-heavy audit</td></tr>
+    <tr><td>Services / Consulting</td><td>Service packages (e.g. Elite, BSP, NME, VPM), session tracking, multi-RM delivery</td></tr>
+    <tr><td>Products</td><td>Order/quotation stage, inventory reference, dispatch status, dealer leads</td></tr>
+  </table>
+</div>
+
+<!-- ============ 3 SAAS MODEL ============ -->
+<div class="section">
+  <h1>3. SaaS Business Model &amp; Revenue Strategy</h1>
+  <h3>How the business works</h3>
+  <svg viewBox="0 0 760 250" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="11">
+    <defs><marker id="c" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#7a5cf0"/></marker></defs>
+    <rect x="200" y="10" width="360" height="56" rx="8" fill="#4f2fb8"/>
+    <text x="380" y="33" text-anchor="middle" fill="#fff" font-weight="700" font-size="13">YOU &mdash; Platform Owner</text>
+    <text x="380" y="52" text-anchor="middle" fill="#fff">Platform Console: tenants &middot; plans &middot; billing &middot; usage &middot; support &middot; releases</text>
+    <g fill="#efeafd" stroke="#7a5cf0">
+      <rect x="10" y="120" width="170" height="70" rx="6"/><rect x="200" y="120" width="170" height="70" rx="6"/><rect x="390" y="120" width="170" height="70" rx="6"/><rect x="580" y="120" width="170" height="70" rx="6"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="95" y="145" font-weight="700" fill="#4f2fb8">Tenant #1</text><text x="95" y="162">Your own company</text><text x="95" y="178" fill="#5d5a73">(internal use, free)</text>
+      <text x="285" y="145" font-weight="700" fill="#4f2fb8">Tenant: Client A</text><text x="285" y="162">e.g. Real-estate firm</text><text x="285" y="178" fill="#5d5a73">Growth plan &middot; 40 users</text>
+      <text x="475" y="145" font-weight="700" fill="#4f2fb8">Tenant: Client B</text><text x="475" y="162">e.g. Education institute</text><text x="475" y="178" fill="#5d5a73">Business plan &middot; 120 users</text>
+      <text x="665" y="145" font-weight="700" fill="#4f2fb8">Tenant: Client N&hellip;</text><text x="665" y="162">Any industry</text><text x="665" y="178" fill="#5d5a73">Enterprise &middot; dedicated DB</text>
+    </g>
+    <line x1="300" y1="66" x2="95" y2="118" stroke="#7a5cf0" marker-end="url(#c)"/><line x1="350" y1="66" x2="285" y2="118" stroke="#7a5cf0" marker-end="url(#c)"/>
+    <line x1="410" y1="66" x2="475" y2="118" stroke="#7a5cf0" marker-end="url(#c)"/><line x1="460" y1="66" x2="665" y2="118" stroke="#7a5cf0" marker-end="url(#c)"/>
+    <rect x="10" y="208" width="740" height="32" rx="6" fill="#e3f6ea" stroke="#1f9d55"/>
+    <text x="380" y="229" text-anchor="middle">Each tenant: own users, roles, data, integrations (own WhatsApp / CallerDesk / Razorpay keys), branding &mdash; fully isolated from every other tenant</text>
+  </svg>
+  <p>Customer companies <b>buy a plan</b>, receive their own private organization account (e.g. <code>clientname.ubos.app</code>) with as many workspaces as their plan allows, and their admin sets up users, roles and integrations. You maintain one codebase and one platform; every improvement you release reaches all tenants (including your own company) at once.</p>
+
+  <h3>Revenue streams</h3>
+  <table class="small">
+    <tr><th style="width:24%">Stream</th><th>How you earn</th><th style="width:16%">Type</th></tr>
+    <tr><td>Subscriptions</td><td>Per-user, per-month plan fee (monthly or annual, annual paid upfront at a discount)</td><td>Recurring</td></tr>
+    <tr><td>Module add-ons</td><td>HRMS &amp; Payroll, Finance &amp; Incentives, AI Suite, Support Desk, Advanced Reports &mdash; sold on top of a base plan</td><td>Recurring</td></tr>
+    <tr><td>Usage</td><td>AI credits, extra storage, recording retention, extra API calls; WhatsApp and calling when routed through your accounts (with margin)</td><td>Recurring, variable</td></tr>
+    <tr><td>Implementation</td><td>One-time onboarding, data migration, workflow set-up, integration set-up</td><td>One-time</td></tr>
+    <tr><td>Customisation</td><td>Custom reports, industry templates, custom integrations (charged per project)</td><td>One-time</td></tr>
+    <tr><td>Training &amp; support plans</td><td>Premium support (dedicated account manager, faster SLA), training sessions</td><td>Recurring</td></tr>
+    <tr><td>Enterprise &amp; white-label</td><td>Dedicated cloud / on-premise licence + AMC; reseller white-label fee</td><td>Recurring + one-time</td></tr>
+    <tr><td>Partner channel</td><td>Resellers/consultants sell UBOS; you share 15&ndash;30% of revenue with them</td><td>Recurring</td></tr>
+  </table>
+
+  <h3>Plans &amp; pricing (indicative &mdash; to be validated with market research)</h3>
+  <table class="small">
+    <tr><th style="width:15%">Plan</th><th style="width:17%">Indicative price</th><th>Includes</th><th style="width:20%">Best for</th></tr>
+    <tr><td><b>Starter</b></td><td>&#8377;499 / user / month</td><td>1 workspace, Customer Master, Leads, assignment, follow-ups, Google Sheets &amp; website leads, WhatsApp inbox (own number), basic dashboards, CSV export, 5 GB/user storage</td><td>Small sales teams (5&ndash;20 users)</td></tr>
+    <tr><td><b>Growth</b></td><td>&#8377;999 / user / month</td><td>Up to 3 workspaces; Starter + CallerDesk calling &amp; recordings, workflows &amp; automation, campaigns, support desk, tasks, reports, Facebook/IndiaMart/JustDial leads</td><td>Growing sales &amp; ops teams</td></tr>
+    <tr><td><b>Business</b></td><td>&#8377;1,499 / user / month</td><td>Up to 10 workspaces; Growth + packages, finance &amp; collections, incentive engine, HRMS (attendance, leave, payroll), assets, performance, audit explorer, documents</td><td>Companies running the whole business on UBOS</td></tr>
+    <tr><td><b>Enterprise</b></td><td>Custom quote</td><td>Unlimited workspaces; Business + dedicated database/cloud or on-premise, SSO, custom domain &amp; white-label, 99.9% SLA, data residency, premium support, custom integrations</td><td>Large / regulated organisations</td></tr>
+  </table>
+  <table class="small">
+    <tr><th style="width:30%">Add-on / usage (indicative)</th><th>Pricing idea</th></tr>
+    <tr><td>HRMS-only users (staff who need only attendance, leave, payslips)</td><td>&#8377;99 / employee / month</td></tr>
+    <tr><td>AI Suite</td><td>Included credits per plan + paid top-ups (cost + margin)</td></tr>
+    <tr><td>Extra storage / recording retention</td><td>Per 100 GB / month</td></tr>
+    <tr><td>Annual billing</td><td>15&ndash;20% discount</td></tr>
+    <tr><td>Free trial</td><td>14 days, no card, sample data, limited to 5 users</td></tr>
+    <tr><td>Implementation fee</td><td>One-time, by company size and data migration effort</td></tr>
+  </table>
+  <div class="box warn">Prices above are a <b>starting proposal only</b>. Before launch we should compare competitors serving Indian SMBs (tele-CRMs, LeadSquared, Zoho, Kylas, HRMS tools), interview 10&ndash;15 target customers, and confirm GST (18% on SaaS) and pricing with your CA.</div>
+
+  <h3>Deployment options you can sell</h3>
+  <table class="small">
+    <tr><th style="width:20%">Option</th><th>Description</th><th style="width:20%">Plans</th></tr>
+    <tr><td>Shared cloud</td><td>All tenants on our cloud with strict logical isolation (tenant ID + database row-level security). Lowest cost, fastest set-up</td><td>Starter, Growth, Business</td></tr>
+    <tr><td>Dedicated cloud</td><td>Separate database (and optionally servers) per customer on our cloud. Can run PostgreSQL, MySQL or SQL Server</td><td>Enterprise</td></tr>
+    <tr><td>On-premise / private cloud</td><td>Installed on the customer's servers; licence + annual maintenance contract; updates shipped by us</td><td>Enterprise (later phase)</td></tr>
+  </table>
+
+  <h3>Go-to-market plan</h3>
+  <div class="flow"><span>1. Internal use (Tenant #1)</span><i>&rarr;</i><span>2. 3&ndash;5 beta customers (discounted, feedback)</span><i>&rarr;</i><span>3. Case studies &amp; pricing final</span><i>&rarr;</i><span>4. Public launch in 2&ndash;3 focus industries</span><i>&rarr;</i><span>5. Self-serve sign-up &amp; partners</span></div>
+  <ul>
+    <li><b>Focus industries first</b> (where you already have domain knowledge), each with a ready-made <b>industry template</b>: lead fields, stages, packages, workflows, reports</li>
+    <li><b>Channels</b>: direct sales (your own sales team using UBOS to sell UBOS), website with free trial &amp; demo booking, referral programme for customers, reseller/consultant partners, content &amp; social media</li>
+    <li><b>Positioning</b>: "One system for sales, calling, WhatsApp, HR and finance &mdash; built for Indian businesses", replacing 4&ndash;6 separate tools</li>
+  </ul>
+
+  <h3>Legal &amp; commercial set-up required before selling</h3>
+  <table class="small">
+    <tr><th style="width:30%">Item</th><th>Notes</th></tr>
+    <tr><td>Legal entity &amp; GST</td><td>Company that sells the software, GST registration, SAC code and invoicing confirmed with CA</td></tr>
+    <tr><td>Brand &amp; trademark</td><td>Final product name, domain, trademark application (check "UBOS" availability)</td></tr>
+    <tr><td>Customer contracts</td><td>Terms of Service, Privacy Policy, Data Processing Agreement (DPA), SLA, Acceptable Use Policy, refund &amp; cancellation policy</td></tr>
+    <tr><td>Payments</td><td>Razorpay Subscriptions (cards, UPI AutoPay, e-mandate) for recurring billing; bank transfer for enterprise invoices</td></tr>
+    <tr><td>WhatsApp for tenants</td><td>Apply to become a Meta <b>Tech Provider</b> so tenants can connect their own WhatsApp numbers via Embedded Signup, or partner with a BSP</td></tr>
+    <tr><td>Security credibility</td><td>Third-party VAPT report before launch; ISO 27001 / SOC 2 roadmap for enterprise deals</td></tr>
+  </table>
+</div>
+
+<!-- ============ 4 PLATFORM CONSOLE ============ -->
+<div class="section">
+  <h1>4. Platform Console, Tenants &amp; Workspaces</h1>
+  <p>UBOS has <b>three levels</b>. The <b>Platform level</b> is used only by you and your platform team to manage the software business. The <b>Tenant (Organization) level</b> is each customer company (and your own company). Inside an organization, <b>Workspaces</b> separate its business lines. A tenant can never see another tenant's data or the Platform Console.</p>
+  <table class="small">
+    <tr><th style="width:18%">Level</th><th style="width:22%">Who</th><th>What they manage</th><th style="width:18%">URL (example)</th></tr>
+    <tr><td><b>Platform</b></td><td>You (Platform Owner) and your platform staff</td><td>All tenants, plans, pricing, subscriptions, invoices, usage, support tickets, releases, platform health, revenue</td><td><code>console.ubos.app</code></td></tr>
+    <tr><td><b>Tenant / Organization</b></td><td>Each customer company's admin and employees</td><td>Their own users, roles, customers, HR, finance, integrations, consolidated reports, and their workspaces</td><td><code>company.ubos.app</code> or custom domain</td></tr>
+    <tr><td><b>Workspace</b></td><td>Teams of one business line</td><td>That line's leads, pipelines, packages, sales team, numbers, workflows and reports</td><td><code>company.ubos.app/w/vastu</code></td></tr>
+  </table>
+
+
+  <h3>Organization &rarr; Workspaces (business lines)</h3>
+  <p>One tenant (organization) can create <b>multiple workspaces</b>, one for each business line, division, brand or process. Leads, pipelines, packages, teams, WhatsApp numbers and reports are kept separate per workspace, while the organization keeps <b>one shared Customer Master</b>. This lets the same customer be served (and cross-sold) by several business lines without duplicate records.</p>
+  <svg viewBox="0 0 760 210" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="10.5">
+    <defs><marker id="w" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#7a5cf0"/></marker></defs>
+    <rect x="280" y="6" width="200" height="30" rx="6" fill="#4f2fb8"/><text x="380" y="26" text-anchor="middle" fill="#fff" font-weight="600">Platform (you)</text>
+    <rect x="40" y="62" width="300" height="30" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="190" y="82" text-anchor="middle" font-weight="600" fill="#4f2fb8">Tenant: Company ABC</text>
+    <rect x="420" y="62" width="300" height="30" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="570" y="82" text-anchor="middle" font-weight="600" fill="#4f2fb8">Tenant: Company XYZ</text>
+    <line x1="340" y1="36" x2="190" y2="60" stroke="#7a5cf0" marker-end="url(#w)"/><line x1="420" y1="36" x2="570" y2="60" stroke="#7a5cf0" marker-end="url(#w)"/>
+    <g fill="#fff" stroke="#7a5cf0">
+      <rect x="40" y="120" width="140" height="44" rx="5"/><rect x="200" y="120" width="140" height="44" rx="5"/>
+      <rect x="420" y="120" width="92" height="44" rx="5"/><rect x="524" y="120" width="92" height="44" rx="5"/><rect x="628" y="120" width="92" height="44" rx="5"/>
+    </g>
+    <g text-anchor="middle">
+      <text x="110" y="138" font-weight="600">Workspace</text><text x="110" y="154">Education</text>
+      <text x="270" y="138" font-weight="600">Workspace</text><text x="270" y="154">Real Estate</text>
+      <text x="466" y="138" font-weight="600">Course /</text><text x="466" y="154">Software</text>
+      <text x="570" y="138" font-weight="600">Logo</text><text x="570" y="154">Designing</text>
+      <text x="674" y="138" font-weight="600">Vastu Consult.</text><text x="674" y="154">/ Audit</text>
+    </g>
+    <line x1="150" y1="92" x2="110" y2="118" stroke="#7a5cf0" marker-end="url(#w)"/><line x1="230" y1="92" x2="270" y2="118" stroke="#7a5cf0" marker-end="url(#w)"/>
+    <line x1="540" y1="92" x2="466" y2="118" stroke="#7a5cf0" marker-end="url(#w)"/><line x1="570" y1="92" x2="570" y2="118" stroke="#7a5cf0" marker-end="url(#w)"/><line x1="600" y1="92" x2="674" y2="118" stroke="#7a5cf0" marker-end="url(#w)"/>
+    <rect x="40" y="178" width="300" height="24" rx="5" fill="#e3f6ea" stroke="#1f9d55"/><text x="190" y="194" text-anchor="middle">Shared Customer Master &middot; HR &middot; Finance (ABC)</text>
+    <rect x="420" y="178" width="300" height="24" rx="5" fill="#e3f6ea" stroke="#1f9d55"/><text x="570" y="194" text-anchor="middle">Shared Customer Master &middot; HR &middot; Finance (XYZ)</text>
+  </svg>
+  <table class="small">
+    <tr><th style="width:26%">Kept per workspace</th><th>Shared at organization level</th></tr>
+    <tr><td>Lead pipelines &amp; processes, lead stages, custom lead fields, lost reasons, call-feedback options</td><td>Customer Master (one record per person/company, with a timeline across all workspaces)</td></tr>
+    <tr><td>Packages / products / services and price lists</td><td>Users &amp; employees, HRMS, payroll, assets, attendance</td></tr>
+    <tr><td>Sales teams, assignment rules, RM ownership per workspace</td><td>Organization-level roles (e.g. CEO, HR, Finance, Auditor see all workspaces)</td></tr>
+    <tr><td>Lead sources mapping (e.g. Facebook form "Logo offer" &rarr; Logo Designing workspace), WhatsApp numbers, CallerDesk numbers / IVR</td><td>Accounting ledgers &amp; GST (each workspace can have its own invoice series and, if needed, its own legal entity/GSTIN)</td></tr>
+    <tr><td>Workflows, templates, campaigns, reports, dashboards</td><td>Consolidated reports and the organization dashboard (all business lines together)</td></tr>
+  </table>
+  <ul>
+    <li><b>Pipelines inside a workspace</b>: each workspace can also have several pipelines/processes, e.g. Education &rarr; Admissions, Renewals; Vastu &rarr; Consultation, Site Audit</li>
+    <li><b>Lead routing to workspaces</b>: each source, form, WhatsApp number, CallerDesk number or webhook is mapped to a workspace (and pipeline); unmapped leads go to an "Unsorted" inbox for a manager to classify</li>
+    <li><b>Cross-sell</b>: an RM can refer a customer from one workspace to another (e.g. a Course customer interested in Logo Designing); a new lead is created in the target workspace, linked to the same customer, with referral credit for incentives</li>
+    <li><b>Users in several workspaces</b>: a user can work in one or many workspaces, with different roles in each (e.g. Manager in Vastu, RM in Logo Designing); a workspace switcher sits at the top of the screen</li>
+    <li><b>Workspace templates</b>: create a new workspace from an industry template (Education, Real Estate, Consulting, Design Services, Software&hellip;) or by cloning an existing workspace</li>
+    <li><b>Plan limits</b>: number of workspaces per plan (e.g. Starter 1, Growth 3, Business 10, Enterprise unlimited); extra workspaces as an add-on</li>
+  </ul>
+  <h3>Platform modules (P01&ndash;P12)</h3>
+  <table class="small">
+    <tr><th style="width:7%">ID</th><th style="width:24%">Module</th><th>Features</th><th style="width:8%">Phase</th></tr>
+    <tr><td>P01</td><td>Tenant Management</td><td>Create / edit / suspend / reactivate / close tenants; company profile, GSTIN, contacts, industry, region; tenant search; notes and timeline per tenant</td><td>1</td></tr>
+    <tr><td>P02</td><td>Provisioning &amp; Onboarding</td><td>Self-serve sign-up or sales-created tenant; subdomain allocation; default roles &amp; industry template applied; first admin invited; onboarding checklist and progress tracking; data-import assistance</td><td>1</td></tr>
+    <tr><td>P03</td><td>Plans &amp; Entitlements</td><td>Define plans, which modules/features each includes, user limits, storage &amp; AI quotas; per-tenant overrides; feature flags per tenant</td><td>1</td></tr>
+    <tr><td>P04</td><td>Subscriptions &amp; Licences</td><td>Trial &rarr; paid conversion, monthly/annual cycles, add/remove licences (pro-rated), upgrades/downgrades, renewals, coupons &amp; discounts</td><td>3</td></tr>
+    <tr><td>P05</td><td>Platform Billing &amp; Invoicing</td><td>GST invoices to tenants, Razorpay Subscriptions / auto-debit, payment retries (dunning), grace period, automatic suspension and reactivation, credit notes, revenue ledger</td><td>3</td></tr>
+    <tr><td>P06</td><td>Usage Metering</td><td>Active users, storage, AI credits, API calls, recordings, WhatsApp/call volumes per tenant; quota alerts; usage-based invoice lines</td><td>3</td></tr>
+    <tr><td>P07</td><td>Tenant Support Desk</td><td>Tickets from tenant admins, SLA by plan, knowledge base, in-app chat; <b>consent-based support access</b> (time-boxed, read-only by default, fully audited and visible to the tenant)</td><td>2</td></tr>
+    <tr><td>P08</td><td>White-label &amp; Domains</td><td>Tenant logo, colours, custom domain with SSL, email sender domain, branded login page; Enterprise: branded mobile app (later)</td><td>4</td></tr>
+    <tr><td>P09</td><td>Release &amp; Announcement Centre</td><td>Staged rollouts (internal tenant &rarr; beta tenants &rarr; all), release notes, in-app announcements, maintenance notices</td><td>4</td></tr>
+    <tr><td>P10</td><td>Platform Analytics</td><td>MRR, ARR, churn, NRR, ARPA, trial conversion, tenant health score, adoption by module, infra cost per tenant</td><td>4</td></tr>
+    <tr><td>P11</td><td>Partner / Reseller Programme</td><td>Partner accounts, referred tenants, commission calculation and statements, partner portal</td><td>6</td></tr>
+    <tr><td>P12</td><td>Platform Security &amp; Audit</td><td>Platform staff roles, 2FA mandatory, IP allow-list, platform audit log, tenant data export &amp; deletion requests, backups per tenant</td><td>1</td></tr>
+  </table>
+
+  <h3>Tenant lifecycle</h3>
+  <div class="flow"><span>Enquiry (in your own UBOS CRM)</span><i>&rarr;</i><span>Demo</span><i>&rarr;</i><span>Trial (14 days)</span><i>&rarr;</i><span>Provisioned + industry template</span><i>&rarr;</i><span>Onboarding &amp; data import</span><i>&rarr;</i><span>Paid &amp; Active</span><i>&rarr;</i><span>Upgrade / add licences</span><i>&rarr;</i><span>Renewal</span></div>
+  <div class="flow"><span>Payment failed</span><i>&rarr;</i><span>Reminders + retries</span><i>&rarr;</i><span>Grace period (e.g. 7 days)</span><i>&rarr;</i><span>Suspended (read-only)</span><i>&rarr;</i><span>Paid &rarr; reactivated instantly</span><i>/</i><span>Cancelled &rarr; data export &rarr; deletion after retention period</span></div>
+
+  <h3>Platform roles (separate from tenant roles)</h3>
+  <table class="small">
+    <tr><th style="width:24%">Platform role</th><th>Access</th></tr>
+    <tr><td>Platform Owner</td><td>Everything on the Platform Console, including pricing, revenue and platform staff management</td></tr>
+    <tr><td>Platform Admin</td><td>Tenants, plans, provisioning, releases; no revenue edits</td></tr>
+    <tr><td>Platform Sales &amp; Onboarding</td><td>Create trials and tenants, apply templates, track onboarding</td></tr>
+    <tr><td>Platform Support</td><td>Tenant tickets; support access only with tenant consent</td></tr>
+    <tr><td>Platform Finance</td><td>Subscriptions, invoices, payments, dunning, revenue reports</td></tr>
+    <tr><td>Platform Tech / DevOps</td><td>Health, logs, queues, integrations status (no tenant business data)</td></tr>
+    <tr><td>Partner (external)</td><td>Partner portal: own referred tenants and commissions only</td></tr>
+  </table>
+
+  <h3>Plan enforcement (how selling actually controls the product)</h3>
+  <ul>
+    <li>Every API request carries the tenant; the API checks the tenant's <b>plan entitlements</b> before the user's role permissions. A module not in the plan is hidden in the menu and blocked in the API, with an "Upgrade" prompt for the tenant admin</li>
+    <li>User licence limit enforced when inviting users; usage quotas (storage, AI credits, API calls) enforced with warnings at 80% and 100%</li>
+    <li>Tenant admins see a <b>Billing &amp; Subscription</b> page: current plan, licences, usage, invoices, upgrade, add licences, payment method</li>
+  </ul>
+
+  <h3>Integrations in a multi-tenant product</h3>
+  <ul>
+    <li>Each tenant activates and deactivates its <b>own</b> integrations with its <b>own</b> credentials (its own CallerDesk account, WhatsApp number, Razorpay, Google account, AI keys) &mdash; "bring your own account"</li>
+    <li>Optionally, you provide platform-managed services (e.g. AI credits, WhatsApp via your Tech Provider set-up) and bill usage with a margin</li>
+    <li>You as Platform Owner decide <b>which integrations are available</b> on which plan; tenant admins decide which ones they switch on</li>
+  </ul>
+
+  <h3>Platform Owner dashboard</h3>
+  <table class="small">
+    <tr><th style="width:24%">Area</th><th>Tiles</th></tr>
+    <tr><td>Revenue</td><td>MRR, ARR, new MRR, expansion MRR, churned MRR, net revenue retention, collections, overdue invoices</td></tr>
+    <tr><td>Customers</td><td>Active tenants, trials running, trial &rarr; paid conversion, tenants at risk (low usage, overdue, many tickets), top tenants by revenue</td></tr>
+    <tr><td>Product</td><td>Active users, module adoption, AI usage, storage, integration errors by tenant</td></tr>
+    <tr><td>Operations</td><td>Open support tickets by plan &amp; SLA, onboarding in progress, release rollout status</td></tr>
+    <tr><td>Cost</td><td>Infra cost per tenant, AI/WhatsApp/calling pass-through cost vs billed, gross margin</td></tr>
+  </table>
+  <div class="box"><b>You use both levels.</b> You log into <code>console.ubos.app</code> as Platform Owner to manage the software business, and into your own company's workspace (Tenant #1) to run your business &mdash; one login, with a switcher between the two.</div>
+</div>
+
+<!-- ============ 3 PERSONAS ============ -->
+<div class="section">
+  <h1>5. Who Uses UBOS &mdash; Teams &amp; Personas</h1>
+  <p>There are two kinds of users. <b>Platform users</b> (you and your platform team) manage the SaaS business from the Platform Console (Section 4). <b>Tenant users</b> are the teams inside each customer company, including your own. Every tenant has the same team types below. What each person sees (menus, dashboards, records, fields, export buttons) depends on the roles assigned to them within their own company.</p>
+  <table>
+    <tr><th style="width:18%">Team</th><th style="width:41%">What they do in UBOS</th><th>Primary screens</th></tr>
+    <tr><td>Management (CEO / Directors)</td><td>Track revenue, collections, conversion, team productivity, cash position; approve high-value discounts</td><td>CEO dashboard, revenue &amp; collection reports, approvals</td></tr>
+    <tr><td>Admin</td><td>Users, roles, settings, integrations, lead fields/stages, master data</td><td>Workspace settings, Integrations Hub, Users, Roles</td></tr>
+    <tr><td>Sales (RM, Team Leader, Manager)</td><td>Work leads, call, WhatsApp, follow-ups, convert to packages, collect payments</td><td>My leads, dialler, inbox, tasks, RM dashboard</td></tr>
+    <tr><td>Operations</td><td>Service delivery after sale, site visits, escalations, SOP compliance, support desk</td><td>Ops dashboard, tasks, tickets, customer 360&deg;</td></tr>
+    <tr><td>Finance &amp; Accounts</td><td>Invoices, receipts, refunds, credit notes, ledgers, GST, incentive verification</td><td>Finance dashboard, ledgers, collections, incentives</td></tr>
+    <tr><td>HR</td><td>Onboarding, attendance, leave, payroll, exits, assets, reminders, celebrations</td><td>HR dashboard, employee directory, approvals</td></tr>
+    <tr><td>Legal</td><td>Contracts, agreements, policy documents, dispute notes, consent records</td><td>Document vault, contract register, legal tasks</td></tr>
+    <tr><td>Audit</td><td>Read-only investigation of changes, discounts, transfers, payments, logins</td><td>Audit explorer, auditor dashboard, exports (if allowed)</td></tr>
+    <tr><td>QA</td><td>Listen to call recordings, score calls, flag compliance issues</td><td>Call QA queue, Call IQ scores</td></tr>
+    <tr><td>Tech</td><td>API keys, webhooks, integrations health, logs, system monitoring</td><td>Developer console, webhook logs, API templates</td></tr>
+    <tr><td>Data Analytics (DA)</td><td>Report design, KPI definitions, data validation, dashboards</td><td>Report builder, data dictionary, export</td></tr>
+    <tr><td>Social Media &amp; Content Creators</td><td>Campaign content, ad copy, creatives, short-video scripts, lead-source performance</td><td>AI Content Studio, campaigns, source reports</td></tr>
+    <tr><td>Support Agents</td><td>Handle customer calls/chats, tickets, SLAs</td><td>Support desk, shared inbox</td></tr>
+    <tr><td><b>Platform team (you)</b></td><td>Sell UBOS, onboard customer companies, manage plans, billing, usage, tenant support and releases</td><td>Platform Console, Platform Owner dashboard</td></tr>
+    <tr><td><b>Partners / resellers</b></td><td>Refer or resell UBOS, track their customers and commissions</td><td>Partner portal</td></tr>
+  </table>
+</div>
+
+<!-- ============ 4 STRUCTURE ============ -->
+<div class="section">
+  <h1>6. Product Structure &mdash; Suites &amp; Module Map</h1>
+  <p>UBOS has a <b>SaaS Platform layer</b> (12 platform modules, P01&ndash;P12, Section 4) and, inside every tenant, <b>8 suites</b> containing <b>30 business modules</b>. Each module is an independent backend package with its own API, tables and permissions, so modules can be built, released and sold separately: plans and add-ons switch modules on per tenant.</p>
+  <div class="box"><b>SaaS Platform layer (Platform Owner only):</b> Tenant Management &middot; Provisioning &middot; Plans &amp; Entitlements &middot; Subscriptions &middot; Platform Billing &middot; Usage Metering &middot; Tenant Support &middot; White-label &middot; Releases &middot; Platform Analytics &middot; Partners &middot; Platform Security</div>
+  <div class="grid2">
+    <div class="card"><h4>A. Core Platform</h4>
+      M01 Users &amp; Access &middot; M02 Roles &amp; Permissions &middot; M03 Org Structure (departments, branches, hierarchy, sales groups) &middot; M04 Workspace Settings &middot; M05 Notifications &amp; Reminders</div>
+    <div class="card"><h4>B. Revenue Suite</h4>
+      M06 Customer Master &middot; M07 Lead Management &middot; M08 RM Ownership Engine &middot; M09 Package Management &middot; M10 Campaigns &amp; Lists</div>
+    <div class="card"><h4>C. Communication Suite</h4>
+      M11 Telephony (CallerDesk + SIM) &middot; M12 WhatsApp CRM &middot; M13 Email &amp; SMS &middot; M14 Support Desk (call/chat tickets)</div>
+    <div class="card"><h4>D. Operations Suite</h4>
+      M15 Task Management &middot; M16 Workflows &amp; Automation &middot; M17 Schedules &middot; M18 Sales Forms &middot; M19 Webhooks &amp; API Templates</div>
+    <div class="card"><h4>E. People Suite (HRMS)</h4>
+      M20 Employee Lifecycle (onboarding &rarr; exit) &middot; M21 Attendance &amp; Leave &middot; M22 Payroll &amp; Payslips &middot; M23 Asset Management &middot; M24 Performance, Achievements &amp; Celebrations</div>
+    <div class="card"><h4>F. Finance Suite</h4>
+      M25 Accounting &amp; Collections &middot; M26 Incentive Engine</div>
+    <div class="card"><h4>G. Governance</h4>
+      M27 Audit Engine &middot; M28 Document Management</div>
+    <div class="card"><h4>H. Intelligence &amp; Integrations</h4>
+      M29 Reports, Dashboards &amp; Export &middot; M30 AI Suite &middot; Integrations Hub (platform service)</div>
+  </div>
+  <h3>How the modules depend on each other</h3>
+  <svg viewBox="0 0 760 270" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="11">
+    <defs><marker id="a" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#7a5cf0"/></marker></defs>
+    <rect x="10" y="10" width="740" height="40" rx="6" fill="#4f2fb8"/><text x="380" y="35" fill="#fff" text-anchor="middle" font-weight="600">Core Platform: Users &middot; Roles &middot; Org &middot; Settings &middot; Notifications &middot; Audit &middot; Integrations Hub &middot; AI Gateway</text>
+    <rect x="10" y="80" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="125" y="105" text-anchor="middle" font-weight="600" fill="#4f2fb8">Revenue</text><text x="125" y="123" text-anchor="middle">Customer &middot; Lead &middot; RM</text><text x="125" y="139" text-anchor="middle">Packages &middot; Campaigns</text>
+    <rect x="265" y="80" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="380" y="105" text-anchor="middle" font-weight="600" fill="#4f2fb8">Communication</text><text x="380" y="123" text-anchor="middle">Calls &middot; WhatsApp &middot; Email</text><text x="380" y="139" text-anchor="middle">Support Desk</text>
+    <rect x="520" y="80" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="635" y="105" text-anchor="middle" font-weight="600" fill="#4f2fb8">Operations</text><text x="635" y="123" text-anchor="middle">Tasks &middot; Workflows</text><text x="635" y="139" text-anchor="middle">Schedules &middot; Webhooks</text>
+    <rect x="10" y="180" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="125" y="205" text-anchor="middle" font-weight="600" fill="#4f2fb8">Finance</text><text x="125" y="223" text-anchor="middle">Ledgers &middot; Invoices</text><text x="125" y="239" text-anchor="middle">Collections &middot; Incentives</text>
+    <rect x="265" y="180" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="380" y="205" text-anchor="middle" font-weight="600" fill="#4f2fb8">People (HRMS)</text><text x="380" y="223" text-anchor="middle">Employees &middot; Attendance &middot; Payroll</text><text x="380" y="239" text-anchor="middle">Assets &middot; Performance</text>
+    <rect x="520" y="180" width="230" height="70" rx="6" fill="#efeafd" stroke="#7a5cf0"/><text x="635" y="205" text-anchor="middle" font-weight="600" fill="#4f2fb8">Intelligence</text><text x="635" y="223" text-anchor="middle">Reports &middot; Dashboards</text><text x="635" y="239" text-anchor="middle">Export &middot; AI insights</text>
+    <line x1="240" y1="115" x2="263" y2="115" stroke="#7a5cf0" marker-end="url(#a)"/>
+    <line x1="495" y1="115" x2="518" y2="115" stroke="#7a5cf0" marker-end="url(#a)"/>
+    <line x1="125" y1="150" x2="125" y2="178" stroke="#7a5cf0" marker-end="url(#a)"/>
+    <line x1="240" y1="215" x2="263" y2="215" stroke="#7a5cf0" marker-end="url(#a)"/>
+    <line x1="495" y1="215" x2="518" y2="215" stroke="#7a5cf0" marker-end="url(#a)"/>
+    <line x1="635" y1="150" x2="635" y2="178" stroke="#7a5cf0" marker-end="url(#a)"/>
+  </svg>
+  <p class="small muted">Revenue feeds Finance (package sold &rarr; invoice &rarr; collection &rarr; incentive). Incentives flow into Payroll. Every suite publishes events that Intelligence turns into reports, and every change is written to the Audit Engine.</p>
+</div>
+
+<!-- ============ 5 SITEMAP ============ -->
+<div class="section">
+  <h1>7. Navigation / Site Map</h1>
+  <p>The left sidebar is built dynamically: a menu item only appears if the <b>tenant's plan includes the module</b> and at least one of the user's roles grants view access to it.</p>
+  <div class="card small" style="margin-bottom:10px"><h4>Platform Console (console.ubos.app &mdash; Platform Owner &amp; staff only)</h4>Dashboard (MRR/ARR) &middot; Tenants &middot; Trials &amp; Onboarding &middot; Plans &amp; Pricing &middot; Subscriptions &middot; Invoices &amp; Payments &middot; Usage &middot; Support Tickets &middot; Releases &amp; Announcements &middot; Partners &middot; Platform Users &middot; Platform Audit &middot; System Health</div>
+  <div class="grid3 small">
+    <div class="card"><h4>Work</h4><ul>
+      <li>Workspace switcher (business line)</li><li>Dashboard (role-based; workspace or organization)</li><li>Global Search</li>
+      <li>Add Lead(s): Single &middot; From Excel/CSV &middot; From Integration</li>
+      <li>Leads &amp; Views (saved filters)</li><li>My Lists</li><li>Customers (360&deg;)</li>
+      <li>My Calls / Call Log</li><li>Inbox (WhatsApp, chat, email)</li>
+      <li>Tasks &amp; Calendar</li><li>Campaigns</li><li>Packages &amp; Orders</li><li>Support Tickets</li></ul></div>
+    <div class="card"><h4>Business</h4><ul>
+      <li>Finance: Ledgers, Invoices, Receipts, Refunds, Credit Notes, Collections, GST</li>
+      <li>Incentives: Rules, Calculations, Approvals, Statements</li>
+      <li>Reports: Macro, Micro, Scheduled</li>
+      <li>Documents</li><li>Audit Explorer</li>
+      <li>AI Suite: Call IQ, Lead IQ, Chat IQ, Content Studio, MCP</li></ul></div>
+    <div class="card"><h4>People (HR)</h4><ul>
+      <li>My Profile &amp; Payslips</li><li>Attendance &amp; Check-in</li><li>Leave</li><li>Approvals inbox</li>
+      <li>Employees</li><li>Onboarding</li><li>Exit &amp; F&amp;F</li><li>Payroll runs</li>
+      <li>Assets</li><li>Performance &amp; Goals</li><li>Achievements &amp; Wall of Fame</li><li>Celebrations</li><li>HR Reminders</li></ul></div>
+    <div class="card"><h4>Automations</h4><ul>
+      <li>Workflows</li><li>Schedules</li><li>Sales Forms</li><li>API Templates</li><li>Webhooks</li><li>Apps / API keys</li></ul></div>
+    <div class="card"><h4>Integrations</h4><ul>
+      <li>Active integrations (Manage)</li><li>Available integrations (Activate now)</li><li>Integration logs &amp; health</li></ul></div>
+    <div class="card"><h4>Settings</h4><ul>
+      <li>Per workspace: Lead Fields, Pipelines &amp; Stages, Call Feedback, Custom Actions; Organization: Preferences</li>
+      <li>Organization: Workspaces (create, clone, archive), pipelines per workspace, lead-source &rarr; workspace mapping</li>
+      <li>Team: Users, Roles &amp; Permission Templates, Departments, Branches, Sales Groups</li>
+      <li>Billing &amp; Subscription: plan, licences, usage, invoices, upgrade</li><li>Branding: logo, colours, custom domain</li><li>Security: 2FA, IP rules, Session timeout</li></ul></div>
+  </div>
+  <h3>Organization preferences (configurable by Admin)</h3>
+  <table class="small">
+    <tr><th style="width:30%">Group</th><th>Settings</th></tr>
+    <tr><td>Workspace</td><td>Default country code, timezone, currency, connected-call minimum duration (sec), session timeout, financial year start, date format</td></tr>
+    <tr><td>Leaderboard</td><td>Rank by lead stage / lead rating / revenue / collections; period</td></tr>
+    <tr><td>Features (on/off)</td><td>Location check-in, block screenshots (Android), campaigns, custom actions, sales groups, lead recapture, new leads view, system fields</td></tr>
+    <tr><td>Sync permissions</td><td>Smart syncing for mobile app (what data is cached offline, per role)</td></tr>
+    <tr><td>Modules (on/off)</td><td>Every suite/module can be enabled or disabled for the workspace</td></tr>
+  </table>
+</div>
+
+<!-- ============ 6 CORE ============ -->
+<div class="section">
+  <h1>8. Core Platform: Users, Roles, Access, Settings</h1>
+  <div class="module"><div class="head"><b>M01 &middot; Users &amp; Access</b><span class="tag">Phase 1</span></div>
+    <ul>
+      <li>Create / invite / deactivate users; bulk import from CSV; employee record auto-created in HRMS (or linked)</li>
+      <li>Login with email/mobile + password, Google OAuth (optional), <b>Two-Factor Authentication</b> (TOTP app or OTP via SMS/WhatsApp)</li>
+      <li><b>IP restriction</b> per role or per user (office IPs only), <b>session timeout</b>, force-logout, single-device option for RMs</li>
+      <li><b>Login audit</b>: every login, failure, logout, IP, device, location</li>
+      <li>Every user belongs to a tenant; user count is limited by the tenant's purchased licences (Billing &rarr; Buy Licences, Transaction History are served by the Platform Billing module)</li>
+      <li>Optional: one person can be a member of several tenants (e.g. a consultant) and switch between them</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M02 &middot; Roles &amp; Permissions</b><span class="tag">Phase 1</span></div>
+    <ul>
+      <li><b>Create or add any role</b> as needed (e.g. "Content Creator", "Legal Reviewer", "Branch Head") &mdash; no code change. Each tenant manages its own roles; the platform supplies default templates</li>
+      <li><b>Assign multiple roles to one user</b> (e.g. a person can be Sales Manager + HR Approver)</li>
+      <li>Permission templates (Default Root, Admin, Manager, Caller, Marketing, &hellip;) that can be cloned and edited</li>
+      <li>Permission = Module &times; Action (view / create / edit / delete / export / approve / assign) &times; Data scope (own / team / department / branch / all) + field-level masks</li>
+      <li>Full model in Section 18</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M03 &middot; Org Structure</b><span class="tag">Phase 1</span></div>
+    <ul>
+      <li>Company &rarr; Branches &rarr; Departments &rarr; Teams / Sales Groups &rarr; Employees</li>
+      <li>Reporting hierarchy (reports-to), used for approvals, team data scope and escalations</li>
+      <li>Default roles provided: Super Admin, Admin, Manager, Team Leader, RM, Finance, Auditor, QA, HR (+ Legal, Ops, Tech, DA, Social Media, Content Creator, Support)</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M04 &middot; Organization &amp; Workspace Settings</b><span class="tag">Phase 1</span></div>
+    <ul>
+      <li>Lead fields per workspace (custom fields of type text, number, date, dropdown, multi-select, file, phone, email, currency)</li>
+      <li>Lead stages and lost reasons; call-feedback / disposition options; custom actions (buttons that trigger workflows)</li>
+      <li>Preferences listed in Section 7; module on/off switches</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M05 &middot; Notifications &amp; Reminders</b><span class="tag">Phase 1&ndash;2</span></div>
+    <ul>
+      <li>Channels: in-app bell, web push, mobile push, email, WhatsApp, SMS &mdash; user picks preferences, admin sets mandatory ones</li>
+      <li>Follow-up reminders, task due, SLA breach, payment due, approval pending, HR reminders (Section 12)</li>
+      <li>Daily digest per role (e.g. RM: today's follow-ups; Manager: overdue team tasks)</li>
+    </ul></div>
+</div>
+
+<!-- ============ 7 REVENUE ============ -->
+<div class="section">
+  <h1>9. Revenue Suite: Customer, Lead, RM, Packages</h1>
+  <div class="module"><div class="head"><b>M06 &middot; Customer Master (Customer 360&deg;)</b><span class="tag">Phase 1</span></div>
+    <p><b>Unique identifiers:</b> Mobile number, Email, PAN, Aadhaar (optional, stored masked/encrypted), system Customer ID. The Customer Master is <b>shared across all workspaces of the organization</b>, so one person who buys a course and later a Vastu audit stays a single customer.</p>
+    <ul>
+      <li><b>Duplicate detection</b> on create/import/integration: exact match on normalised mobile (+91 handling), email, PAN; fuzzy match on name + city</li>
+      <li><b>Auto-merge</b> rules (exact mobile or PAN &rarr; auto; fuzzy &rarr; suggest merge for manual approval). Merge history kept, reversible by Admin</li>
+      <li><b>Source consolidation</b>: all sources a customer came from (Facebook, website, referral&hellip;) recorded with first-touch and last-touch</li>
+      <li><b>Customer timeline</b>: leads, calls (with recording), WhatsApp chats, emails, tasks, packages, invoices, payments, tickets, documents, audit events</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M07 &middot; Lead Management</b><span class="tag">Phase 1</span></div>
+    <p><b>Sources:</b> Website / API, Facebook &amp; Instagram Lead Ads, Google Ads (lead forms), WhatsApp, Referral, IndiaMart, JustDial, 99acres, Housing, Google Sheets, Excel/CSV import, Manual, Chat widget.</p>
+    <p><b>Bifurcation by business line:</b> every lead belongs to a <b>workspace</b> (business line, e.g. Course/Software, Logo Designing, Vastu Consultation/Audit) and a <b>pipeline/process</b> inside it. Stages, fields, packages, assignment rules and reports are configured per workspace and pipeline. Leads can be moved or cross-sold between workspaces with full history.</p>
+    <p><b>Default lifecycle</b> (editable per workspace / pipeline):</p>
+    <div class="flow"><span>New</span><i>&rarr;</i><span>Contacted</span><i>&rarr;</i><span>Interested</span><i>&rarr;</i><span>Follow-up</span><i>&rarr;</i><span>Demo</span><i>&rarr;</i><span>Negotiation</span><i>&rarr;</i><span>Won</span><i>/</i><span>Lost</span></div>
+    <table class="small">
+      <tr><th style="width:24%">Assignment rule</th><th>Behaviour</th></tr>
+      <tr><td>Sticky</td><td>If the customer already has a Primary RM, the new lead goes to that RM (if active); otherwise falls to the next rule</td></tr>
+      <tr><td>Round robin</td><td>Rotates among active, checked-in RMs in a sales group; respects daily caps and leave status</td></tr>
+      <tr><td>Skill based</td><td>Matches lead attributes (language, product, package) to RM skills</td></tr>
+      <tr><td>Region based</td><td>Matches city/state/pincode to territory owners</td></tr>
+      <tr><td>Manual / bulk</td><td>Managers reassign individually or in bulk; every transfer is audited with reason</td></tr>
+    </table>
+    <ul>
+      <li>Follow-ups with date/time, reminder and outcome; overdue follow-ups escalate to Team Leader</li>
+      <li>Views (saved filters), My Lists, lead rating, tags, lead recapture (re-enquiry re-opens lead and notifies owner)</li>
+      <li>Lead aging &amp; SLA: first-response time tracked from creation to first call/message</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M08 &middot; RM Ownership Engine</b><span class="tag">Phase 1</span></div>
+    <table class="small">
+      <tr><th style="width:24%">Ownership type</th><th>Rule</th></tr>
+      <tr><td>Primary RM</td><td>Permanent owner of the customer. Changes only via manager-approved transfer (audited). Gets sticky routing of all future leads</td></tr>
+      <tr><td>Secondary RM</td><td>Owner of a specific package / deal. Multiple secondary RMs possible across packages</td></tr>
+    </table>
+    <ul><li>Shared access, shared notes and shared activities between Primary and Secondary RMs</li>
+      <li>Separate incentive lines per RM, with split % configurable per package (e.g. 70/30)</li>
+      <li>RM exit: bulk transfer of book to successor, keeping history and recalculating future incentives only</li></ul></div>
+  <div class="module"><div class="head"><b>M09 &middot; Package Management</b><span class="tag">Phase 3</span></div>
+    <ul><li>Package catalogue: Elite, BSP, NME, VPM (and any new ones), each with MRP, GST rate, validity, deliverables</li>
+      <li>Per sale: MRP, offer price, discount (amount and %), owner RM, secondary RM, instalment plan, collection status (Pending / Partial / Paid / Refunded)</li>
+      <li>Discount approval matrix: e.g. &le;10% RM, &le;20% Manager, &gt;20% Management &mdash; all audited</li></ul></div>
+  <div class="module"><div class="head"><b>M10 &middot; Campaigns &amp; Lists</b><span class="tag">Phase 2</span></div>
+    <ul><li>Calling campaigns (lead lists pushed to RMs' diallers), WhatsApp broadcast campaigns, email campaigns</li>
+      <li>Campaign results: reach, connect rate, replies, conversions, revenue, cost per lead (when ad spend is entered or synced)</li></ul></div>
+</div>
+
+<!-- ============ 8 COMMUNICATION ============ -->
+<div class="section">
+  <h1>10. Communication Suite: Calling, WhatsApp, Support Desk</h1>
+  <div class="module"><div class="head"><b>M11 &middot; Telephony</b><span class="tag">Phase 2</span><span class="tag ok">Integration: CallerDesk</span></div>
+    <table class="small">
+      <tr><th style="width:22%">Mode</th><th>How it works</th></tr>
+      <tr><td>Cloud calling (CallerDesk)</td><td>Click-to-call from lead/customer screen &rarr; UBOS calls CallerDesk API &rarr; agent phone rings, then customer. CallerDesk posts call events (answered, duration, recording URL) back to a UBOS webhook; the call is logged on the lead automatically</td></tr>
+      <tr><td>IVR &amp; inbound</td><td>Inbound calls on the CallerDesk number route via IVR; UBOS looks up the caller, shows a screen-pop and routes to Primary RM (sticky) or queue</td></tr>
+      <tr><td>SIM-based calling</td><td>Android app (later phase) logs calls made from the RM's SIM and uploads recordings where the device allows</td></tr>
+    </table>
+    <ul><li>Call recording playback inside UBOS (streamed via signed URLs; optionally copied into our storage for retention)</li>
+      <li>Mandatory disposition after each call (call feedback options from settings) and next follow-up</li>
+      <li>Monitoring: live call board for managers; queue management; missed-call callback tasks</li>
+      <li>Call analytics: attempts, connects, talk time, connected-call minimum duration rule, first-response time</li></ul></div>
+  <div class="module"><div class="head"><b>M12 &middot; WhatsApp CRM</b><span class="tag">Phase 2</span><span class="tag ok">Integration: WhatsApp Business API</span></div>
+    <ul>
+      <li>Connect through the official WhatsApp Business Platform (Meta Cloud API directly, or a BSP such as Interakt / Gupshup / AiSensy &mdash; your choice, see Section 31)</li>
+      <li><b>Shared inbox</b>: all conversations, assign to RM/agent, internal notes, labels, 24-hour session window indicator</li>
+      <li>Approved <b>templates</b> (create in UBOS, submit for Meta approval, track status), <b>broadcast</b> &amp; campaigns with opt-out handling</li>
+      <li><b>Chat widget</b> for the website that opens WhatsApp or an in-site chat</li>
+      <li><b>AI chatbot</b> &amp; auto-replies within an approved playbook; hands over to a human on trigger words, low confidence or request</li>
+      <li>Incoming message from unknown number &rarr; creates lead (source = WhatsApp) &rarr; assignment rules</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M13 &middot; Email &amp; SMS</b><span class="tag">Phase 2</span></div>
+    <ul><li>Email: SMTP/Gmail/Microsoft 365 connection, templates, tracked sends logged on timeline</li>
+      <li>SMS: DLT-registered templates via an Indian SMS provider (for OTP and transactional alerts)</li></ul></div>
+  <div class="module"><div class="head"><b>M14 &middot; Support Desk (Operations support by call &amp; chat)</b><span class="tag">Phase 2</span></div>
+    <ul>
+      <li>Tickets from calls, WhatsApp, chat widget, email or created by staff; linked to customer and package</li>
+      <li>Categories, priority, SLA (first response &amp; resolution), auto-assignment to support/ops team, escalation matrix</li>
+      <li>Internal support too: employees raise IT / HR / Admin / Finance tickets to the right team</li>
+      <li>CSAT survey after closure via WhatsApp; support dashboard (open, breached, average handle time)</li>
+    </ul></div>
+</div>
+
+<!-- ============ 9 OPERATIONS ============ -->
+<div class="section">
+  <h1>11. Operations Suite: Tasks, Workflows, Automation, Reminders</h1>
+  <div class="module"><div class="head"><b>M15 &middot; Task Management</b><span class="tag">Phase 2</span></div>
+    <ul><li>Task types: Follow-up, Meeting, Site visit (with location check-in), Callback, Escalation, Document collection, Generic</li>
+      <li>Calendar view, Google Meet link generation for meetings, recurring tasks, checklists</li>
+      <li>Overdue &rarr; reminder &rarr; escalate to reports-to after configurable time</li></ul></div>
+  <div class="module"><div class="head"><b>M16 &middot; Workflows &amp; Automation</b><span class="tag">Phase 2</span></div>
+    <p>A visual "When &rarr; If &rarr; Then" builder usable by Admin/Ops without coding.</p>
+    <table class="small">
+      <tr><th style="width:20%">Part</th><th>Examples</th></tr>
+      <tr><td>Triggers (When)</td><td>Lead created, stage changed, field updated, call ended with disposition X, WhatsApp received, payment received, task overdue, employee joined, leave applied, date-based (birthday, renewal date), incoming webhook, custom action button</td></tr>
+      <tr><td>Conditions (If)</td><td>Field comparisons, source, package, RM, branch, time window, AND/OR groups</td></tr>
+      <tr><td>Actions (Then)</td><td>Assign / reassign, change stage, create task, send WhatsApp template, send email/SMS, call webhook / API template, update field, add to list/campaign, notify user, request approval, run AI (summarise, score, draft reply), wait / delay</td></tr>
+    </table>
+    <ul><li>Run history with per-step log; retries; enable/disable; version history; test mode on a sample record</li></ul></div>
+  <div class="module"><div class="head"><b>M17 &middot; Schedules</b><span class="tag">Phase 2</span></div>
+    <ul><li>Time-based jobs: daily report email, weekly incentive preview, monthly payroll reminder, Google Sheet sync every N minutes</li></ul></div>
+  <div class="module"><div class="head"><b>M18 &middot; Sales Forms</b><span class="tag">Phase 2</span></div>
+    <ul><li>Build forms (lead capture, site-visit report, KYC collection, feedback) &mdash; embeddable on websites or used inside the app; submissions map to lead/customer fields</li></ul></div>
+  <div class="module"><div class="head"><b>M19 &middot; Webhooks &amp; API Templates</b><span class="tag">Phase 2</span></div>
+    <ul>
+      <li><b>Incoming webhooks</b>: unique URLs with secret to receive leads/events from any system; field mapping UI</li>
+      <li><b>Outgoing webhooks</b>: subscribe external URLs to UBOS events (lead.created, payment.received&hellip;); signed payloads (HMAC); retries with backoff; delivery log</li>
+      <li><b>API templates</b>: saved HTTP calls to third-party APIs that workflows can reuse</li>
+      <li><b>Apps</b>: API keys / OAuth clients with scoped permissions for partner systems and the mobile app</li>
+    </ul></div>
+  <h3>Reminder catalogue</h3>
+  <table class="small">
+    <tr><th style="width:26%">Category</th><th>Reminders</th></tr>
+    <tr><td>Sales</td><td>Follow-up due, untouched new lead (&gt; X min), demo tomorrow, payment instalment due, renewal approaching</td></tr>
+    <tr><td>Operations</td><td>Ticket SLA about to breach, site visit today, pending document collection</td></tr>
+    <tr><td>Finance</td><td>Overdue receivables, refund pending approval, GST filing date, incentive approval pending</td></tr>
+    <tr><td>HR</td><td>See HR reminders in Section 12</td></tr>
+    <tr><td>Management</td><td>Daily flash report, discount approvals waiting, collection target vs actual</td></tr>
+  </table>
+</div>
+
+<!-- ============ 10 PEOPLE ============ -->
+<div class="section">
+  <h1>12. People Suite: HRMS, Assets, Performance &amp; Celebrations</h1>
+  <div class="module"><div class="head"><b>M20 &middot; Employee Lifecycle: Onboarding &rarr; Exit</b><span class="tag">Phase 3</span></div>
+    <div class="flow"><span>Offer</span><i>&rarr;</i><span>Pre-joining docs</span><i>&rarr;</i><span>Onboarding checklist</span><i>&rarr;</i><span>Asset issue</span><i>&rarr;</i><span>User + roles created</span><i>&rarr;</i><span>Probation</span><i>&rarr;</i><span>Confirmation</span><i>&rarr;</i><span>Resignation</span><i>&rarr;</i><span>Exit clearance</span><i>&rarr;</i><span>F&amp;F</span></div>
+    <ul>
+      <li><b>Onboarding</b>: candidate portal link to upload KYC, education, bank details, photo; e-sign offer letter; onboarding checklist per department (IT, Admin, HR, Manager tasks)</li>
+      <li>Employee profile: personal, job, salary structure, bank, documents, emergency contacts, history of role/salary changes</li>
+      <li><b>Exit</b>: resignation request &rarr; manager &amp; HR approval &rarr; notice period tracking &rarr; clearance checklist (assets returned, data handover, lead book transfer, dues) &rarr; full &amp; final settlement &rarr; experience/relieving letters &rarr; user deactivated automatically on last day</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M21 &middot; Attendance &amp; Leave</b><span class="tag">Phase 3</span></div>
+    <ul>
+      <li>Check-in/out from web or mobile with geo-location (field staff) and optional selfie; IP-based check-in for office staff; biometric import (CSV/API) later</li>
+      <li>Shifts, weekly offs, holiday calendar per branch; late-mark and half-day rules; regularisation requests</li>
+      <li>Leave types (CL, SL, EL, comp-off, LWP&hellip;), accrual and carry-forward policy, balance, apply/approve/cancel</li>
+      <li>Leave status feeds lead assignment (no leads to RMs on leave)</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M22 &middot; Payroll &amp; Payslips</b><span class="tag">Phase 3</span></div>
+    <ul>
+      <li>Salary structure components (Basic, HRA, allowances, deductions); monthly payroll run using attendance &amp; LWP</li>
+      <li>Approved incentives from M26 added automatically as earnings</li>
+      <li>Statutory (India): PF, ESI, Professional Tax, TDS &mdash; configured per your applicability (see Section 31)</li>
+      <li>Payslip PDF generation, employee self-service download, bank transfer file export, payroll register</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>Approvals Engine (shared)</b><span class="tag">Phase 3</span></div>
+    <p>One configurable multi-level approval engine used by leave, regularisation, expense/reimbursement, asset request, resignation, discount, refund and incentive approvals. Approve/reject from web, mobile or a WhatsApp notification link; delegation when an approver is on leave; full audit.</p></div>
+  <div class="module"><div class="head"><b>HR Reminders</b><span class="tag">Phase 3</span></div>
+    <table class="small">
+      <tr><th style="width:30%">Reminder</th><th>Who gets it</th></tr>
+      <tr><td>Birthdays &amp; work anniversaries</td><td>HR, manager, team (and celebration post on the wall)</td></tr>
+      <tr><td>Probation ending / confirmation due</td><td>HR and reporting manager</td></tr>
+      <tr><td>Pending onboarding documents</td><td>New joiner and HR</td></tr>
+      <tr><td>Document expiry (contracts, ID, certifications)</td><td>HR and the employee</td></tr>
+      <tr><td>Pending leave / regularisation approvals</td><td>Approver, escalate to HR after N days</td></tr>
+      <tr><td>Missing attendance / no check-in</td><td>Employee, then manager</td></tr>
+      <tr><td>Payroll cut-off, PF/ESI/PT/TDS due dates</td><td>HR and Finance</td></tr>
+      <tr><td>Notice period end, exit clearance pending, asset return pending</td><td>HR, IT/Admin, manager</td></tr>
+      <tr><td>Appraisal cycle dates, goal-setting deadlines</td><td>All employees and managers</td></tr>
+    </table></div>
+  <div class="module"><div class="head"><b>M23 &middot; Asset Management</b><span class="tag">Phase 3</span></div>
+    <ul>
+      <li>Asset register: laptops, mobiles, SIM cards, headsets, ID cards, furniture, vehicles &mdash; asset tag, serial, purchase date, cost, warranty, vendor, location, condition</li>
+      <li>Issue to employee with digital acknowledgement; transfer; return with condition check; damage/loss recording and recovery</li>
+      <li>Employee asset request &rarr; approval &rarr; allocation; warranty/AMC expiry reminders; depreciation report</li>
+      <li>Exit clearance is blocked until all issued assets are returned or recovered</li>
+    </ul></div>
+  <div class="module"><div class="head"><b>M24 &middot; Performance, Achievements &amp; Celebrations</b><span class="tag">Phase 4</span></div>
+    <ul>
+      <li><b>Performance</b>: goals/KRAs per role, auto-filled from CRM data (calls, conversions, collections) plus manager ratings; quarterly/annual review cycles; 360&deg; feedback (optional)</li>
+      <li><b>Achievements</b>: badges and awards (Top Closer, Fastest Responder, 100 Calls Day, Collection Champion), leaderboard, "Wall of Fame"</li>
+      <li><b>Celebrations</b>: birthday, anniversary, new-joiner welcome and target-achieved posts on an internal feed with reactions and comments; optional greeting via WhatsApp/email</li>
+    </ul></div>
+</div>
+
+<!-- ============ 11 FINANCE ============ -->
+<div class="section">
+  <h1>13. Finance Suite: Accounting &amp; Incentives</h1>
+  <div class="module"><div class="head"><b>M25 &middot; Accounting &amp; Collections</b><span class="tag">Phase 3</span><span class="tag ok">Integration: Razorpay</span></div>
+    <table class="small">
+      <tr><th style="width:24%">Area</th><th>Features</th></tr>
+      <tr><td>Ledgers</td><td>Customer ledger, package ledger, RM-wise receivables; running balances; opening balance import</td></tr>
+      <tr><td>Invoicing</td><td>GST-compliant invoices (CGST/SGST/IGST by place of supply), numbering series per branch/FY, PDF, send via WhatsApp/email; e-invoice later if turnover requires</td></tr>
+      <tr><td>Receipts</td><td>Razorpay payment links &amp; webhooks auto-create receipts; manual receipts for cash/UPI/cheque/NEFT with proof upload</td></tr>
+      <tr><td>Refunds &amp; credit notes</td><td>Request &rarr; approval &rarr; Razorpay refund or manual; credit note linked to invoice</td></tr>
+      <tr><td>Collections</td><td>Instalment schedules, due-date reminders, overdue ageing (0-30-60-90+), collection efficiency per RM</td></tr>
+      <tr><td>Reports</td><td>Collection report, revenue report (booked vs collected), pending dues, GST summary (output tax by rate), day book</td></tr>
+      <tr><td>Accounting sync</td><td>Export / sync of invoices and receipts to Tally or Zoho Books (UBOS is the operational ledger; statutory books stay in your accounting package)</td></tr>
+    </table></div>
+  <div class="module"><div class="head"><b>M26 &middot; Incentive Engine</b><span class="tag">Phase 4</span></div>
+    <ul>
+      <li>Calculates <b>RM incentives</b>, <b>Manager incentives</b> (override on team performance) and <b>Referral incentives</b></li>
+      <li>Rule types: <b>Fixed</b> (&#8377; per sale), <b>Percentage</b> (of collected amount), <b>Slab based</b> (achievement bands); filters by package, source, period, role</li>
+      <li>Incentive earned on <b>collection</b>, not booking (configurable); clawback on refunds</li>
+      <li>Primary / Secondary RM split per package</li>
+      <li>Approval workflow:</li>
+    </ul>
+    <div class="flow"><span>Auto-calculated</span><i>&rarr;</i><span>Finance verifies</span><i>&rarr;</i><span>Manager approves</span><i>&rarr;</i><span>HR approves</span><i>&rarr;</i><span>Posted to payroll</span></div>
+    <ul><li>RM self-view incentive statement with drill-down to each sale; disputes raised as tickets; every rule and amount change audited</li></ul></div>
+  <div class="box"><b>Example slab rule:</b> Monthly collection &lt; &#8377;2 L &rarr; 0%; &#8377;2&ndash;5 L &rarr; 3%; &#8377;5&ndash;10 L &rarr; 5%; &gt; &#8377;10 L &rarr; 7% on full amount. Secondary RM gets 30% of the package incentive. Manager override = 1% of team collection above target.</div>
+</div>
+
+<!-- ============ 12 AUDIT ============ -->
+<div class="section">
+  <h1>14. Audit, Documents &amp; Compliance</h1>
+  <div class="module"><div class="head"><b>M27 &middot; Audit Engine</b><span class="tag">Phase 1 (logging) / Phase 5 (explorer)</span></div>
+    <p>Logging starts on day one (it cannot be added retroactively); the Audit Explorer screens come in Phase 5.</p>
+    <table class="small">
+      <tr><th style="width:30%">Audited events</th><th>Recorded fields</th></tr>
+      <tr><td>Customer updates, merges</td><td rowspan="6"><b>Who</b> (user, roles, IP, device) &middot; <b>When</b> (UTC timestamp) &middot; <b>What</b> (entity, record ID, action) &middot; <b>Old value</b> &middot; <b>New value</b> &middot; reason / approval reference</td></tr>
+      <tr><td>Payment updates, refunds</td></tr>
+      <tr><td>Lead transfers / RM changes</td></tr>
+      <tr><td>Discount changes</td></tr>
+      <tr><td>Incentive rule &amp; amount changes</td></tr>
+      <tr><td>User logins, role/permission changes, exports, settings, integration activation</td></tr>
+    </table>
+    <ul><li>Append-only table (no update/delete permitted even for Super Admin); hash-chained rows for tamper evidence; retention per policy (e.g. 8 years for financial)</li></ul></div>
+  <div class="module"><div class="head"><b>M28 &middot; Document Management</b><span class="tag">Phase 5</span></div>
+    <ul><li>Stores KYC, invoices, contracts, agreements, call recordings, HR documents, policies</li>
+      <li><b>Version control</b> (every upload keeps prior versions), folder &amp; tag structure, link to customer/employee/package</li>
+      <li>Access controlled by role and document category (e.g. HR docs only HR; KYC masked for RMs)</li>
+      <li>Legal register: contract dates, renewal/expiry reminders, signatory, counterparty</li></ul></div>
+</div>
+
+<!-- ============ 13 INTELLIGENCE ============ -->
+<div class="section">
+  <h1>15. Intelligence Suite: Reports, Dashboards, Export</h1>
+  <div class="module"><div class="head"><b>M29 &middot; Reports</b><span class="tag">Phase 4</span></div>
+    <div class="grid2">
+      <div><h4>Macro reports</h4><ul><li>Lead funnel (stage-to-stage conversion)</li><li>Sales funnel &amp; pipeline value</li><li>Revenue (booked / collected / net of refunds)</li><li>Collection &amp; ageing</li><li>Headcount, attrition, attendance</li><li>Support SLA performance</li></ul></div>
+      <div><h4>Micro reports</h4><ul><li>Per RM (calls, talk time, conversions, revenue, incentive)</li><li>Per package</li><li>Per source (cost per lead, conversion, ROI)</li><li>Per customer (lifetime value)</li><li>Per activity (calls, chats, tasks, visits)</li><li>Per employee (attendance, leave, assets)</li></ul></div>
+    </div>
+    <ul><li>Filters: date range, branch, department, team, RM, source, package; drill-down to records</li>
+      <li>Scheduled reports by email/WhatsApp; custom report builder for DA team (Phase 4+)</li></ul></div>
+  <h3>Permission-controlled CSV export</h3>
+  <table class="small">
+    <tr><th style="width:30%">Control</th><th>Rule</th></tr>
+    <tr><td>Export permission</td><td>Separate "export" action per module; without it the Export button is hidden and the API refuses</td></tr>
+    <tr><td>Data scope</td><td>Export contains only records within the user's scope (own / team / department / branch / all)</td></tr>
+    <tr><td>Field masking</td><td>Masked fields (e.g. mobile, PAN, Aadhaar, salary) stay masked in exports unless the role has "unmask"</td></tr>
+    <tr><td>Row limits</td><td>Per-role maximum rows per export (e.g. RM 500, Manager 5,000, Admin unlimited)</td></tr>
+    <tr><td>Approval (optional)</td><td>Large or sensitive exports can require approval</td></tr>
+    <tr><td>Audit</td><td>Every export logged: who, what filters, row count, file hash; files expire after 24 h</td></tr>
+    <tr><td>Format</td><td>CSV (UTF-8, Excel-friendly) and XLSX; large exports run in background and notify when ready</td></tr>
+  </table>
+</div>
+
+<!-- ============ 14 AI ============ -->
+<div class="section">
+  <h1>16. AI Suite (Gemini, Claude, OpenAI)</h1>
+  <p>All AI features go through one internal <b>AI Gateway</b>. Admin chooses which provider/model each feature uses and stores the API keys (encrypted). Switching provider does not change any feature screen.</p>
+  <table>
+    <tr><th style="width:22%">Feature</th><th>What it does</th><th style="width:16%">Phase</th></tr>
+    <tr><td>Call IQ</td><td>Transcribes recorded calls, scores the rep against a checklist, extracts intent, objections and next step, pushes a summary to the lead</td><td>6 (pilot in 4)</td></tr>
+    <tr><td>Lead IQ</td><td>Reads the lead trail and scores intent (hot / warm / cold) with reasons, so the RM knows what to say before the first call</td><td>6</td></tr>
+    <tr><td>Chat IQ</td><td>WhatsApp / website chatbot answering from an approved knowledge base and playbook; hands over to a human when needed</td><td>4&ndash;6</td></tr>
+    <tr><td>Follow-up suggestions</td><td>Suggests next best action and drafts the WhatsApp/email message</td><td>6</td></tr>
+    <tr><td>Sentiment analysis</td><td>On calls, chats and tickets; flags angry customers to managers</td><td>6</td></tr>
+    <tr><td>Revenue forecasting</td><td>Pipeline-weighted + historical forecast by month, RM and package</td><td>6</td></tr>
+    <tr><td>Churn prediction</td><td>Flags customers unlikely to renew or pay next instalment</td><td>6</td></tr>
+    <tr><td>Content Studio</td><td>Generates WhatsApp/email templates, ad copy, social captions, blog drafts, hashtags in brand voice and in Hindi/English/Hinglish</td><td>4</td></tr>
+    <tr><td>Image generation</td><td>Creatives for ads/posts in set sizes (1:1, 4:5, 9:16) via the selected provider's image model</td><td>4</td></tr>
+    <tr><td>Video shorts</td><td>Short-video scripts, scene lists, captions and voice-over text; where the chosen provider's video API is enabled on your account, generates short clips for review</td><td>6</td></tr>
+    <tr><td>MCP server</td><td>Lets Claude, ChatGPT or Gemini query leads and run summaries in plain language &mdash; strictly within the connecting user's permissions</td><td>6</td></tr>
+    <tr><td>Ask UBOS</td><td>Natural-language questions on dashboards ("collections by RM this month") answered from the reporting API</td><td>6</td></tr>
+  </table>
+  <h3>AI guardrails</h3>
+  <ul>
+    <li>AI only sees data the requesting user is allowed to see; sensitive fields (PAN, Aadhaar, bank, salary) are stripped before sending to any provider</li>
+    <li>All generated customer-facing content is a <b>draft</b> until a human approves it (except the chatbot, which runs only inside its approved playbook)</li>
+    <li>Usage &amp; cost meter per feature, per team, with monthly budget caps and alerts</li>
+    <li>Prompt and response logs for audit (with retention policy); provider fallback if one is down</li>
+    <li>Use provider business/enterprise terms where your data is not used for model training</li>
+  </ul>
+</div>
+
+<!-- ============ 15 INTEGRATIONS ============ -->
+<div class="section">
+  <h1>17. Integrations Hub (activate / deactivate)</h1>
+  <p>Modelled on the "Active Integrations / Available Integrations" pattern, and <b>separate for every tenant</b>. You, as Platform Owner, decide which integrations each plan offers. Inside a tenant, <b>only that company's admin (or roles they allow) can activate, configure, pause or deactivate</b> an integration, using the company's own accounts and credentials. Deactivating stops all inbound and outbound traffic immediately but keeps historical data and settings, so re-activation is one click.</p>
+  <h3>Lifecycle of an integration</h3>
+  <div class="flow"><span>Available</span><i>&rarr;</i><span>Activate now</span><i>&rarr;</i><span>Enter credentials</span><i>&rarr;</i><span>Test connection</span><i>&rarr;</i><span>Map fields</span><i>&rarr;</i><span>Active</span><i>&harr;</i><span>Paused</span><i>&rarr;</i><span>Deactivated</span></div>
+  <table class="small">
+    <tr><th style="width:18%">Integration</th><th style="width:44%">What UBOS does with it</th><th>Direction / mechanism</th></tr>
+    <tr><td><b>CallerDesk</b></td><td>Click-to-call, inbound screen-pop, IVR routing, call logs, recordings, agent status</td><td>Out: REST API &middot; In: call-event webhooks</td></tr>
+    <tr><td><b>WhatsApp</b></td><td>Shared inbox, templates, broadcast, chatbot, notifications</td><td>Meta Cloud API or BSP &middot; webhooks for messages &amp; statuses</td></tr>
+    <tr><td><b>WhatsApp Chat Widget</b></td><td>Website widget that starts a WhatsApp chat and creates a lead</td><td>JS snippet</td></tr>
+    <tr><td><b>Google Sheets</b></td><td>(a) Import leads from a sheet (polling or Apps Script push); (b) Export/sync selected reports or lead views to a sheet</td><td>Google OAuth + Sheets API, two-way</td></tr>
+    <tr><td><b>Razorpay</b></td><td>Payment links, payment &amp; refund status, auto-receipts</td><td>REST API + signed webhooks</td></tr>
+    <tr><td><b>Website / API</b></td><td>Lead capture from any website form or backend</td><td>Incoming webhook / REST with API key</td></tr>
+    <tr><td>Facebook &amp; Instagram</td><td>Lead Ads leads in real time</td><td>Meta Graph API webhooks</td></tr>
+    <tr><td>Google Ads</td><td>Lead-form extension leads</td><td>Webhook</td></tr>
+    <tr><td>IndiaMart, JustDial</td><td>Buyer enquiries as leads</td><td>Vendor pull/push APIs</td></tr>
+    <tr><td>99acres, Housing, MagicBricks</td><td>Property enquiries as leads</td><td>Vendor APIs / email parsing</td></tr>
+    <tr><td>Google Meet / Calendar</td><td>Meeting links on tasks, calendar sync</td><td>Google OAuth</td></tr>
+    <tr><td>Email (Gmail / M365 / SMTP)</td><td>Send &amp; log email</td><td>OAuth / SMTP</td></tr>
+    <tr><td>SMS (DLT)</td><td>OTP and alerts</td><td>Provider API</td></tr>
+    <tr><td>Tally / Zoho Books</td><td>Push invoices &amp; receipts</td><td>Export / API</td></tr>
+    <tr><td>AI providers</td><td>Gemini, Claude, OpenAI</td><td>API keys via AI Gateway</td></tr>
+    <tr><td>Biometric devices</td><td>Attendance punches</td><td>CSV / vendor API</td></tr>
+  </table>
+  <h3>Technical pattern (for the tech team)</h3>
+  <ul>
+    <li>Each integration is an <b>adapter</b> implementing a common interface: <code>activate()</code>, <code>testConnection()</code>, <code>handleWebhook()</code>, <code>sync()</code>, <code>deactivate()</code></li>
+    <li>Credentials encrypted at rest (envelope encryption); never returned to the browser after save</li>
+    <li>All inbound webhooks verified (signature/secret), stored raw in an inbox table, then processed by a queue &mdash; nothing is lost if processing fails</li>
+    <li>Integration health page: last event, error rate, retry queue, "replay" button</li>
+  </ul>
+</div>
+
+<!-- ============ 16 RBAC ============ -->
+<div class="section">
+  <h1>18. Roles &amp; Permission Model (multi-role)</h1>
+  <div class="box">Permissions are checked in three layers: <b>1. Tenant</b> (the request can only touch that tenant's data) &rarr; <b>2. Plan entitlement</b> (is the module in the tenant's plan?) &rarr; <b>3. User roles</b> (does any of the user's roles allow this action on this record?). Platform roles (Section 4) are a separate set and never mix with tenant roles.</div>
+  <h3>Building blocks</h3>
+  <table class="small">
+    <tr><th style="width:20%">Concept</th><th>Definition</th></tr>
+    <tr><td>Permission</td><td><code>module.resource.action</code> e.g. <code>crm.lead.view</code>, <code>crm.lead.export</code>, <code>finance.refund.approve</code>, <code>hr.payslip.view</code></td></tr>
+    <tr><td>Data scope</td><td>Attached to each granted permission: <b>Own</b> &lt; <b>Team</b> &lt; <b>Department</b> &lt; <b>Branch</b> &lt; <b>Workspace</b> &lt; <b>Organization (all workspaces)</b></td></tr>
+    <tr><td>Field rule</td><td>Per sensitive field: hidden / masked / visible / editable (e.g. mobile masked for Marketing)</td></tr>
+    <tr><td>Role</td><td>Named bundle of permissions + scopes + field rules. Admins can <b>create any number of roles</b></td></tr>
+    <tr><td>Permission template</td><td>Starting point to create a role (Root, Admin, Manager, Caller, Marketing, Finance, HR, Auditor&hellip;)</td></tr>
+    <tr><td>User &harr; Role</td><td><b>Many-to-many</b>. One user can hold several roles, each assigned for a specific workspace or the whole organization, optionally limited to a branch/department and a validity period (e.g. "acting manager" for 30 days)</td></tr>
+  </table>
+  <h3>How multiple roles combine</h3>
+  <ol>
+    <li><b>Union of permissions</b>: if any role grants an action, the user has it</li>
+    <li><b>Widest scope wins</b> per permission (Team from one role + All from another = All)</li>
+    <li><b>Most permissive field rule wins</b>, except fields marked "restricted" which need an explicit grant</li>
+    <li><b>Explicit deny</b> (optional, used sparingly) overrides any grant &mdash; e.g. Auditor role denies all edit actions</li>
+    <li><b>Segregation of duties</b> checks: the system warns/blocks conflicting combinations (e.g. the same person cannot both create and approve a refund or incentive)</li>
+  </ol>
+  <h3>Default permission matrix (starting point &mdash; fully editable)</h3>
+  <table class="small">
+    <tr><th>Module</th><th>Super Admin</th><th>Admin</th><th>Manager</th><th>Team Lead</th><th>RM</th><th>Finance</th><th>HR</th><th>Auditor</th><th>QA</th><th>Marketing</th></tr>
+    <tr><td>Leads</td><td>All&nbsp;CRUDE</td><td>All CRUDE</td><td>Dept CRUE</td><td>Team CRUE</td><td>Own CRU</td><td>All R</td><td>&mdash;</td><td>All R</td><td>All R</td><td>All C R(masked)</td></tr>
+    <tr><td>Customers</td><td>All CRUDE</td><td>All CRUE</td><td>Dept RUE</td><td>Team RU</td><td>Own RU</td><td>All R</td><td>&mdash;</td><td>All R</td><td>All R</td><td>&mdash;</td></tr>
+    <tr><td>Calls &amp; recordings</td><td>All</td><td>All</td><td>Dept R</td><td>Team R</td><td>Own R</td><td>&mdash;</td><td>&mdash;</td><td>All R</td><td>All R + score</td><td>&mdash;</td></tr>
+    <tr><td>WhatsApp inbox</td><td>All</td><td>All</td><td>Dept</td><td>Team</td><td>Own</td><td>&mdash;</td><td>&mdash;</td><td>All R</td><td>All R</td><td>Broadcast</td></tr>
+    <tr><td>Packages &amp; discounts</td><td>All</td><td>All</td><td>Dept + approve</td><td>Team</td><td>Own (&le;limit)</td><td>All R</td><td>&mdash;</td><td>All R</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>Finance</td><td>All</td><td>R</td><td>Dept R</td><td>&mdash;</td><td>Own R</td><td>All CRUE + approve</td><td>&mdash;</td><td>All R E</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>Incentives</td><td>All</td><td>R</td><td>Team approve</td><td>Team R</td><td>Own R</td><td>Verify</td><td>Approve</td><td>All R</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>HRMS</td><td>All</td><td>R</td><td>Team approve</td><td>Team approve</td><td>Self</td><td>Payroll R</td><td>All CRUDE</td><td>All R</td><td>Self</td><td>Self</td></tr>
+    <tr><td>Assets</td><td>All</td><td>All</td><td>Team R</td><td>Team R</td><td>Self</td><td>R</td><td>All</td><td>All R</td><td>Self</td><td>Self</td></tr>
+    <tr><td>Reports &amp; export</td><td>All E</td><td>All E</td><td>Dept E</td><td>Team</td><td>Own</td><td>Finance E</td><td>HR E</td><td>All E</td><td>QA</td><td>Source</td></tr>
+    <tr><td>Integrations &amp; settings</td><td>All</td><td>All</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>R</td><td>&mdash;</td><td>&mdash;</td></tr>
+    <tr><td>Audit explorer</td><td>R</td><td>R</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>Finance R</td><td>HR R</td><td>All R E</td><td>&mdash;</td><td>&mdash;</td></tr>
+  </table>
+  <p class="small muted">C = create, R = read, U = update, D = delete, E = export. Legal, Ops, Tech, DA, Social Media, Content Creator and Support templates are created the same way.</p>
+</div>
+
+<!-- ============ 17 DASHBOARDS ============ -->
+<div class="section">
+  <h1>19. Role-Based Dashboards</h1>
+  <p>On login each user lands on the dashboard of their primary role; users with several roles can switch between dashboards. Every dashboard can be viewed <b>per workspace</b> (e.g. Logo Designing only) or <b>consolidated for the organization</b> (all business lines, with a breakdown by workspace) if the user has organization scope. Every tile respects the user's data scope.</p>
+  <table class="small">
+    <tr><th style="width:17%">Dashboard</th><th>Key tiles &amp; charts</th></tr>
+    <tr><td><b>Platform Owner</b></td><td>MRR, ARR, churn, NRR, active tenants, trials, overdue invoices, tenant health, usage &amp; cost per tenant (details in Section 4)</td></tr>
+    <tr><td>CEO / Management</td><td>Revenue booked vs collected (MTD/QTD/YTD), collection efficiency, pipeline value, conversion rate, top/bottom RMs, source ROI, cash forecast, headcount &amp; attrition, pending approvals</td></tr>
+    <tr><td>COO / Operations</td><td>Open tickets &amp; SLA breaches, tasks overdue by team, site visits today, delivery status of sold packages, escalations, CSAT</td></tr>
+    <tr><td>Admin</td><td>Active users &amp; licences, integration health, failed webhooks, login anomalies, storage usage, pending setup items</td></tr>
+    <tr><td>Sales Head / Manager</td><td>Team funnel, leads untouched, follow-ups due/overdue, calls &amp; talk time per RM, conversions, discount approvals, leaderboard, target vs achievement</td></tr>
+    <tr><td>Team Leader</td><td>Live call board, team follow-ups, lead distribution, today's attendance</td></tr>
+    <tr><td>RM</td><td>My follow-ups today, new leads, hot leads (Lead IQ), my calls, my pipeline, my collections, my incentive estimate, my rank</td></tr>
+    <tr><td>Finance</td><td>Collections today/MTD, receivables ageing, refunds pending, GST summary, incentive verification queue, Razorpay settlement status</td></tr>
+    <tr><td>HR</td><td>Headcount, attendance today, on leave, approvals pending, joiners/exits this month, probation due, birthdays/anniversaries, assets issued/unreturned, payroll status</td></tr>
+    <tr><td>Auditor</td><td>Sensitive changes this period (discounts, refunds, transfers), exports log, unusual login activity, segregation-of-duties alerts</td></tr>
+    <tr><td>QA</td><td>Calls to review, average Call IQ score per RM, compliance flags</td></tr>
+    <tr><td>Marketing / Social / Content</td><td>Leads by source &amp; campaign, cost per lead, conversion by source, AI content drafts awaiting approval, AI usage</td></tr>
+    <tr><td>Legal</td><td>Contracts expiring, pending reviews, disputes, consent records</td></tr>
+    <tr><td>Tech</td><td>API error rate, queue backlog, webhook failures, uptime, response times</td></tr>
+    <tr><td>Employee (everyone)</td><td>My attendance, leave balance, payslips, assets, celebrations feed, announcements, my tickets</td></tr>
+  </table>
+</div>
+
+<!-- ============ 18 WORKFLOWS ============ -->
+<div class="section">
+  <h1>20. End-to-End Business Workflows</h1>
+  <h3>A. Lead to cash to incentive</h3>
+  <div class="flow"><span>Lead arrives (FB / WhatsApp / Sheet / API)</span><i>&rarr;</i><span>Dedupe vs Customer Master</span><i>&rarr;</i><span>Sticky / round-robin assignment</span><i>&rarr;</i><span>RM notified (app + WhatsApp)</span><i>&rarr;</i><span>Click-to-call via CallerDesk</span><i>&rarr;</i><span>Recording + disposition logged</span><i>&rarr;</i><span>Follow-ups &amp; WhatsApp</span><i>&rarr;</i><span>Won &rarr; Package sold</span><i>&rarr;</i><span>Discount approval (if needed)</span><i>&rarr;</i><span>Invoice + Razorpay link</span><i>&rarr;</i><span>Payment webhook &rarr; receipt</span><i>&rarr;</i><span>Incentive calculated</span><i>&rarr;</i><span>Finance &rarr; Manager &rarr; HR approve</span><i>&rarr;</i><span>Payroll</span></div>
+  <h3>B. Repeat customer (sticky ownership)</h3>
+  <div class="flow"><span>Existing customer enquires again</span><i>&rarr;</i><span>Matched by mobile/email/PAN</span><i>&rarr;</i><span>Routed to Primary RM</span><i>&rarr;</i><span>New package with Secondary RM (optional)</span><i>&rarr;</i><span>Split incentive</span></div>
+  <h3>C. Support request</h3>
+  <div class="flow"><span>Customer WhatsApps / calls</span><i>&rarr;</i><span>Chatbot answers or creates ticket</span><i>&rarr;</i><span>Assigned by category</span><i>&rarr;</i><span>SLA timer</span><i>&rarr;</i><span>Escalation if breached</span><i>&rarr;</i><span>Resolved</span><i>&rarr;</i><span>CSAT</span></div>
+  <h3>D. Employee onboarding</h3>
+  <div class="flow"><span>Offer approved</span><i>&rarr;</i><span>Candidate uploads docs</span><i>&rarr;</i><span>HR verifies</span><i>&rarr;</i><span>Employee + user created, roles assigned</span><i>&rarr;</i><span>IT issues assets (acknowledged)</span><i>&rarr;</i><span>Welcome post</span><i>&rarr;</i><span>Probation reminder</span></div>
+  <h3>E. Leave</h3>
+  <div class="flow"><span>Apply</span><i>&rarr;</i><span>Balance check</span><i>&rarr;</i><span>Manager approval</span><i>&rarr;</i><span>Calendar &amp; attendance updated</span><i>&rarr;</i><span>Lead assignment paused for RM</span></div>
+  <h3>F. Employee exit</h3>
+  <div class="flow"><span>Resignation</span><i>&rarr;</i><span>Approvals</span><i>&rarr;</i><span>Notice tracking</span><i>&rarr;</i><span>Lead book transferred</span><i>&rarr;</i><span>Assets returned</span><i>&rarr;</i><span>F&amp;F incl. pending incentives</span><i>&rarr;</i><span>Letters issued</span><i>&rarr;</i><span>Access revoked on last day</span></div>
+  <h3>G. Refund</h3>
+  <div class="flow"><span>Request with reason</span><i>&rarr;</i><span>Manager approval</span><i>&rarr;</i><span>Finance approval</span><i>&rarr;</i><span>Razorpay refund</span><i>&rarr;</i><span>Credit note</span><i>&rarr;</i><span>Incentive clawback</span><i>&rarr;</i><span>Audit entry</span></div>
+  <h3>H. New customer company (SaaS)</h3>
+  <div class="flow"><span>Enquiry captured in your own UBOS</span><i>&rarr;</i><span>Demo</span><i>&rarr;</i><span>Trial tenant created</span><i>&rarr;</i><span>Industry template applied</span><i>&rarr;</i><span>Plan purchased via Razorpay</span><i>&rarr;</i><span>GST invoice issued</span><i>&rarr;</i><span>Onboarding &amp; data import</span><i>&rarr;</i><span>Go-live</span><i>&rarr;</i><span>Monthly auto-renewal</span></div>
+  <h3>I. AI content</h3>
+  <div class="flow"><span>Content creator briefs AI</span><i>&rarr;</i><span>Drafts: copy, image, short script</span><i>&rarr;</i><span>Edit</span><i>&rarr;</i><span>Approval</span><i>&rarr;</i><span>Saved as WhatsApp template / campaign asset</span></div>
+</div>
+
+<!-- ============ 19 ARCHITECTURE ============ -->
+<div class="section">
+  <h1>21. Technical Architecture</h1>
+  <h3>Recommended stack</h3>
+  <table class="small">
+    <tr><th style="width:22%">Layer</th><th style="width:34%">Choice</th><th>Why</th></tr>
+    <tr><td>Web frontend</td><td>Next.js (React, TypeScript), Tailwind + shadcn/ui</td><td>Fast admin UIs, server rendering, one language across stack</td></tr>
+    <tr><td>Mobile (later)</td><td>React Native (Expo) &mdash; Android first</td><td>SIM call logging, check-in, notifications; shares API &amp; types</td></tr>
+    <tr><td>Backend API</td><td>NestJS (Node.js, TypeScript) &mdash; modular monolith</td><td>Clear module boundaries, dependency injection, OpenAPI generation</td></tr>
+    <tr><td>Data access</td><td>Prisma ORM</td><td>Supports PostgreSQL, MySQL and SQL Server from one schema; migrations</td></tr>
+    <tr><td>Database</td><td>PostgreSQL 16 (recommended)</td><td>JSONB for custom fields, row-level security option, strong reporting</td></tr>
+    <tr><td>Cache &amp; queues</td><td>Redis + BullMQ</td><td>Sessions, rate limits, background jobs, webhook retries, schedules</td></tr>
+    <tr><td>Search</td><td>PostgreSQL full-text first; Elasticsearch/OpenSearch when data grows</td><td>Avoids running Elasticsearch before it is needed</td></tr>
+    <tr><td>Realtime</td><td>WebSockets (Socket.IO)</td><td>Live inbox, call screen-pop, notifications</td></tr>
+    <tr><td>File storage</td><td>AWS S3 (Mumbai region) or S3-compatible</td><td>Recordings, documents, exports; signed URLs</td></tr>
+    <tr><td>Auth</td><td>JWT access + rotating refresh tokens, OAuth (Google), TOTP 2FA</td><td>Stateless API, secure sessions</td></tr>
+    <tr><td>Infra</td><td>Docker; start on AWS (ECS or a managed VM) &rarr; Kubernetes when scale needs it</td><td>Kubernetes on day one adds cost and ops load without benefit</td></tr>
+    <tr><td>Monitoring</td><td>Prometheus + Grafana, Loki logs, Sentry errors, uptime checks</td><td>As specified, plus error tracking</td></tr>
+  </table>
+  <h3>Logical architecture</h3>
+  <svg viewBox="0 0 760 330" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, Arial" font-size="10.5">
+    <defs><marker id="b" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#5d5a73"/></marker></defs>
+    <g fill="#efeafd" stroke="#7a5cf0">
+      <rect x="20" y="10" width="160" height="36" rx="5"/><rect x="200" y="10" width="160" height="36" rx="5"/><rect x="380" y="10" width="160" height="36" rx="5"/><rect x="560" y="10" width="180" height="36" rx="5"/>
+    </g>
+    <g text-anchor="middle" fill="#1d1b2e"><text x="100" y="32">Tenant web + Console</text><text x="280" y="32">Mobile app (later)</text><text x="460" y="32">Partner / Sheets / API</text><text x="650" y="32">AI agents via MCP</text></g>
+    <rect x="20" y="70" width="720" height="32" rx="5" fill="#4f2fb8"/><text x="380" y="91" text-anchor="middle" fill="#fff" font-weight="600">API Gateway: tenant resolution, auth, plan entitlements, per-tenant rate limits, /api/v1 + /platform/v1</text>
+    <rect x="20" y="120" width="720" height="110" rx="6" fill="#fbfaff" stroke="#7a5cf0"/>
+    <text x="30" y="137" fill="#4f2fb8" font-weight="600">NestJS modular monolith</text>
+    <g fill="#efeafd" stroke="#c9bff2">
+      <rect x="30" y="145" width="108" height="34" rx="4"/><rect x="146" y="145" width="108" height="34" rx="4"/><rect x="262" y="145" width="108" height="34" rx="4"/><rect x="378" y="145" width="108" height="34" rx="4"/><rect x="494" y="145" width="108" height="34" rx="4"/><rect x="610" y="145" width="120" height="34" rx="4"/>
+      <rect x="30" y="187" width="108" height="34" rx="4"/><rect x="146" y="187" width="108" height="34" rx="4"/><rect x="262" y="187" width="108" height="34" rx="4"/><rect x="378" y="187" width="108" height="34" rx="4"/><rect x="494" y="187" width="108" height="34" rx="4"/><rect x="610" y="187" width="120" height="34" rx="4"/>
+    </g>
+    <g text-anchor="middle" fill="#1d1b2e">
+      <text x="84" y="166">Tenancy &amp; RBAC</text><text x="200" y="166">CRM</text><text x="316" y="166">Telephony</text><text x="432" y="166">Messaging</text><text x="548" y="166">Workflows</text><text x="670" y="166">Integrations Hub</text>
+      <text x="84" y="208">HRMS</text><text x="200" y="208">Assets</text><text x="316" y="208">Finance</text><text x="432" y="208">Incentives</text><text x="548" y="208">Reports</text><text x="670" y="208">AI Gateway</text>
+    </g>
+    <rect x="20" y="245" width="720" height="26" rx="5" fill="#e3f6ea" stroke="#1f9d55"/><text x="380" y="262" text-anchor="middle" fill="#1d1b2e">Event bus (Redis/BullMQ) &rarr; workers: webhooks, sync, notifications, AI jobs, exports, audit writer</text>
+    <g fill="#fff" stroke="#5d5a73">
+      <rect x="20" y="288" width="130" height="32" rx="4"/><rect x="165" y="288" width="110" height="32" rx="4"/><rect x="290" y="288" width="110" height="32" rx="4"/><rect x="415" y="288" width="140" height="32" rx="4"/><rect x="570" y="288" width="170" height="32" rx="4"/>
+    </g>
+    <g text-anchor="middle" fill="#1d1b2e"><text x="85" y="308">PostgreSQL</text><text x="220" y="308">Redis</text><text x="345" y="308">S3 storage</text><text x="485" y="308">Search (later)</text><text x="655" y="308">External: CallerDesk, Meta&hellip;</text></g>
+  </svg>
+  <h3>Multi-tenancy design</h3>
+  <table class="small">
+    <tr><th style="width:22%">Concern</th><th>Design</th></tr>
+    <tr><td>Tenant identification</td><td>Subdomain (<code>acme.ubos.app</code>) or verified custom domain &rarr; tenant; tenant ID is also a signed claim in the user's JWT; both must match</td></tr>
+    <tr><td>Data isolation (shared cloud)</td><td>Shared database, <code>tenant_id</code> on every row, enforced by Prisma middleware <b>and</b> PostgreSQL row-level security policies</td></tr>
+    <tr><td>Data isolation (enterprise)</td><td>Database-per-tenant (or dedicated cluster); the tenant registry stores which connection to use</td></tr>
+    <tr><td>Files</td><td>S3 prefix per tenant (<code>tenants/{id}/&hellip;</code>), signed URLs scoped to the tenant</td></tr>
+    <tr><td>Cache, queues, search</td><td>All keys and indexes prefixed by tenant; per-tenant rate limits and job concurrency so one busy tenant cannot slow others ("noisy neighbour")</td></tr>
+    <tr><td>Secrets</td><td>Each tenant's integration credentials encrypted with a per-tenant data key</td></tr>
+    <tr><td>Configuration</td><td>Plan entitlements + per-tenant feature flags + tenant settings (fields, stages, roles, branding)</td></tr>
+    <tr><td>Upgrades</td><td>One codebase for all tenants; schema migrations are backward-compatible and run once for the shared database, then per dedicated database</td></tr>
+  </table>
+  <h3>Key architecture decisions</h3>
+  <ul>
+    <li><b>Modular monolith first</b>: one deployable backend with strict module boundaries. Modules talk via internal interfaces and events, so heavy ones (Telephony, Messaging, AI) can be split into separate services later without rewrites.</li>
+    <li><b>API-first</b>: the web app has no private backdoor; it uses the same public REST API as the mobile app and partners.</li>
+    <li><b>Event-driven side effects</b>: saving a record emits a domain event (e.g. <code>lead.stage_changed</code>); workflows, notifications, audit, webhooks and AI react asynchronously.</li>
+    <li><b>Multi-tenant from day one</b>: every request is resolved to a tenant (from subdomain / custom domain and the JWT), every table carries <code>tenant_id</code>, and PostgreSQL row-level security blocks cross-tenant reads even if application code has a bug.</li>
+    <li><b>Separate Platform Console</b>: a distinct app and API namespace (<code>/platform/v1</code>) for the Platform Owner, with its own roles and audit log.</li>
+  </ul>
+</div>
+
+<!-- ============ 20 DATA ============ -->
+<div class="section">
+  <h1>22. Database Strategy &amp; Data Model</h1>
+  <h3>SQL Server vs MySQL vs PostgreSQL</h3>
+  <table class="small">
+    <tr><th style="width:18%"></th><th>PostgreSQL <span class="tag ok">Recommended</span></th><th>MySQL 8</th><th>SQL Server</th></tr>
+    <tr><td>Licence cost</td><td>Free</td><td>Free (Community)</td><td>Paid beyond Express (10 GB limit)</td></tr>
+    <tr><td>Custom fields (JSON)</td><td>JSONB with indexes &mdash; excellent</td><td>JSON &mdash; good</td><td>JSON functions &mdash; adequate</td></tr>
+    <tr><td>Reporting / analytics</td><td>Excellent (window functions, materialised views)</td><td>Good</td><td>Excellent</td></tr>
+    <tr><td>Managed hosting in India</td><td>AWS RDS / Azure / GCP</td><td>AWS RDS / Azure / GCP</td><td>AWS RDS / Azure SQL</td></tr>
+    <tr><td>Best when</td><td>New build, cost-sensitive, heavy reporting</td><td>Team already runs MySQL</td><td>Company standardised on Microsoft stack</td></tr>
+  </table>
+  <div class="box"><b>Strategy for a SaaS product:</b> the shared cloud runs on <b>PostgreSQL</b> (needed for row-level tenant isolation and lowest cost). All data access goes through Prisma with no vendor-specific SQL in business code, so an <b>Enterprise customer who insists on MySQL or SQL Server</b> can get a dedicated deployment on that database. We test and support PostgreSQL first, and certify MySQL / SQL Server only when an enterprise deal requires it.</div>
+  <h3>Core entities (schema draft in <code>packages/database/prisma/schema.prisma</code>)</h3>
+  <table class="small">
+    <tr><th style="width:18%">Domain</th><th>Tables</th></tr>
+    <tr><td>Platform (SaaS)</td><td>tenants, tenant_domains, plans, plan_features, tenant_entitlements, subscriptions, subscription_items, platform_invoices, platform_payments, usage_records, feature_flags, platform_users, platform_roles, support_access_grants, partners, partner_commissions, announcements, releases</td></tr>
+    <tr><td>Identity</td><td>companies (= tenant profile), branches, departments, teams, users, roles, permissions, role_permissions (with scope), user_roles (many-to-many, with scope &amp; validity), field_rules, sessions, login_events, api_keys</td></tr>
+    <tr><td>CRM</td><td>customers, customer_identifiers, customer_merges, leads, lead_sources, lead_stages, lead_stage_history, lead_fields (definitions), lead assignments, follow_ups, views, lists, list_members, tags</td></tr>
+    <tr><td>Ownership</td><td>customer_owners (primary RM history), package_owners (secondary RM, split %)</td></tr>
+    <tr><td>Packages</td><td>packages (catalogue), customer_packages (sales), instalments, discount_approvals</td></tr>
+    <tr><td>Communication</td><td>calls, call_recordings, call_dispositions, conversations, messages, message_templates, broadcasts, emails, tickets, ticket_events</td></tr>
+    <tr><td>Operations</td><td>tasks, workflows, workflow_versions, workflow_runs, workflow_run_steps, schedules, forms, form_submissions</td></tr>
+    <tr><td>Integrations</td><td>integrations (catalogue), integration_connections (status: active/paused/inactive, encrypted config), webhook_endpoints, webhook_inbox, webhook_deliveries, api_templates</td></tr>
+    <tr><td>HRMS</td><td>employees, employee_documents, onboarding_checklists, attendance_records, shifts, holidays, leave_types, leave_balances, leave_requests, salary_structures, payroll_runs, payslips, exits, approvals, approval_steps, hr_reminders</td></tr>
+    <tr><td>Assets</td><td>assets, asset_categories, asset_assignments, asset_requests, asset_maintenance</td></tr>
+    <tr><td>Performance</td><td>goals, reviews, review_ratings, achievements, badges, celebrations, feed_posts, reactions</td></tr>
+    <tr><td>Finance</td><td>invoices, invoice_lines, receipts, refunds, credit_notes, ledger_entries, payment_links, tax_rates, number_series</td></tr>
+    <tr><td>Incentives</td><td>incentive_rules, incentive_slabs, incentive_calculations, incentive_lines, incentive_approvals</td></tr>
+    <tr><td>Governance</td><td>audit_logs (append-only), documents, document_versions, exports</td></tr>
+    <tr><td>AI</td><td>ai_providers, ai_feature_settings, ai_requests (usage &amp; cost), ai_content_drafts, knowledge_base_articles</td></tr>
+  </table>
+  <h3>Data rules</h3>
+  <ul><li>Every tenant table: <code>id</code> (UUID), <code>tenant_id</code> (indexed, row-level security), <code>created_at</code>, <code>created_by</code>, <code>updated_at</code>, <code>updated_by</code>, soft-delete <code>deleted_at</code> where relevant</li>
+    <li>Money stored as integer paise (no floating point); all timestamps in UTC, displayed in workspace timezone</li>
+    <li>Mobile numbers normalised to E.164; PAN/Aadhaar encrypted with only last 4 digits searchable</li>
+    <li>Data dictionary and KPI definitions maintained by the DA team in <code>docs/data-dictionary</code></li></ul>
+</div>
+
+<!-- ============ 21 API ============ -->
+<div class="section">
+  <h1>23. API Design (API-first)</h1>
+  <h3>Conventions</h3>
+  <ul>
+    <li>REST + JSON at <code>/api/v1/...</code>; OpenAPI 3 spec auto-generated and published to an internal developer portal</li>
+    <li>Auth: <code>Authorization: Bearer &lt;JWT&gt;</code> for users; <code>X-API-Key</code> for apps; every request is permission- and scope-checked server-side</li>
+    <li>Cursor pagination (<code>?limit=50&amp;cursor=&hellip;</code>), filtering (<code>?filter[stage]=won</code>), sorting, sparse fields</li>
+    <li>Idempotency keys on create/payment endpoints; standard error format <code>{ code, message, details, traceId }</code></li>
+    <li>Rate limits per user, per API key and per tenant; webhooks signed with HMAC-SHA256</li>
+    <li>Tenant is resolved from the host name and JWT on every call; the Platform Console uses a separate namespace <code>/platform/v1</code> that tenant tokens can never call</li>
+  </ul>
+  <h3>Representative endpoints</h3>
+  <pre>AUTH        POST /auth/login | /auth/refresh | /auth/2fa/verify | /auth/logout
+USERS       GET/POST /users  PATCH /users/:id  POST /users/:id/roles  DELETE /users/:id/roles/:roleId
+ROLES       GET/POST /roles  PUT /roles/:id/permissions  GET /permissions/catalog
+CUSTOMERS   GET/POST /customers  GET /customers/:id/timeline  POST /customers/merge  GET /customers/duplicates
+LEADS       GET/POST /leads  PATCH /leads/:id  POST /leads/:id/assign  POST /leads/bulk-assign
+            POST /leads/import (CSV/XLSX)  POST /leads/:id/follow-ups  GET /views/:id/leads
+PACKAGES    GET/POST /packages  POST /customers/:id/packages  POST /customer-packages/:id/discount-requests
+CALLS       POST /calls/click-to-call  GET /calls  GET /calls/:id/recording  POST /calls/:id/disposition
+WHATSAPP    GET /conversations  POST /conversations/:id/messages  GET/POST /whatsapp/templates  POST /broadcasts
+TICKETS     GET/POST /tickets  PATCH /tickets/:id  POST /tickets/:id/escalate
+TASKS       GET/POST /tasks  PATCH /tasks/:id
+WORKFLOWS   GET/POST /workflows  POST /workflows/:id/test  GET /workflows/:id/runs
+WEBHOOKS    POST /hooks/in/:endpointKey   (public, signed)   GET/POST /webhook-subscriptions
+INTEGRATION GET /integrations  POST /integrations/:key/activate  POST /integrations/:key/test
+            POST /integrations/:key/pause  POST /integrations/:key/deactivate
+            POST /integrations/callerdesk/events | /integrations/whatsapp/events | /integrations/razorpay/events
+HR          GET/POST /employees  POST /attendance/check-in  POST /leave-requests  POST /approvals/:id/decision
+            POST /payroll-runs  GET /payslips/:id/pdf  POST /exits
+ASSETS      GET/POST /assets  POST /assets/:id/assign  POST /assets/:id/return  POST /asset-requests
+PERFORMANCE GET/POST /goals  POST /reviews  POST /achievements  GET /feed
+FINANCE     POST /invoices  POST /receipts  POST /refunds  POST /credit-notes  GET /ledgers/customer/:id
+            POST /payment-links  GET /reports/gst-summary
+INCENTIVES  GET/POST /incentive-rules  POST /incentive-calculations/run  POST /incentive-calculations/:id/approve
+REPORTS     GET /reports/:reportKey?from=&amp;to=&amp;groupBy=   GET /dashboards/:role
+EXPORT      POST /exports {resource, filters, format}  GET /exports/:id/download
+AUDIT       GET /audit-logs?entity=&amp;entityId=&amp;user=&amp;from=&amp;to=
+BILLING     GET /billing/subscription  POST /billing/licences  POST /billing/upgrade  GET /billing/invoices  GET /billing/usage
+PLATFORM    /platform/v1/tenants (CRUD, suspend, reactivate)  /platform/v1/plans  /platform/v1/subscriptions
+            /platform/v1/invoices  /platform/v1/usage  /platform/v1/support-access  /platform/v1/metrics/mrr
+            /platform/v1/feature-flags  /platform/v1/partners  /platform/v1/announcements
+AI          POST /ai/chat  POST /ai/summarize-call/:callId  POST /ai/score-lead/:leadId
+            POST /ai/content {type: template|ad|caption|image|video_script}  GET /ai/usage</pre>
+  <h3>Outgoing webhook events (examples)</h3>
+  <p class="small"><code>lead.created</code> &middot; <code>lead.assigned</code> &middot; <code>lead.stage_changed</code> &middot; <code>call.completed</code> &middot; <code>message.received</code> &middot; <code>package.sold</code> &middot; <code>invoice.created</code> &middot; <code>payment.received</code> &middot; <code>refund.processed</code> &middot; <code>ticket.created</code> &middot; <code>ticket.sla_breached</code> &middot; <code>employee.joined</code> &middot; <code>leave.approved</code> &middot; <code>employee.exited</code> &middot; <code>asset.assigned</code> &middot; <code>incentive.approved</code></p>
+  <p class="small"><b>Platform events:</b> <code>tenant.created</code> &middot; <code>trial.ending</code> &middot; <code>subscription.renewed</code> &middot; <code>payment.failed</code> &middot; <code>tenant.suspended</code> &middot; <code>quota.exceeded</code></p>
+</div>
+
+<!-- ============ 22 SECURITY ============ -->
+<div class="section">
+  <h1>24. Security, Privacy &amp; Compliance</h1>
+  <table class="small">
+    <tr><th style="width:24%">Area</th><th>Controls</th></tr>
+    <tr><td>Authentication</td><td>Strong password policy, bcrypt/argon2 hashing, TOTP 2FA (mandatory for Admin, Finance, HR, Auditor), Google OAuth, account lockout, session timeout, device list &amp; remote logout</td></tr>
+    <tr><td>Tenant isolation</td><td>Tenant ID enforced in API, ORM and database (row-level security); automated tests that attempt cross-tenant access on every release; per-tenant encryption keys for secrets; optional database-per-tenant for Enterprise</td></tr>
+    <tr><td>Platform staff access</td><td>Platform staff cannot read tenant business data by default; support access needs tenant consent, is time-limited, logged and shown to the tenant admin</td></tr>
+    <tr><td>Authorisation</td><td>Server-side RBAC + data scope on every query; field-level masking; segregation-of-duties checks</td></tr>
+    <tr><td>Network</td><td>HTTPS/TLS 1.2+, IP allow-lists per role, WAF, rate limiting, CORS restricted to known origins</td></tr>
+    <tr><td>Data protection</td><td>Encryption at rest (database &amp; S3), field-level encryption for PAN/Aadhaar/bank/salary, secrets in a vault (AWS Secrets Manager), signed short-lived URLs for recordings/documents</td></tr>
+    <tr><td>Mobile</td><td>Block screenshots on Android (setting), remote wipe of cached data on logout/exit</td></tr>
+    <tr><td>Your legal role</td><td>For customer companies' data you are the <b>data processor</b>; each tenant is the data controller. Signed DPA, published sub-processor list (cloud, CallerDesk, Meta, AI providers), tenant data export on request and deletion after contract end</td></tr>
+    <tr><td>Privacy law (India)</td><td>Digital Personal Data Protection Act, 2023: consent capture &amp; purpose, data-principal requests (access/correction/erasure), breach-notification process, data retention schedule, data stored in India</td></tr>
+    <tr><td>Telecom &amp; messaging</td><td>Call-recording disclosure in IVR, DND/NDNC scrubbing for promotional calls, TRAI DLT for SMS, WhatsApp opt-in &amp; opt-out handling</td></tr>
+    <tr><td>Aadhaar</td><td>Optional only; store masked or not at all unless a lawful purpose exists; never display in full</td></tr>
+    <tr><td>Audit</td><td>Append-only, hash-chained audit log; export and permission changes always logged</td></tr>
+    <tr><td>Backups &amp; DR</td><td>Automated daily backups + point-in-time recovery (7&ndash;35 days), monthly restore test, RPO &le; 15 min, RTO &le; 4 h; ability to restore a <b>single tenant</b> without affecting others</td></tr>
+    <tr><td>Certifications</td><td>External VAPT before commercial launch and yearly; ISO 27001 and SOC 2 Type II on the roadmap for enterprise sales</td></tr>
+    <tr><td>Secure development</td><td>Code review, dependency scanning, OWASP Top-10 testing, yearly external penetration test, least-privilege cloud access</td></tr>
+  </table>
+</div>
+
+<!-- ============ 23 NFR ============ -->
+<div class="section">
+  <h1>25. Non-Functional Requirements</h1>
+  <table class="small">
+    <tr><th style="width:26%">Requirement</th><th>Target</th></tr>
+    <tr><td>Tenants &amp; users</td><td>Design for 1,000 tenants and 50,000 named users on the shared cloud (5,000 concurrent); your own company ~25&ndash;50 users at start</td></tr>
+    <tr><td>Tenant provisioning</td><td>New trial tenant ready in &lt; 2 minutes from sign-up</td></tr>
+    <tr><td>Data volume</td><td>100 million leads and 500 million activities across tenants; recordings in object storage, no fixed limit</td></tr>
+    <tr><td>API response</td><td>p95 &lt; 300 ms for reads, &lt; 500 ms for writes; dashboards &lt; 2 s</td></tr>
+    <tr><td>Lead latency</td><td>Integration lead visible to assigned RM within 10 seconds</td></tr>
+    <tr><td>Availability</td><td>99.5% during internal use; 99.9% monthly before commercial launch (contractual SLA in paid plans, service credits for Enterprise)</td></tr>
+    <tr><td>Browser / devices</td><td>Latest Chrome, Edge, Safari, Firefox; responsive down to 360 px; Android 10+ app</td></tr>
+    <tr><td>Accessibility</td><td>WCAG 2.1 AA for core screens</td></tr>
+    <tr><td>Localisation</td><td>English UI first; Hindi UI later; INR, IST defaults with configurable timezone/currency</td></tr>
+    <tr><td>Maintainability</td><td>TypeScript end-to-end, &ge; 70% unit-test coverage on business rules, OpenAPI kept in sync</td></tr>
+    <tr><td>Observability</td><td>Every request traceable by traceId across API, queue and integrations</td></tr>
+  </table>
+</div>
+
+<!-- ============ 24 DEVOPS ============ -->
+<div class="section">
+  <h1>26. DevOps, Environments &amp; Monitoring</h1>
+  <table class="small">
+    <tr><th style="width:18%">Environment</th><th>Purpose</th><th>Data</th></tr>
+    <tr><td>Local</td><td>Developer laptops via Docker Compose (Postgres, Redis, MinIO)</td><td>Seed / fake data</td></tr>
+    <tr><td>Dev</td><td>Integration of merged features</td><td>Fake data, integration sandboxes</td></tr>
+    <tr><td>Staging / UAT</td><td>Business users test before release</td><td>Anonymised copy of production</td></tr>
+    <tr><td>Production</td><td>Live (AWS ap-south-1 Mumbai recommended)</td><td>Real data</td></tr>
+  </table>
+  <ul>
+    <li>Git (GitHub) with protected main branch, pull-request reviews, conventional commits</li>
+    <li>CI: lint, type-check, unit tests, build, security scan on every PR; CD: auto-deploy to Dev, one-click to Staging and Production with database migration step and rollback</li>
+    <li>Feature flags per tenant to release modules gradually (also powers plan entitlements and module on/off switches)</li>
+    <li><b>Ring-based rollout</b>: every release goes first to Tenant #1 (your company), then to beta tenants, then to all tenants</li>
+    <li>Zero-downtime deployments and backward-compatible migrations, since customer companies use the system all day</li>
+    <li>Public status page for customers; incident updates by email/WhatsApp to tenant admins</li>
+    <li>Monitoring: Grafana dashboards (API latency, errors, queue depth, DB load), alerts to WhatsApp/email for the tech on-call</li>
+    <li>Release cadence: every 2 weeks to production after UAT sign-off</li>
+  </ul>
+</div>
+
+<!-- ============ 25 ROADMAP ============ -->
+<div class="section">
+  <h1>27. Road Map &amp; Release Plan</h1>
+  <p>Your original 6-phase, 12-month plan is kept, extended with the SaaS platform, workspaces, HRMS, Assets, Support Desk, Integrations Hub and AI Content. <b>Your own company (Tenant #1) goes live first</b>; beta customers join in Phase 3; commercial launch follows Phase 4. Each phase ends with UAT and a production release.</p>
+  <table class="small">
+    <tr><th style="width:12%">Phase</th><th style="width:12%">Months</th><th>Deliverables</th><th style="width:20%">Go-live outcome</th></tr>
+    <tr><td><b>0 &middot; Foundation</b></td><td>Weeks 1&ndash;3</td><td>Blueprint sign-off, UI design system &amp; key screen mock-ups, repo, CI/CD, environments, <b>multi-tenant core (tenant resolution, row-level security, tenant registry)</b>, auth, audit logging, base RBAC</td><td>Clickable prototype</td></tr>
+    <tr><td><b>1 &middot; Core CRM (MVP)</b></td><td>Month 1&ndash;2</td><td>Users, multi-role RBAC, org structure, <b>workspaces &amp; pipelines</b>, settings, Customer Master + dedupe, Lead Management, assignment rules, follow-ups, views, CSV import/export, Integrations Hub with <b>Google Sheets</b> + Website/API; Platform Console basics (tenants, plans, entitlements, platform security)</td><td>Your company runs sales on UBOS as Tenant #1</td></tr>
+    <tr><td><b>2 &middot; Communication</b></td><td>Month 3&ndash;4</td><td><b>CallerDesk</b> (click-to-call, recordings, dispositions), <b>WhatsApp</b> inbox/templates/broadcast + widget, Facebook leads, tasks, workflows v1, reminders, Support Desk, notifications; tenant support desk (P07)</td><td>All calls &amp; chats inside UBOS</td></tr>
+    <tr><td><b>3 &middot; Money &amp; People</b></td><td>Month 5&ndash;6</td><td>Packages, discounts, invoices, receipts, <b>Razorpay</b>, ledgers, collections; HRMS: onboarding, attendance, leave, approvals, HR reminders, assets; <b>subscriptions, platform billing &amp; usage metering</b> (P04&ndash;P06), self-serve trial</td><td>Collections tracked; HR on UBOS; <b>3&ndash;5 beta customers</b></td></tr>
+    <tr><td><b>4 &middot; Insight &amp; Pay</b></td><td>Month 7&ndash;8</td><td>Reports, role dashboards, incentive engine, payroll &amp; payslips, exit, performance, achievements, celebrations, AI Content Studio, Chat IQ pilot; white-label &amp; domains, release centre, platform analytics (P08&ndash;P10); VAPT, legal documents</td><td><b>Commercial launch</b>; automated incentives &amp; payslips</td></tr>
+    <tr><td><b>5 &middot; Governance</b></td><td>Month 9&ndash;10</td><td>Audit explorer, document management &amp; versions, legal register, refunds/credit notes, GST summary, Tally/Zoho sync, more lead-source integrations, mobile app (Android) v1</td><td>Audit-ready</td></tr>
+    <tr><td><b>6 &middot; AI &amp; Scale</b></td><td>Month 11&ndash;12</td><td>Call IQ, Lead IQ, sentiment, forecasting, churn, MCP server, Ask UBOS, video shorts, partner programme (P11), dedicated-cloud option, performance tuning, 99.9% SLA hardening</td><td>AI-assisted sales &amp; management</td></tr>
+  </table>
+  <h3>MVP definition (end of Phase 1, ~12 weeks incl. Phase 0)</h3>
+  <ul><li>Platform Owner can create a tenant (your company) from the Platform Console; the tenant admin can create workspaces (business lines) and pipelines</li>
+    <li>Admin can create roles, assign multiple roles (per workspace or organization-wide), set permissions and export rights</li>
+    <li>Leads flow in from Google Sheets and website, are de-duplicated and auto-assigned</li>
+    <li>RMs work leads with stages, follow-ups and reminders; managers see team views and a basic dashboard</li>
+    <li>Every change is audited; data exports respect access</li></ul>
+  <h3>How each feature moves from idea to production</h3>
+  <div class="flow"><span>Requirement (Product)</span><i>&rarr;</i><span>Design &amp; data spec (Design + DA)</span><i>&rarr;</i><span>Build (Tech)</span><i>&rarr;</i><span>Test (QA)</span><i>&rarr;</i><span>UAT (Business owner)</span><i>&rarr;</i><span>Release</span><i>&rarr;</i><span>Training &amp; SOP (Ops)</span></div>
+</div>
+
+<!-- ============ 26 TEAM ============ -->
+<div class="section">
+  <h1>28. Team Structure &amp; Responsibilities</h1>
+  <h3>Suggested build team</h3>
+  <table class="small">
+    <tr><th style="width:28%">Role</th><th style="width:10%">Count</th><th>Notes</th></tr>
+    <tr><td>Product Owner (you / delegate)</td><td>1</td><td>Final say on priorities and UAT sign-off</td></tr>
+    <tr><td>Product Manager / Business Analyst</td><td>1</td><td>PRDs, workflows, backlog</td></tr>
+    <tr><td>UI/UX Designer</td><td>1</td><td>Design system and screens (Phase 0&ndash;2 full time)</td></tr>
+    <tr><td>Tech Lead / Architect</td><td>1</td><td>Architecture, code review, security</td></tr>
+    <tr><td>Backend developers</td><td>2&ndash;3</td><td>NestJS, integrations, workers</td></tr>
+    <tr><td>Frontend developers</td><td>2</td><td>Next.js web app</td></tr>
+    <tr><td>Mobile developer</td><td>1 (from Phase 4)</td><td>React Native Android app</td></tr>
+    <tr><td>QA engineers</td><td>1&ndash;2</td><td>Manual + automation</td></tr>
+    <tr><td>DevOps (part-time)</td><td>0.5</td><td>CI/CD, cloud, monitoring</td></tr>
+    <tr><td>Data analyst</td><td>1 (part-time early)</td><td>Data dictionary, KPIs, reports</td></tr>
+  </table>
+  <h3>Additional team to run UBOS as a software business (from Phase 3&ndash;4)</h3>
+  <table class="small">
+    <tr><th style="width:28%">Role</th><th style="width:10%">Count</th><th>Notes</th></tr>
+    <tr><td>SaaS sales / business development</td><td>1&ndash;2</td><td>Demos, trials, closing; uses UBOS itself as their CRM</td></tr>
+    <tr><td>Implementation / customer success</td><td>1&ndash;2</td><td>Onboarding, data migration, workspace templates, training, renewals</td></tr>
+    <tr><td>Customer support (L1/L2)</td><td>1&ndash;2</td><td>Tenant tickets, chat, how-to help; escalates bugs to tech</td></tr>
+    <tr><td>Product marketing</td><td>1</td><td>Website, content, case studies, campaigns</td></tr>
+    <tr><td>Partner manager (later)</td><td>1</td><td>Reseller/consultant channel</td></tr>
+  </table>
+  <h3>Department responsibilities in the project</h3>
+  <table class="small">
+    <tr><th style="width:16%">Team</th><th>Responsibilities</th></tr>
+    <tr><td>Data</td><td>Business requirement gathering, data dictionary, KPI definitions, report &amp; dashboard design, data validation rules, master data governance</td></tr>
+    <tr><td>Product</td><td>PRD preparation, workflow definition, feature prioritisation, UAT coordination, release planning</td></tr>
+    <tr><td>Tech</td><td>Architecture, database design, API development, security design, deployment, monitoring, scaling</td></tr>
+    <tr><td>QA</td><td>Functional, regression, load, security and automation testing; UAT support</td></tr>
+    <tr><td>Operations</td><td>Business process validation, SOP creation, user training, escalation matrix, policy definitions</td></tr>
+    <tr><td>Sales</td><td>Lead lifecycle definition, RM workflow, sales funnel design, conversion metrics, commission rules</td></tr>
+    <tr><td>Finance</td><td>Collection rules, accounting rules, revenue recognition, incentive verification, audit support</td></tr>
+    <tr><td>HR</td><td>Employee hierarchy, attendance rules, leave &amp; payroll policy, incentive approval, performance metrics, asset policy</td></tr>
+    <tr><td>Legal</td><td>Privacy notices &amp; consent text, contract templates, data-retention policy, vendor DPAs (CallerDesk, WhatsApp BSP, AI providers)</td></tr>
+    <tr><td>Social / Content</td><td>Brand voice for AI Content Studio, template library, campaign taxonomy</td></tr>
+  </table>
+</div>
+
+<!-- ============ 27 KPIs ============ -->
+<div class="section">
+  <h1>29. Success KPIs (with formulas)</h1>
+  <table class="small">
+    <tr><th style="width:22%">KPI</th><th style="width:46%">Formula</th><th>Initial target (to confirm)</th></tr>
+    <tr><td>Lead conversion rate</td><td>Leads Won &divide; Leads Created (same cohort period) &times; 100</td><td>+20% vs baseline in 6 months</td></tr>
+    <tr><td>First response time</td><td>Median minutes from lead created to first call/message</td><td>&lt; 5 minutes</td></tr>
+    <tr><td>Collection efficiency</td><td>Amount collected &divide; Amount due in period &times; 100</td><td>&ge; 90%</td></tr>
+    <tr><td>RM productivity</td><td>Connected calls, talk time, conversions and revenue per RM per day</td><td>Baseline in month 1, +15%</td></tr>
+    <tr><td>Customer retention</td><td>Customers with repeat/renewed package &divide; customers eligible &times; 100</td><td>Baseline, +10%</td></tr>
+    <tr><td>Revenue growth</td><td>(Revenue this period &minus; same period last year) &divide; last year &times; 100</td><td>Business target</td></tr>
+    <tr><td>Incentive accuracy</td><td>Incentive lines with no correction after approval &divide; total lines &times; 100</td><td>&ge; 99%</td></tr>
+    <tr><td>Audit compliance</td><td>Sensitive changes with complete audit trail &amp; approval &divide; total sensitive changes</td><td>100%</td></tr>
+    <tr><td>System adoption</td><td>Weekly active users &divide; licensed users; % of calls/chats done inside UBOS</td><td>&ge; 95% / &ge; 90%</td></tr>
+    <tr><td>Support SLA</td><td>Tickets resolved within SLA &divide; tickets closed</td><td>&ge; 90%</td></tr>
+    <tr><td>HR process time</td><td>Days from offer to fully onboarded; leave approval turnaround</td><td>&lt; 3 days / &lt; 24 h</td></tr>
+  </table>
+  <h3>SaaS business KPIs (Platform Owner)</h3>
+  <table class="small">
+    <tr><th style="width:22%">KPI</th><th style="width:46%">Formula</th><th>Initial target (to confirm)</th></tr>
+    <tr><td>MRR / ARR</td><td>Sum of monthly recurring subscription revenue; ARR = MRR &times; 12</td><td>Business plan target</td></tr>
+    <tr><td>Paying tenants</td><td>Tenants with an active paid subscription</td><td>e.g. 25 in first 6 months after launch</td></tr>
+    <tr><td>Trial &rarr; paid conversion</td><td>Trials converted &divide; trials started &times; 100</td><td>&ge; 15&ndash;20%</td></tr>
+    <tr><td>Logo churn (monthly)</td><td>Tenants cancelled in month &divide; tenants at start of month &times; 100</td><td>&lt; 2%</td></tr>
+    <tr><td>Net revenue retention</td><td>(Start MRR + expansion &minus; contraction &minus; churn) &divide; start MRR &times; 100 (12-month cohort)</td><td>&ge; 105%</td></tr>
+    <tr><td>ARPA</td><td>MRR &divide; paying tenants</td><td>Track by plan</td></tr>
+    <tr><td>CAC payback</td><td>Sales &amp; marketing cost to win a tenant &divide; monthly gross margin per tenant</td><td>&lt; 12 months</td></tr>
+    <tr><td>Gross margin</td><td>(Revenue &minus; infra, pass-through and support cost) &divide; revenue &times; 100</td><td>&ge; 75%</td></tr>
+    <tr><td>Time to go-live</td><td>Days from purchase to tenant fully onboarded</td><td>&lt; 14 days (SMB)</td></tr>
+  </table>
+</div>
+
+<!-- ============ 28 RISKS ============ -->
+<div class="section">
+  <h1>30. Risks &amp; Mitigations</h1>
+  <table class="small">
+    <tr><th style="width:28%">Risk</th><th style="width:10%">Level</th><th>Mitigation</th></tr>
+    <tr><td>Scope too large, nothing ships</td><td><span class="tag bad">High</span></td><td>Strict phases; MVP in ~12 weeks; new ideas go to backlog, not current sprint</td></tr>
+    <tr><td>Integration API changes / limits (CallerDesk, Meta, portals)</td><td><span class="tag warn">Medium</span></td><td>Adapter pattern, raw webhook inbox with replay, sandbox accounts, health monitoring</td></tr>
+    <tr><td>WhatsApp policy / template rejection, number quality</td><td><span class="tag warn">Medium</span></td><td>Opt-in capture, template review process, broadcast throttling</td></tr>
+    <tr><td>Data migration from current tools is messy</td><td><span class="tag warn">Medium</span></td><td>Import tool with dedupe preview; DA team cleans data before go-live</td></tr>
+    <tr><td>Low adoption by RMs</td><td><span class="tag warn">Medium</span></td><td>Fast, simple RM screens; mobile app; dashboards &amp; incentives only visible from UBOS data</td></tr>
+    <tr><td>Payroll &amp; statutory errors</td><td><span class="tag warn">Medium</span></td><td>Parallel run with current payroll for 2 months; CA review of rules</td></tr>
+    <tr><td>Data leakage via exports or AI</td><td><span class="tag warn">Medium</span></td><td>Export permissions &amp; masking, audit, AI data stripping, enterprise AI terms</td></tr>
+    <tr><td>AI cost overrun</td><td><span class="tag">Low&ndash;Med</span></td><td>Per-feature budgets, caching, cheaper models for bulk tasks</td></tr>
+    <tr><td>Key-person dependency in tech team</td><td><span class="tag warn">Medium</span></td><td>Documentation in repo, code reviews, shared ownership</td></tr>
+    <tr><td>Data of one customer company visible to another</td><td><span class="tag bad">High impact</span></td><td>Tenant isolation in API + ORM + database RLS, automated cross-tenant tests, VAPT, per-tenant keys</td></tr>
+    <tr><td>Customer-specific requests fragment the product</td><td><span class="tag warn">Medium</span></td><td>Solve with configuration (fields, stages, workspaces, workflows) not custom code; paid customisation only via APIs/templates</td></tr>
+    <tr><td>Support load grows with every customer</td><td><span class="tag warn">Medium</span></td><td>Knowledge base, in-app guides, onboarding templates, tiered support by plan</td></tr>
+    <tr><td>Strong competition (tele-CRMs, LeadSquared, Zoho, HRMS tools)</td><td><span class="tag warn">Medium</span></td><td>All-in-one positioning (CRM + calling + WhatsApp + HR + finance), multi-business-line workspaces, focus industries, competitive pricing</td></tr>
+    <tr><td>Unpaid usage costs (WhatsApp, AI, calls)</td><td><span class="tag warn">Medium</span></td><td>Bring-your-own accounts by default; prepaid credits for platform-provided services; quotas</td></tr>
+  </table>
+</div>
+
+<!-- ============ 29 DECISIONS ============ -->
+<div class="section">
+  <h1>31. Decisions Needed From You</h1>
+  <p>Please mark your choice on each before we start building. Defaults shown are what we will use if not changed.</p>
+  <table class="small">
+    <tr><th style="width:4%">#</th><th style="width:38%">Decision</th><th>Options</th><th style="width:22%">Recommended default</th></tr>
+    <tr><td>1</td><td>Production database</td><td>PostgreSQL / MySQL / SQL Server</td><td>PostgreSQL</td></tr>
+    <tr><td>2</td><td>Hosting</td><td>AWS / Azure / own VPS</td><td>AWS Mumbai</td></tr>
+    <tr><td>3</td><td>WhatsApp connection</td><td>Meta Cloud API direct / BSP (Interakt, Gupshup, AiSensy, existing provider)</td><td>Your current provider if it has an API; else Meta Cloud API</td></tr>
+    <tr><td>4</td><td>CallerDesk account details</td><td>API key, numbers, IVR flows, agent list</td><td>Needed in Phase 2</td></tr>
+    <tr><td>5</td><td>Single company or SaaS</td><td><b>Decided: multi-tenant SaaS</b> &mdash; own use as Tenant #1 + sell to other companies, multiple workspaces per company</td><td>&#10003; Decided (v2.0)</td></tr>
+    <tr><td>6</td><td>Branches &amp; departments list</td><td>&mdash;</td><td>Needed in Phase 0</td></tr>
+    <tr><td>7</td><td>Lead stages, sources, packages, discount limits</td><td>&mdash;</td><td>Needed in Phase 0</td></tr>
+    <tr><td>8</td><td>Incentive rules (current scheme)</td><td>&mdash;</td><td>Needed by Phase 3</td></tr>
+    <tr><td>9</td><td>Payroll statutory applicability</td><td>PF / ESI / PT state / TDS</td><td>Confirm with CA</td></tr>
+    <tr><td>10</td><td>Accounting package to sync</td><td>Tally / Zoho Books / none</td><td>Tally export</td></tr>
+    <tr><td>11</td><td>Default AI provider</td><td>Gemini / Claude / OpenAI (can mix per feature)</td><td>Configurable; start with one</td></tr>
+    <tr><td>12</td><td>Mobile app timing</td><td>Phase 2 / Phase 5</td><td>Phase 5 (web is responsive before)</td></tr>
+    <tr><td>13</td><td>Build team</td><td>In-house hires / agency / mixed</td><td>Mixed, with in-house tech lead</td></tr>
+    <tr><td>14</td><td>Brand name, logo, colours, domain, trademark</td><td>&mdash;</td><td>"UBOS" working name; check trademark</td></tr>
+    <tr><td>15</td><td>Pricing &amp; plans</td><td>Per user / per workspace / flat; prices in Section 3</td><td>Per user per month, 4 plans</td></tr>
+    <tr><td>16</td><td>Legal entity selling the software, GST</td><td>Existing company / new company</td><td>Confirm with CA</td></tr>
+    <tr><td>17</td><td>First focus industries for sales</td><td>e.g. Education, Consulting/Vastu, Design services, Real estate</td><td>2&ndash;3 where you have domain knowledge</td></tr>
+    <tr><td>18</td><td>Deployment tiers offered at launch</td><td>Shared cloud / dedicated / on-premise</td><td>Shared cloud only at launch</td></tr>
+    <tr><td>19</td><td>WhatsApp for tenants</td><td>Meta Tech Provider / BSP partnership / tenants bring own BSP</td><td>Tenants bring own; apply for Tech Provider</td></tr>
+    <tr><td>20</td><td>Free trial length &amp; limits</td><td>7 / 14 / 30 days</td><td>14 days, 5 users</td></tr>
+    <tr><td>21</td><td>Your own business lines (workspaces for Tenant #1)</td><td>e.g. Course/Software, Logo Designing, Vastu Consultation/Audit</td><td>Needed in Phase 0</td></tr>
+  </table>
+  <div class="box"><b>Next step after your approval:</b> Phase 0 starts &mdash; design system, clickable prototype of the Platform Console, RM, Manager and Admin screens (with the workspace switcher), final multi-tenant database schema, and repository set-up in <code>C:\Users\ravi\UBOS</code>.</div>
+</div>
+
+<!-- ============ 30 APPENDIX ============ -->
+<div class="section">
+  <h1>32. Appendix: Project Folder Structure &amp; Glossary</h1>
+  <pre>C:\Users\ravi\UBOS
+├── README.md                     Project overview &amp; status
+├── docs\
+│   ├── blueprint\                This blueprint (HTML source + PDF)
+│   ├── requirements\             Module-wise requirement files (M01–M30)
+│   ├── architecture\             Architecture, ADRs (decisions)
+│   ├── api\                      API conventions &amp; endpoint catalogue
+│   ├── data-dictionary\          Entities, fields, KPI definitions
+│   ├── rbac\                     Default permission matrix (CSV)
+│   ├── integrations\             One spec per integration
+│   └── roadmap\                  Phases &amp; release plan
+├── apps\
+│   ├── web\                      Next.js tenant portal (to be built)
+│   ├── console\                  Next.js Platform Console (to be built)
+│   ├── api\                      NestJS API (to be built)
+│   ├── worker\                   Background jobs (to be built)
+│   └── mobile\                   React Native app (later)
+├── packages\
+│   ├── database\prisma\          schema.prisma (draft data model)
+│   ├── shared\                   Shared types &amp; permission catalogue
+│   ├── integrations\             Adapters: callerdesk, whatsapp, google-sheets, razorpay…
+│   └── ai-gateway\               Gemini / Claude / OpenAI providers
+├── infra\                        docker-compose, deployment, monitoring
+└── .env.example                  Environment variables template</pre>
+  <h3>Glossary</h3>
+  <table class="small">
+    <tr><th style="width:20%">Term</th><th>Meaning</th></tr>
+    <tr><td>Tenant / Organization</td><td>One customer company subscribed to UBOS, with its own isolated data</td></tr>
+    <tr><td>Workspace</td><td>A business line inside an organization (e.g. Logo Designing), with its own leads, pipelines and teams</td></tr>
+    <tr><td>Platform Console</td><td>Your admin area to manage all tenants, plans, billing and support</td></tr>
+    <tr><td>MRR / ARR / NRR</td><td>Monthly / annual recurring revenue; net revenue retention</td></tr>
+    <tr><td>RLS</td><td>Row-level security &mdash; database rule that keeps each tenant's rows invisible to others</td></tr>
+    <tr><td>RM</td><td>Relationship Manager &mdash; salesperson who owns customers</td></tr>
+    <tr><td>Primary / Secondary RM</td><td>Permanent customer owner / package-level owner</td></tr>
+    <tr><td>Sticky assignment</td><td>New leads of an existing customer go back to the same RM</td></tr>
+    <tr><td>Data scope</td><td>Which records a permission applies to (own, team, department, branch, all)</td></tr>
+    <tr><td>BSP</td><td>WhatsApp Business Solution Provider</td></tr>
+    <tr><td>Disposition</td><td>Outcome tag recorded after a call</td></tr>
+    <tr><td>F&amp;F</td><td>Full and final settlement on employee exit</td></tr>
+    <tr><td>MCP</td><td>Model Context Protocol &mdash; lets AI assistants securely use UBOS data</td></tr>
+    <tr><td>UAT</td><td>User acceptance testing by business owners</td></tr>
+    <tr><td>DPDP Act</td><td>India's Digital Personal Data Protection Act, 2023</td></tr>
+  </table>
+  <p class="muted small" style="margin-top:20px">End of document &middot; UBOS Blueprint v1.0 (draft) &middot; Prepared for owner review. No application code will be written until this blueprint is approved.</p>
+</div>
+
+</body>
+</html>
