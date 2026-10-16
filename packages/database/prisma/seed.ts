@@ -67,6 +67,29 @@ async function main() {
   );
   const [course, logo, vastu] = own.workspaces;
 
+  // Sample custom lead fields per business line (editable in Workspaces → Settings).
+  const fields: [string, { key: string; label: string; type: string; options?: string[]; required?: boolean }[]][] = [
+    [course.id, [
+      { key: 'course', label: 'Course interested', type: 'dropdown', options: ['Numerology Basic', 'Numerology Advanced', 'Software Licence'], required: true },
+      { key: 'preferred_batch', label: 'Preferred batch', type: 'dropdown', options: ['Weekday', 'Weekend', 'Online'] },
+    ]],
+    [logo.id, [
+      { key: 'business_type', label: 'Business type', type: 'text' },
+      { key: 'services', label: 'Services needed', type: 'multiselect', options: ['Logo', 'Visiting card', 'Brochure', 'Website'] },
+      { key: 'budget', label: 'Budget', type: 'currency' },
+    ]],
+    [vastu.id, [
+      { key: 'property_type', label: 'Property type', type: 'dropdown', options: ['Home', 'Office', 'Shop', 'Factory', 'Plot'], required: true },
+      { key: 'city', label: 'City', type: 'text' },
+      { key: 'site_visit_date', label: 'Site visit date', type: 'date' },
+    ]],
+  ];
+  for (const [workspaceId, list] of fields) {
+    await prisma.leadField.createMany({
+      data: list.map((f, position) => ({ tenantId: own.tenant.id, workspaceId, position, options: [], required: false, ...f })),
+    });
+  }
+
   const branch = await prisma.branch.create({ data: { tenantId: own.tenant.id, name: 'Head Office' } });
   const dept = await prisma.department.create({ data: { tenantId: own.tenant.id, branchId: branch.id, name: 'Sales' } });
   const vastuTeam = await prisma.team.create({ data: { tenantId: own.tenant.id, departmentId: dept.id, workspaceId: vastu.id, name: 'Vastu Team' } });

@@ -48,17 +48,31 @@ export async function syncPermissionCatalog(client: PrismaClient) {
 export const slugify = (s: string) =>
   s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
 
-/** Creates a workspace with its pipelines and stages inside an existing tenant. */
+export const DEFAULT_SOURCES: [string, string][] = [
+  ['manual', 'Manual entry'], ['website', 'Website'], ['facebook', 'Facebook'], ['instagram', 'Instagram'],
+  ['google_ads', 'Google Ads'], ['whatsapp', 'WhatsApp'], ['google_sheets', 'Google Sheets'], ['referral', 'Referral'],
+  ['indiamart', 'IndiaMart'], ['justdial', 'JustDial'], ['walk_in', 'Walk-in'], ['cross_sell', 'Cross-sell'],
+];
+export const DEFAULT_LOST_REASONS = ['Not interested', 'Budget issue', 'Bought elsewhere', 'Not reachable', 'Wrong number', 'Duplicate enquiry'];
+
+/** Creates a workspace with its pipelines, stages, lead sources and lost reasons inside an existing tenant. */
 export async function createWorkspace(tx: Tx, tenantId: string, w: WorkspaceInput) {
   const workspace = await tx.workspace.create({
     data: { tenantId, name: w.name, slug: slugify(w.name), template: w.template },
   });
-  for (const p of w.pipelines ?? [{ name: 'Sales' }]) {
+  await tx.workspaceOption.createMany({
+    data: [
+      ...DEFAULT_SOURCES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_source', value, label, position })),
+      ...DEFAULT_LOST_REASONS.map((label, position) => ({ tenantId, workspaceId: workspace.id, kind: 'lost_reason', value: label, label, position })),
+    ],
+  });
+  for (const [position, p] of (w.pipelines ?? [{ name: 'Sales' }]).entries()) {
     await tx.pipeline.create({
       data: {
         tenantId,
         workspaceId: workspace.id,
         name: p.name,
+        position,
         stages: {
           create: (p.stages ?? DEFAULT_STAGES).map((name, position) => ({
             tenantId, name, position, isWon: name === 'Won', isLost: name === 'Lost',

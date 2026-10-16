@@ -76,7 +76,7 @@ check('Auditor can export CSV organization-wide', audExport.status === 200 && St
 // ── Shared Customer Master across workspaces ──
 const crossSell = await call('/api/v1/leads', {
   tenant: 'mycompany', token: adminA, workspace: ws['Vastu Consultation / Audit'], method: 'POST',
-  body: { name: 'Priya Verma', mobile: '+91 98765 00002', source: 'cross_sell' },
+  body: { name: 'Priya Verma', mobile: '+91 98765 00002', source: 'cross_sell', customFields: { property_type: 'Home' } },
 });
 check('Same mobile in another workspace reuses the existing customer', crossSell.status === 201 && crossSell.body.existingCustomer === true, crossSell);
 

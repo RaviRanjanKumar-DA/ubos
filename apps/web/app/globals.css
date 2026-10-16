@@ -93,6 +93,9 @@ table.table { width: 100%; border-collapse: collapse; }
 .page-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .ws-switch { display: flex; align-items: center; gap: 8px; }
 .ws-switch select { height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: inherit; font-weight: 600; background: var(--brand-50); color: var(--brand); }
+.ws-switch { min-width: 0; flex: 0 1 auto; }
+.ws-switch select { min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+.topbar > .btn, .topbar .avatar { flex: none; }
 .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--brand-100); color: var(--brand); display: grid; place-items: center; font-weight: 700; font-size: 13px; }
 .menu-btn { display: none; }
 @media (max-width: 860px) {

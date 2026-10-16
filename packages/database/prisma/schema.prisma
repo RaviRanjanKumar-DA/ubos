@@ -186,8 +186,43 @@ model Workspace {
   pipelines Pipeline[]
   leads     Lead[]
   packages  Package[]
+  fields    LeadField[]
+  options   WorkspaceOption[]
 
   @@unique([tenantId, slug])
+}
+
+// Custom lead field of one workspace (business line). Values live in Lead.customFields under `key`.
+model LeadField {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  key         String    // stable machine name, e.g. "property_type"; never changes after creation
+  label       String
+  type        String    // text | textarea | number | currency | date | dropdown | multiselect | checkbox | phone | email | url
+  options     String[]  @default([])
+  required    Boolean   @default(false)
+  position    Int       @default(0)
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@unique([workspaceId, key])
+}
+
+// Simple pick-lists per workspace: lead sources and lost reasons (later: call feedback, tags…).
+model WorkspaceOption {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id])
+  kind        String    // lead_source | lost_reason
+  value       String    // stored on records (lead.source / lead.lostReason)
+  label       String
+  position    Int       @default(0)
+  isArchived  Boolean   @default(false)
+
+  @@unique([workspaceId, kind, value])
 }
 
 // A process inside a workspace, e.g. Education → Admissions / Renewals; Vastu → Consultation / Site Audit.
@@ -197,6 +232,7 @@ model Pipeline {
   workspaceId String
   workspace   Workspace   @relation(fields: [workspaceId], references: [id])
   name        String
+  position    Int         @default(0)
   stages      LeadStage[]
   leads       Lead[]
 }

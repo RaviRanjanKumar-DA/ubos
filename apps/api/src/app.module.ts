@@ -20,6 +20,7 @@ import { Mailer } from './auth/mailer';
 import { UsersController } from './modules/users.controller';
 import { RolesController } from './modules/roles.controller';
 import { OrgController } from './modules/org.controller';
+import { WorkspaceSettingsController } from './modules/workspace-settings.controller';
 
 @Controller('health')
 class HealthController {
@@ -37,6 +38,7 @@ class HealthController {
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
+    WorkspaceSettingsController,
   ],
   providers: [
     DbService,

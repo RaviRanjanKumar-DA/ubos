@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 
@@ -9,6 +10,7 @@ interface Workspace {
   name: string;
   template: string | null;
   leadCount: number;
+  isArchived: boolean;
   pipelines: { id: string; name: string; stages: { id: string; name: string }[] }[];
 }
 
@@ -51,10 +53,17 @@ export default function WorkspacesPage() {
       {error && <div className="error">{error}</div>}
       <div className="grid cols-3">
         {list?.map((w) => (
-          <div className="card" key={w.id}>
+          <div className="card" key={w.id} style={w.isArchived ? { opacity: 0.6 } : undefined}>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <h2 style={{ margin: 0 }}>{w.name}</h2>
-              <span className="badge grey">{w.leadCount} leads</span>
+              <h2 style={{ margin: 0 }}>{w.name} {w.isArchived && <span className="badge grey">Archived</span>}</h2>
+              <div className="row" style={{ gap: 6 }}>
+                <span className="badge grey">{w.leadCount} leads</span>
+                {w.isArchived ? (
+                  <button className="btn sm outline" onClick={() => api(`/api/v1/workspaces/${w.id}`, { method: 'PATCH', body: { isArchived: false }, noWorkspace: true }).then(load).catch((e) => setError(e.message))}>Restore</button>
+                ) : (
+                  <Link className="btn sm outline" href={`/app/workspaces/${w.id}`}>Settings</Link>
+                )}
+              </div>
             </div>
             <div className="small muted" style={{ margin: '4px 0 10px' }}>Template: {w.template ?? '—'}</div>
             {w.pipelines.map((p) => (

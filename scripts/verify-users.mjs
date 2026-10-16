@@ -75,7 +75,7 @@ check('new user must change the temporary password', p1.mustChangePassword === t
 await call('/api/v1/auth/password', { token: p1.accessToken, method: 'POST', body: { currentPassword: created.body.temporaryPassword, newPassword: 'PoojaPass2026' } });
 const pooja = (await login('pooja', 'PoojaPass2026')).accessToken;
 const pLogo = await call('/api/v1/leads', { token: pooja, workspace: ws['Logo Designing'], method: 'POST', body: { name: 'Bright Studio', mobile: '9000011111', source: 'facebook' } });
-const pCourse = await call('/api/v1/leads', { token: pooja, workspace: ws['Course / Software'], method: 'POST', body: { name: 'Course Lead', mobile: '9000011112' } });
+const pCourse = await call('/api/v1/leads', { token: pooja, workspace: ws['Course / Software'], method: 'POST', body: { name: 'Course Lead', mobile: '9000011112', customFields: { course: 'Numerology Basic' } } });
 const pVastu = await call('/api/v1/leads', { token: pooja, workspace: ws['Vastu Consultation / Audit'] });
 check('custom role works in Logo, RM role in Course, no access to Vastu', pLogo.status === 201 && pCourse.status === 201 && pVastu.status === 403, [pLogo.status, pCourse.status, pVastu.status]);
 

@@ -21,7 +21,8 @@
     "dev:web": "npm run dev -w @ubos/web",
     "verify:isolation": "node scripts/verify-isolation.mjs",
     "verify:auth": "node scripts/verify-auth.mjs",
-    "verify:users": "node scripts/verify-users.mjs"
+    "verify:users": "node scripts/verify-users.mjs",
+    "verify:settings": "node scripts/verify-workspace-settings.mjs"
   },
   "engines": {
     "node": ">=20"

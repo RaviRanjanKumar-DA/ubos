@@ -20,13 +20,15 @@ export class WorkspacesController {
   @RequirePermission('org.workspace.view')
   list() {
     const a = auth();
+    // Organization admins also see archived workspaces so they can restore them.
+    const orgAdmin = a.permissions['org.workspace.manage'] === 'ORGANIZATION';
     return this.db.tenant(async (tx) => {
       const workspaces = await tx.workspace.findMany({
-        where: { id: { in: a.accessibleWorkspaceIds }, isArchived: false },
-        orderBy: { name: 'asc' },
-        include: { pipelines: { include: { stages: { orderBy: { position: 'asc' } } } } },
+        where: orgAdmin ? {} : { id: { in: a.accessibleWorkspaceIds }, isArchived: false },
+        orderBy: [{ isArchived: 'asc' }, { name: 'asc' }],
+        include: { pipelines: { orderBy: { position: 'asc' }, include: { stages: { orderBy: { position: 'asc' } } } } },
       });
-      const counts = await tx.lead.groupBy({ by: ['workspaceId'], _count: true, where: { workspaceId: { in: a.accessibleWorkspaceIds } } });
+      const counts = await tx.lead.groupBy({ by: ['workspaceId'], _count: true, where: { workspaceId: { in: workspaces.map((w) => w.id) } } });
       const byWs = new Map(counts.map((c) => [c.workspaceId, c._count]));
       return workspaces.map((w) => ({ ...w, leadCount: byWs.get(w.id) ?? 0 }));
     });
