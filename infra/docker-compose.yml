@@ -16,6 +16,11 @@ services:
       interval: 3s
       retries: 20
 
+  # Local mailbox for login codes and notifications: SMTP on 1025, web inbox on http://localhost:8025
+  mailpit:
+    image: axllent/mailpit:v1.21.8
+    ports: ["1025:1025", "8025:8025"]
+
   redis:
     image: redis:7
     ports: ["6379:6379"]

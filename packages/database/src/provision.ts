@@ -73,6 +73,8 @@ export async function provisionTenant(tx: Tx, input: ProvisionInput) {
     },
   });
 
+  await tx.organizationSetting.create({ data: { tenantId: tenant.id } });
+
   const now = new Date();
   const trialEnd = new Date(now.getTime() + 14 * 86_400_000);
   await tx.subscription.create({

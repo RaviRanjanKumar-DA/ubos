@@ -19,7 +19,8 @@
     "test": "npm run test --workspaces --if-present",
     "dev:api": "npm run dev -w @ubos/api",
     "dev:web": "npm run dev -w @ubos/web",
-    "verify:isolation": "node scripts/verify-isolation.mjs"
+    "verify:isolation": "node scripts/verify-isolation.mjs",
+    "verify:auth": "node scripts/verify-auth.mjs"
   },
   "engines": {
     "node": ">=20"

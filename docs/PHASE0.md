@@ -40,8 +40,7 @@ npm run dev:web
 
 ## Known limitations (deliberately left for Phase 1)
 
-- Tokens are stored in browser localStorage in the prototype; Phase 1 moves to httpOnly cookies + refresh-token rotation.
-- 2FA (TOTP), IP restriction, session timeout, password reset: Phase 1 (M01).
+- ~~Tokens in localStorage; no 2FA / IP restriction / session timeout~~ → done in Phase 1.1 (see PHASE1.md).
 - Field-level masking and per-role export row limits are designed but not enforced yet (export is capped at 5,000 rows).
 - Integration activation is an on/off switch only; credentials, field mapping and the real CallerDesk / WhatsApp / Google Sheets adapters come in Phases 1–2.
 - Lead create (customer match + lead insert) is atomic, but the audit hash chain serialises writers per tenant with an advisory lock, which is fine for current volumes and will be revisited for high write rates.

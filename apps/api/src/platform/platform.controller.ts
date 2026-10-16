@@ -1,35 +1,44 @@
 import {
-  Body, CanActivate, ConflictException, Controller, ExecutionContext, Get, Injectable, NotFoundException,
-  Param, Patch, Post, UnauthorizedException, UseGuards,
+  Body, CanActivate, ConflictException, Controller, ExecutionContext, Get, HttpCode, HttpException, Injectable,
+  NotFoundException, Param, Patch, Post, Req, Res, UnauthorizedException, UseGuards,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import type { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { appendAudit, provisionTenant, slugify } from '@ubos/database';
 import { DbService } from '../common/db.service';
 import { ctx } from '../common/context';
 import { parse } from '../common/errors';
+import { decrypt } from '../auth/crypto';
+import { normalizeIp } from '../auth/ip';
+import { SessionService } from '../auth/sessions';
+import { authTransaction, CommitThenThrow } from '../auth/tx';
 
-/** Platform staff guard. Uses a separate signing secret, so tenant tokens can never reach these routes. */
+/** Platform staff guard: separate cookies and signing secret, so tenant sessions can never reach these routes. */
 @Injectable()
 export class PlatformGuard implements CanActivate {
-  constructor(private jwt: JwtService) {}
+  constructor(private sessions: SessionService, private db: DbService) {}
   async canActivate(context: ExecutionContext) {
-    const req = context.switchToHttp().getRequest();
-    const token = (req.headers.authorization as string | undefined)?.replace(/^Bearer /, '');
+    const req = context.switchToHttp().getRequest<Request>();
+    const token = this.sessions.tokenFrom(req, 'platform');
     if (!token) throw new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Login required' });
-    try {
-      const p = await this.jwt.verifyAsync(token, { secret: process.env.JWT_PLATFORM_SECRET });
-      if (p.typ !== 'platform') throw new Error();
-      ctx().platformUserId = p.sub;
-      return true;
-    } catch {
-      throw new UnauthorizedException({ code: 'TOKEN_INVALID', message: 'Session expired, please log in again' });
+    const claims = await this.sessions.verifyAccess('platform', token);
+    const session = await this.db.platform.session.findUnique({ where: { id: claims.sid } });
+    if (!session || session.revokedAt || session.platformUserId !== claims.sub) {
+      throw new UnauthorizedException({ code: 'SESSION_REVOKED', message: 'You were signed out, please log in again' });
     }
+    ctx().platformUserId = claims.sub;
+    (req as Request & { platformSessionId?: string }).platformSessionId = session.id;
+    return true;
   }
 }
 
-const LoginBody = z.object({ email: z.string().email(), password: z.string().min(1) });
+const PLATFORM_IDLE_MINUTES = 8 * 60;
+const PLATFORM_MAX_FAILED = 5;
+const PLATFORM_LOCK_MINUTES = 15;
+
+const LoginBody = z.object({ email: z.string().email(), password: z.string().min(1), code: z.string().regex(/^\d{6}$/).optional() });
 const CreateTenant = z.object({
   name: z.string().trim().min(2).max(100),
   slug: z.string().trim().regex(/^[a-z0-9-]{3,40}$/, 'Use 3–40 lowercase letters, numbers or dashes').optional(),
@@ -44,26 +53,71 @@ const SetStatus = z.object({ status: z.enum(['active', 'suspended']) });
 
 @Controller('platform/v1')
 export class PlatformController {
-  constructor(private db: DbService, private jwt: JwtService) {}
+  constructor(private db: DbService, private sessions: SessionService) {}
 
+  /** Platform staff sign-in. If 2FA is on, the 6-digit authenticator code must be sent with the password. */
   @Post('auth/login')
-  async login(@Body() body: unknown) {
-    const { email, password } = parse(LoginBody, body);
-    const user = await this.db.platform.platformUser.findUnique({ where: { email: email.toLowerCase() } });
-    const ok = !!user && user.isActive && (await bcrypt.compare(password, user.passwordHash));
-    await this.db.platform.$transaction((tx) =>
-      appendAudit(tx, {
-        tenantId: null, actorType: 'platform_user', actorId: user?.id ?? null, ip: ctx().ip,
-        entity: 'platform_user', entityId: user?.id ?? email.toLowerCase(),
-        action: ok ? 'platform.login' : 'platform.login_failed',
-      }),
-    );
-    if (!ok) throw new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Wrong email or password' });
-    const accessToken = await this.jwt.signAsync(
-      { sub: user!.id, typ: 'platform', role: user!.role },
-      { secret: process.env.JWT_PLATFORM_SECRET, expiresIn: '8h' },
-    );
-    return { accessToken, user: { id: user!.id, name: user!.name, email: user!.email, role: user!.role } };
+  @HttpCode(200)
+  login(@Body() body: unknown, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const { email, password, code } = parse(LoginBody, body);
+    return authTransaction((fn) => this.db.platform.$transaction(fn), async (tx) => {
+      const user = await tx.platformUser.findUnique({ where: { email: email.toLowerCase() } });
+      const audit = (action: string) => appendAudit(tx, {
+        tenantId: null, actorType: 'platform_user', actorId: user?.id ?? null, ip: normalizeIp(req.ip),
+        entity: 'platform_user', entityId: user?.id ?? email.toLowerCase(), action,
+      });
+      if (user?.lockedUntil && user.lockedUntil > new Date()) {
+        throw new HttpException({ code: 'ACCOUNT_LOCKED', message: 'Too many failed attempts. Try again later.' }, 423);
+      }
+      const passwordOk = !!user && user.isActive && (await bcrypt.compare(password, user.passwordHash));
+      if (passwordOk && user!.totpEnabled && !code) return { mfaRequired: true as const };
+      const codeOk = !user?.totpEnabled || (!!code && !!user.totpSecret && authenticator.check(code, decrypt(user.totpSecret)));
+      if (!passwordOk || !codeOk) {
+        if (user) {
+          const failed = user.failedLogins + 1;
+          const lock = failed >= PLATFORM_MAX_FAILED;
+          await tx.platformUser.update({
+            where: { id: user.id },
+            data: lock ? { failedLogins: 0, lockedUntil: new Date(Date.now() + PLATFORM_LOCK_MINUTES * 60_000) } : { failedLogins: failed },
+          });
+        }
+        await audit('platform.login_failed');
+        throw new CommitThenThrow(new UnauthorizedException({ code: 'INVALID_CREDENTIALS', message: 'Wrong email, password or code' }));
+      }
+      await tx.platformUser.update({ where: { id: user!.id }, data: { failedLogins: 0, lockedUntil: null } });
+      const { accessToken } = await this.sessions.issue(tx, 'platform', { userId: user!.id }, req, res);
+      await audit('platform.login');
+      return { mfaRequired: false as const, accessToken, user: { id: user!.id, name: user!.name, email: user!.email, role: user!.role } };
+    });
+  }
+
+  @Post('auth/refresh')
+  @HttpCode(200)
+  refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    return authTransaction((fn) => this.db.platform.$transaction(fn), (tx) =>
+      this.sessions.refresh(tx, 'platform', req, res, PLATFORM_IDLE_MINUTES));
+  }
+
+  @UseGuards(PlatformGuard)
+  @Post('auth/logout')
+  @HttpCode(200)
+  async logout(@Req() req: Request & { platformSessionId?: string }, @Res({ passthrough: true }) res: Response) {
+    await this.db.platform.$transaction(async (tx) => {
+      await this.sessions.revoke(tx, req.platformSessionId!, 'logout');
+      await appendAudit(tx, {
+        tenantId: null, actorType: 'platform_user', actorId: ctx().platformUserId, ip: normalizeIp(req.ip),
+        entity: 'session', entityId: req.platformSessionId!, action: 'platform.logout',
+      });
+    });
+    this.sessions.clear(res, 'platform');
+    return { ok: true };
+  }
+
+  @UseGuards(PlatformGuard)
+  @Get('auth/me')
+  async me() {
+    const u = await this.db.platform.platformUser.findUniqueOrThrow({ where: { id: ctx().platformUserId } });
+    return { id: u.id, name: u.name, email: u.email, role: u.role, totpEnabled: u.totpEnabled };
   }
 
   @UseGuards(PlatformGuard)

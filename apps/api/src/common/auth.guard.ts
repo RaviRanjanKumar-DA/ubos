@@ -2,12 +2,14 @@ import {
   CanActivate, ExecutionContext, ForbiddenException, Injectable, SetMetadata, UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { JwtService } from '@nestjs/jwt';
 import type { Request } from 'express';
 import {
   accessibleWorkspaceIds, DataScope, FeatureKey, PermissionKey, resolvePermissions, RoleAssignment,
 } from '@ubos/shared';
 import { DbService } from './db.service';
+import { SessionService } from '../auth/sessions';
+import { DEFAULT_SETTINGS } from '../auth/login.service';
+import { ipAllowed, normalizeIp } from '../auth/ip';
 import { ctx } from './context';
 
 export const IS_PUBLIC = 'isPublic';
@@ -34,7 +36,7 @@ const SCOPE_ORDER: DataScope[] = ['OWN', 'TEAM', 'DEPARTMENT', 'BRANCH', 'WORKSP
  */
 @Injectable()
 export class TenantAuthGuard implements CanActivate {
-  constructor(private reflector: Reflector, private jwt: JwtService, private db: DbService) {}
+  constructor(private reflector: Reflector, private sessions: SessionService, private db: DbService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest<Request>();
@@ -42,14 +44,9 @@ export class TenantAuthGuard implements CanActivate {
     const targets = [context.getHandler(), context.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
 
-    const token = req.headers.authorization?.replace(/^Bearer /, '');
+    const token = this.sessions.tokenFrom(req, 'tenant');
     if (!token) throw new UnauthorizedException({ code: 'UNAUTHENTICATED', message: 'Login required' });
-    let payload: { sub: string; tid: string; typ: string };
-    try {
-      payload = await this.jwt.verifyAsync(token, { secret: process.env.JWT_ACCESS_SECRET });
-    } catch {
-      throw new UnauthorizedException({ code: 'TOKEN_INVALID', message: 'Session expired, please log in again' });
-    }
+    const payload = await this.sessions.verifyAccess('tenant', token);
     const c = ctx();
     // A token issued for one organization can never be used against another.
     if (payload.typ !== 'tenant' || payload.tid !== c.tenant?.id) {
@@ -69,9 +66,18 @@ export class TenantAuthGuard implements CanActivate {
         orderBy: { currentPeriodEnd: 'desc' },
       });
       const overrides = await tx.tenantEntitlement.findMany();
-      return { user, workspaces, sub, overrides };
+      const session = await tx.session.findUnique({ where: { id: payload.sid } });
+      const settings = (await tx.organizationSetting.findUnique({ where: { tenantId: payload.tid! } })) ?? DEFAULT_SETTINGS;
+      return { user, workspaces, sub, overrides, session, settings };
     });
     if (!data.user || !data.user.isActive) throw new UnauthorizedException({ code: 'USER_INACTIVE', message: 'User is inactive' });
+    // Logout, remote logout and password changes take effect immediately, not when the access token expires.
+    if (!data.session || data.session.revokedAt || data.session.userId !== data.user.id) {
+      throw new UnauthorizedException({ code: 'SESSION_REVOKED', message: 'You were signed out, please log in again' });
+    }
+    if (!ipAllowed(normalizeIp(req.ip), data.settings.ipAllowlist)) {
+      throw new ForbiddenException({ code: 'IP_NOT_ALLOWED', message: 'Access is not allowed from this network' });
+    }
 
     const features = new Set<FeatureKey>((data.sub?.plan.features ?? []).map((f) => f.featureKey as FeatureKey));
     for (const o of data.overrides) {
@@ -91,8 +97,13 @@ export class TenantAuthGuard implements CanActivate {
       throw new ForbiddenException({ code: 'WORKSPACE_FORBIDDEN', message: 'You do not have access to this workspace' });
     }
 
+    const mfaSetupRequired = !data.user.totpEnabled && assignments.some((r) => data.settings.require2faRoles.includes(r.roleName));
     c.auth = {
       userId: data.user.id,
+      sessionId: data.session.id,
+      totpEnabled: data.user.totpEnabled,
+      mustChangePassword: data.user.mustChangePassword,
+      mfaSetupRequired,
       name: data.user.name,
       email: data.user.email,
       teamId: data.user.teamId,
@@ -102,6 +113,12 @@ export class TenantAuthGuard implements CanActivate {
       permissions: resolvePermissions(assignments, { workspaceId: requestedWs, features }),
       features,
     };
+
+    // Until the password is changed / 2FA is set up, only the account endpoints (me, password, 2fa, logout) work.
+    if (!req.path.startsWith('/api/v1/auth/')) {
+      if (c.auth.mustChangePassword) throw new ForbiddenException({ code: 'PASSWORD_CHANGE_REQUIRED', message: 'Please set a new password first' });
+      if (mfaSetupRequired) throw new ForbiddenException({ code: 'MFA_SETUP_REQUIRED', message: 'Your organization requires two-factor authentication. Please set it up first.' });
+    }
 
     const feature = this.reflector.getAllAndOverride<FeatureKey>(FEATURE, targets);
     if (feature && !features.has(feature)) {

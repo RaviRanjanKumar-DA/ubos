@@ -118,9 +118,46 @@ model PlatformUser {
   name         String
   email        String  @unique
   passwordHash String
-  totpSecret   String? // 2FA becomes mandatory for platform staff in Phase 1
+  totpSecret   String? // encrypted TOTP secret
+  totpEnabled  Boolean   @default(false)
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
   role         String  // owner | admin | sales | support | finance | tech
   isActive     Boolean @default(true)
+}
+
+// Login sessions for tenant users and platform staff. The refresh token is stored only as a SHA-256 hash.
+model Session {
+  id             String    @id @default(uuid())
+  tenantId       String?   // null for platform staff sessions
+  userId         String?
+  platformUserId String?
+  refreshHash    String    @unique
+  prevRefreshHash String?  // previous token; presenting it again means the token was stolen
+  userAgent      String?
+  ip             String?
+  createdAt      DateTime  @default(now())
+  lastUsedAt     DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  revokedReason  String?
+
+  @@index([userId])
+  @@index([platformUserId])
+  @@index([prevRefreshHash])
+}
+
+// Security policy per organization (Workspace settings → Preferences / Security).
+model OrganizationSetting {
+  tenantId           String   @id
+  sessionIdleMinutes Int      @default(480)
+  ipAllowlist        String[] @default([])
+  require2faRoles    String[] @default([]) // role names that must use two-factor auth
+  loginMethods       String[] @default(["password", "google", "microsoft", "email_code"])
+  allowedEmailDomains String[] @default([]) // empty = any domain (for Google / Microsoft / email-code login)
+  maxFailedLogins    Int      @default(5)
+  lockMinutes        Int      @default(15)
+  updatedAt          DateTime @updatedAt
 }
 
 model SupportAccessGrant {
@@ -225,15 +262,36 @@ model User {
   directReports User[]     @relation("Hierarchy")
   name          String
   email         String
+  username      String?
   mobile        String?
   passwordHash  String
   totpSecret    String?    // encrypted
+  totpEnabled   Boolean    @default(false)
+  failedLogins  Int        @default(0)
+  lockedUntil   DateTime?
+  passwordChangedAt DateTime?
+  mustChangePassword Boolean @default(false)
   isActive      Boolean    @default(true)
   roles         UserRole[]
   employee      Employee?
   createdAt     DateTime   @default(now())
 
   @@unique([tenantId, email])
+  @@unique([tenantId, username])
+}
+
+// One-time login codes sent by email ("Sign in with email code"). Only a hash of the code is stored.
+model LoginCode {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId])
 }
 
 // ═════════════════════════ Roles & permissions (multi-role, per workspace) ═════════════════════════

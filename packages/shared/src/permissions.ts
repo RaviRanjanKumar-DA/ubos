@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   'org.user.view': 'View users',
   'org.user.manage': 'Create users and assign roles',
   'org.role.manage': 'Create and edit roles',
+  'org.security.manage': 'Security policy: login methods, 2FA rules, IP allow-list, session timeout',
   'integrations.view': 'View integrations',
   'integrations.manage': 'Activate / deactivate integrations',
   'audit.view': 'View audit log',

@@ -72,10 +72,11 @@ async function main() {
   const vastuTeam = await prisma.team.create({ data: { tenantId: own.tenant.id, departmentId: dept.id, workspaceId: vastu.id, name: 'Vastu Team' } });
 
   const hash = await bcrypt.hash(DEV_PASSWORD, 10);
-  const mkUser = (name: string, email: string, teamId?: string) =>
-    prisma.user.create({ data: { tenantId: own.tenant.id, name, email, passwordHash: hash, teamId } });
+  const mkUser = (name: string, email: string, teamId?: string, extra: { username?: string; mobile?: string } = {}) =>
+    prisma.user.create({ data: { tenantId: own.tenant.id, name, email, passwordHash: hash, teamId, ...extra } });
   const manager = await mkUser('Neha (Manager)', 'manager@mycompany.local', vastuTeam.id);
-  const rmVastu = await mkUser('Arjun (RM)', 'rm@mycompany.local', vastuTeam.id);
+  // Arjun can also sign in with username "arjun" or mobile 98765 11111.
+  const rmVastu = await mkUser('Arjun (RM)', 'rm@mycompany.local', vastuTeam.id, { username: 'arjun', mobile: '+919876511111' });
   const rmCourse = await mkUser('Simran (RM)', 'rm2@mycompany.local');
   const auditor = await mkUser('Kabir (Auditor)', 'auditor@mycompany.local');
 

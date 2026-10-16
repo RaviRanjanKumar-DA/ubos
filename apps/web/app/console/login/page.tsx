@@ -2,12 +2,14 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, platformApi, platformSession } from '@/lib/api';
+import { ApiError, platformApi } from '@/lib/api';
 
 export default function ConsoleLogin() {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
+  const [needCode, setNeedCode] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
 
@@ -16,10 +18,14 @@ export default function ConsoleLogin() {
     setBusy(true);
     setError('');
     try {
-      const r = await platformApi<{ accessToken: string; user: { name: string } }>('/platform/v1/auth/login', {
-        method: 'POST', body: { email, password },
+      const r = await platformApi<{ mfaRequired: boolean }>('/platform/v1/auth/login', {
+        method: 'POST', body: { email, password, ...(needCode ? { code } : {}) },
       });
-      platformSession.set({ token: r.accessToken, name: r.user.name });
+      if (r.mfaRequired) {
+        setNeedCode(true);
+        setBusy(false);
+        return;
+      }
       router.push('/console');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Cannot reach the server');
@@ -43,6 +49,9 @@ export default function ConsoleLogin() {
           {error && <div className="error">{error}</div>}
           <div className="field"><label htmlFor="e">Email</label><input id="e" className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
           <div className="field"><label htmlFor="p">Password</label><input id="p" className="input" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
+          {needCode && (
+            <div className="field"><label htmlFor="c">Authenticator code</label><input id="c" className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} required autoFocus /></div>
+          )}
           <button className="btn" style={{ width: '100%', justifyContent: 'center' }} disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
           <p className="small muted" style={{ marginTop: 14 }}><a href="/login">Organization sign-in</a></p>
         </form>

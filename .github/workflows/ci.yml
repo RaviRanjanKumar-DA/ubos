@@ -18,6 +18,9 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U ubos" --health-interval 3s --health-retries 20
+      mailpit:
+        image: axllent/mailpit:v1.21.8
+        ports: ["1025:1025", "8025:8025"]
     env:
       DATABASE_URL: postgresql://ubos:ubos@localhost:5432/ubos
       APP_DATABASE_URL: postgresql://ubos_app:ubos_app_ci@localhost:5432/ubos
@@ -25,6 +28,9 @@ jobs:
       JWT_ACCESS_SECRET: ci-access-secret-not-for-production
       JWT_PLATFORM_SECRET: ci-platform-secret-not-for-production
       API_PORT: 4000
+      ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,3 +54,5 @@ jobs:
           node apps/api/dist/main.js &
           for i in $(seq 1 30); do curl -sf http://localhost:4000/health && break; sleep 1; done
           npm run verify:isolation
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:auth

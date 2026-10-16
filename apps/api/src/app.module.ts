@@ -12,6 +12,11 @@ import { IntegrationsController } from './modules/integrations.controller';
 import { AuditController } from './modules/audit.controller';
 import { DashboardController } from './modules/dashboard.controller';
 import { PlatformController, PlatformGuard } from './platform/platform.controller';
+import { SecurityController } from './modules/security.controller';
+import { OAuthController } from './auth/oauth.controller';
+import { SessionService } from './auth/sessions';
+import { TenantLoginService } from './auth/login.service';
+import { Mailer } from './auth/mailer';
 
 @Controller('health')
 class HealthController {
@@ -28,9 +33,13 @@ class HealthController {
   controllers: [
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
+    SecurityController, OAuthController,
   ],
   providers: [
     DbService,
+    SessionService,
+    TenantLoginService,
+    Mailer,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },
     { provide: APP_FILTER, useClass: ErrorFilter },

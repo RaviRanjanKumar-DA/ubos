@@ -5,6 +5,8 @@ config({ path: resolve(__dirname, '../../../.env') });
 
 import { randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';
+import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { contextStore } from './common/context';
@@ -13,10 +15,25 @@ async function bootstrap() {
   for (const key of ['APP_DATABASE_URL', 'PLATFORM_DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_PLATFORM_SECRET']) {
     if (!process.env[key]) throw new Error(`Missing environment variable ${key}`);
   }
+  for (const key of ['ENCRYPTION_KEY']) {
+    if (!process.env[key]) throw new Error(`Missing environment variable ${key}`);
+  }
   const app = await NestFactory.create(AppModule);
+  app.use(cookieParser());
   app.enableCors({
-    origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3000').split(','),
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Tenant', 'X-Workspace'],
+    origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(','),
+    credentials: true,
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Tenant', 'X-Workspace', 'X-UBOS-CSRF'],
+  });
+  // CSRF: a browser request that relies on session cookies must also carry a custom header,
+  // which other websites cannot add (CORS). Together with SameSite=Lax cookies this blocks forged requests.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const unsafe = !['GET', 'HEAD', 'OPTIONS'].includes(req.method);
+    const usesCookies = Object.keys(req.cookies ?? {}).some((k) => k.startsWith('ubos_'));
+    if (unsafe && usesCookies && !req.headers.authorization && req.headers['x-ubos-csrf'] !== '1') {
+      return res.status(403).json({ code: 'CSRF_REJECTED', message: 'Request blocked for security reasons' });
+    }
+    next();
   });
   // Every request runs inside its own context (trace id, tenant, user) — read via ctx().
   app.use((req: { ip?: string; headers: Record<string, unknown> }, res: { setHeader(k: string, v: string): void }, next: () => void) => {

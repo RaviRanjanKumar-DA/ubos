@@ -10,6 +10,11 @@ export interface TenantInfo {
 
 export interface AuthInfo {
   userId: string;
+  sessionId: string;
+  totpEnabled: boolean;
+  mustChangePassword: boolean;
+  /** The user's role requires 2FA (organization policy) but it is not set up yet. */
+  mfaSetupRequired: boolean;
   name: string;
   email: string;
   teamId: string | null;

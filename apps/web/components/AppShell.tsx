@@ -14,6 +14,7 @@ export interface Me {
   currentWorkspaceId: string | null;
   permissions: Record<string, string>;
   features: string[];
+  security: { totpEnabled: boolean; mustChangePassword: boolean; mfaSetupRequired: boolean };
 }
 
 interface ShellCtx {
@@ -44,6 +45,9 @@ const NAV = [
   { href: '/app/workspaces', label: 'Workspaces', icon: 'workspaces', perm: 'org.workspace.view' },
   { href: '/app/integrations', label: 'Integrations', icon: 'integrations', perm: 'integrations.view' },
   { href: '/app/audit', label: 'Audit Log', icon: 'audit', perm: 'audit.view' },
+  { href: '/app/settings/security', label: 'Security Policy', icon: 'lock', perm: 'org.security.manage' },
+  { section: 'Account' },
+  { href: '/app/security', label: 'My Security', icon: 'lock', perm: null },
 ] as const;
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -64,8 +68,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return load();
       }
       setMe(m);
+      // Organization policy: a new password or 2FA setup comes before any other screen.
+      if ((m.security.mustChangePassword || m.security.mfaSetupRequired) && !window.location.pathname.startsWith('/app/security')) {
+        router.replace(`/app/security?reason=${m.security.mustChangePassword ? 'password' : 'mfa'}`);
+      }
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 401 || e.code === 'TENANT_SUSPENDED')) {
+      if (e instanceof ApiError && (e.status === 401 || e.code === 'TENANT_SUSPENDED' || e.code === 'IP_NOT_ALLOWED')) {
         session.set(null);
         return router.replace('/login');
       }
@@ -87,7 +95,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setVersion((v) => v + 1);
   }
 
-  function logout() {
+  async function logout() {
+    await api('/api/v1/auth/logout', { method: 'POST' }).catch(() => undefined);
     session.set(null);
     router.replace('/login');
   }
@@ -113,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               );
             }
-            if (!can(item.perm)) return null;
+            if (item.perm && !can(item.perm)) return null;
             return (
               <Link key={i} href={item.href} className={`nav-item ${pathname.startsWith(item.href) ? 'active' : ''}`} onClick={() => setOpen(false)}>
                 <Icon name={item.icon} /> {item.label}

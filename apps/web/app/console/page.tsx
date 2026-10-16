@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ApiError, platformApi, platformSession, rupees } from '@/lib/api';
+import { ApiError, platformApi, rupees } from '@/lib/api';
 import { Icon } from '@/components/Icon';
 
 interface Tenant {
@@ -34,10 +34,9 @@ export default function ConsolePage() {
   const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
-    const s = platformSession.get();
-    if (!s) return router.replace('/console/login');
-    setName(s.name);
     try {
+      const meRes = await platformApi<{ name: string }>('/platform/v1/auth/me');
+      setName(meRes.name);
       const [t, m, p] = await Promise.all([
         platformApi<Tenant[]>('/platform/v1/tenants'),
         platformApi<Metrics>('/platform/v1/metrics'),
@@ -48,7 +47,6 @@ export default function ConsolePage() {
       setPlans(p);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
-        platformSession.set(null);
         return router.replace('/console/login');
       }
       setError(e instanceof Error ? e.message : 'Failed');
@@ -78,7 +76,7 @@ export default function ConsolePage() {
         <div className="brand" style={{ padding: 0 }}><span className="logo">U</span> Platform Console</div>
         <div className="spacer" />
         <span className="small muted hide-sm">{name}</span>
-        <button className="btn ghost sm" title="Sign out" onClick={() => { platformSession.set(null); router.replace('/console/login'); }}>
+        <button className="btn ghost sm" title="Sign out" onClick={async () => { await platformApi('/platform/v1/auth/logout', { method: 'POST' }).catch(() => undefined); router.replace('/console/login'); }}>
           <Icon name="logout" />
         </button>
       </header>
