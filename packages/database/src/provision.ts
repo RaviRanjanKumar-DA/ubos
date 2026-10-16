@@ -1,5 +1,6 @@
 import bcrypt from 'bcryptjs';
-import { ROLE_TEMPLATES } from '@ubos/shared';
+import { ADMIN_ROLE, PERMISSION_KEYS, ROLE_TEMPLATES } from '@ubos/shared';
+import type { PrismaClient } from '@prisma/client';
 import type { Tx } from './tenant-context';
 import { appendAudit } from './audit';
 
@@ -26,6 +27,22 @@ export interface ProvisionInput {
   admin: { name: string; email: string; password: string };
   workspaces: WorkspaceInput[];
   actor?: { type: 'platform_user' | 'system'; id?: string };
+}
+
+/**
+ * Keeps the database permission catalogue in step with the code: new permission keys are added, and every
+ * tenant's built-in admin role receives them organization-wide. Runs at API startup (platform connection).
+ */
+export async function syncPermissionCatalog(client: PrismaClient) {
+  await client.permission.createMany({ data: PERMISSION_KEYS.map((key) => ({ key })), skipDuplicates: true });
+  const perms = await client.permission.findMany({ where: { key: { in: PERMISSION_KEYS } } });
+  const adminRoles = await client.role.findMany({ where: { name: ADMIN_ROLE }, select: { id: true } });
+  if (!adminRoles.length) return 0;
+  const r = await client.rolePermission.createMany({
+    data: adminRoles.flatMap((role) => perms.map((p) => ({ roleId: role.id, permissionId: p.id, scope: 'ORGANIZATION' as const }))),
+    skipDuplicates: true,
+  });
+  return r.count;
 }
 
 export const slugify = (s: string) =>

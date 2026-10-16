@@ -18,6 +18,7 @@ export const PERMISSIONS = {
   'org.user.view': 'View users',
   'org.user.manage': 'Create users and assign roles',
   'org.role.manage': 'Create and edit roles',
+  'org.structure.manage': 'Branches, departments and teams',
   'org.security.manage': 'Security policy: login methods, 2FA rules, IP allow-list, session timeout',
   'integrations.view': 'View integrations',
   'integrations.manage': 'Activate / deactivate integrations',
@@ -25,6 +26,21 @@ export const PERMISSIONS = {
 } as const;
 export type PermissionKey = keyof typeof PERMISSIONS;
 export const PERMISSION_KEYS = Object.keys(PERMISSIONS) as PermissionKey[];
+
+/** Groups for the role editor screen. */
+export const PERMISSION_GROUPS: { label: string; prefix: string }[] = [
+  { label: 'Dashboard', prefix: 'dashboard.' },
+  { label: 'Leads & customers', prefix: 'crm.' },
+  { label: 'Organization', prefix: 'org.' },
+  { label: 'Integrations', prefix: 'integrations.' },
+  { label: 'Audit', prefix: 'audit.' },
+];
+
+/**
+ * The built-in administrator role. It always has every permission organization-wide and cannot be
+ * edited or deleted, and an organization can never be left without an active user holding it.
+ */
+export const ADMIN_ROLE = 'Organization Admin';
 
 // Feature keys sold through plans (Platform → Plans & Entitlements).
 export const FEATURES = {

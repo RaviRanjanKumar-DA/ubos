@@ -10,6 +10,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { contextStore } from './common/context';
+import { DbService } from './common/db.service';
+import { syncPermissionCatalog } from '@ubos/database';
 
 async function bootstrap() {
   for (const key of ['APP_DATABASE_URL', 'PLATFORM_DATABASE_URL', 'JWT_ACCESS_SECRET', 'JWT_PLATFORM_SECRET']) {
@@ -41,6 +43,8 @@ async function bootstrap() {
     res.setHeader('X-Trace-Id', traceId);
     contextStore.run({ traceId, ip: req.ip ?? null }, next);
   });
+  const added = await syncPermissionCatalog(app.get(DbService).platform);
+  if (added) Logger.log(`Granted ${added} new permission(s) to Organization Admin roles`, 'Bootstrap');
   const port = Number(process.env.API_PORT ?? 4000);
   await app.listen(port);
   Logger.log(`UBOS API listening on http://localhost:${port}`, 'Bootstrap');

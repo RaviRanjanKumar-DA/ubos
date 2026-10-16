@@ -56,3 +56,5 @@ jobs:
           npm run verify:isolation
           npx tsx packages/database/prisma/seed.ts
           npm run verify:auth
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:users

@@ -17,6 +17,9 @@ import { OAuthController } from './auth/oauth.controller';
 import { SessionService } from './auth/sessions';
 import { TenantLoginService } from './auth/login.service';
 import { Mailer } from './auth/mailer';
+import { UsersController } from './modules/users.controller';
+import { RolesController } from './modules/roles.controller';
+import { OrgController } from './modules/org.controller';
 
 @Controller('health')
 class HealthController {
@@ -33,7 +36,7 @@ class HealthController {
   controllers: [
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
-    SecurityController, OAuthController,
+    SecurityController, OAuthController, UsersController, RolesController, OrgController,
   ],
   providers: [
     DbService,
