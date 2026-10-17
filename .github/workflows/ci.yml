@@ -60,3 +60,5 @@ jobs:
           npm run verify:users
           npx tsx packages/database/prisma/seed.ts
           npm run verify:settings
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:customers

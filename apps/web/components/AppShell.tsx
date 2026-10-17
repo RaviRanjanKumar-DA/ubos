@@ -35,6 +35,7 @@ const NAV = [
   { section: 'Work' },
   { href: '/app/dashboard', label: 'Dashboard', icon: 'dashboard', perm: 'dashboard.view' },
   { href: '/app/leads', label: 'Leads', icon: 'leads', perm: 'crm.lead.view' },
+  { href: '/app/customers', label: 'Customers', icon: 'hr', perm: 'crm.customer.view' },
   { label: 'Calls', icon: 'calls', phase: 2 },
   { label: 'WhatsApp Inbox', icon: 'chat', phase: 2 },
   { section: 'Business' },

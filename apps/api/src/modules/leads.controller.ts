@@ -9,6 +9,7 @@ import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
+import { findCustomer, nextCustomerCode } from '../common/customers';
 
 const ListQuery = z.object({
   pipelineId: z.string().uuid().optional(),
@@ -64,6 +65,7 @@ export class LeadsController {
         id: l.id,
         name: l.customer.name,
         mobile: l.customer.mobile,
+        customerId: l.customerId,
         customerCode: l.customer.code,
         source: l.source,
         workspace: l.workspace.name,
@@ -97,13 +99,17 @@ export class LeadsController {
       await this.assertSource(tx, a.workspaceId!, input.source);
       const customFields = await this.checkFields(tx, a.workspaceId!, input.customFields);
 
-      let customer = await tx.customer.findFirst({ where: { mobile } });
+      // One customer per person across all business lines: link to an existing record by mobile / email.
+      const match = await findCustomer(tx, { mobile, email: input.email || null });
+      let customer = match?.customer ?? null;
       const isExistingCustomer = !!customer;
       if (!customer) {
-        const count = await tx.customer.count();
         customer = await tx.customer.create({
-          data: { tenantId: tenantId(), name: input.name, mobile, email: input.email || null, code: `C${String(count + 1).padStart(5, '0')}` },
+          data: { tenantId: tenantId(), name: input.name, mobile, email: input.email || null, code: await nextCustomerCode(tx) },
         });
+      } else if (match?.matchedBy === 'email' && mobile !== customer.mobile && !customer.alternateMobiles.includes(mobile)) {
+        // Same person (by email) enquiring from another number: remember it as an alternate mobile.
+        customer = await tx.customer.update({ where: { id: customer.id }, data: { alternateMobiles: { push: mobile } } });
       }
       const lead = await tx.lead.create({
         data: {
@@ -115,7 +121,7 @@ export class LeadsController {
         entity: 'lead', entityId: lead.id, action: 'lead.created',
         newValue: { name: input.name, source: input.source, customerCode: customer.code, existingCustomer: isExistingCustomer },
       });
-      return { id: lead.id, customerCode: customer.code, existingCustomer: isExistingCustomer };
+      return { id: lead.id, customerId: customer.id, customerCode: customer.code, existingCustomer: isExistingCustomer, matchedBy: match?.matchedBy ?? null };
     });
   }
 

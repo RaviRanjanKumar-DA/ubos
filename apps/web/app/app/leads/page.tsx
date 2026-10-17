@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 import { FieldInput } from '@/components/FieldInput';
@@ -10,6 +11,7 @@ interface Lead {
   id: string;
   name: string;
   mobile: string | null;
+  customerId: string;
   customerCode: string;
   source: string;
   workspace: string;
@@ -116,7 +118,7 @@ export default function LeadsPage() {
             <tbody>
               {leads?.map((l) => (
                 <tr key={l.id}>
-                  <td><b>{l.name}</b><div className="small muted">{l.customerCode} · {l.pipeline}</div></td>
+                  <td>{can('crm.customer.view') ? <Link href={`/app/customers/${l.customerId}`}><b>{l.name}</b></Link> : <b>{l.name}</b>}<div className="small muted">{l.customerCode} · {l.pipeline}</div></td>
                   <td>{l.mobile}</td>
                   {!me.currentWorkspaceId && <td><span className="badge">{l.workspace}</span></td>}
                   {shownFields.map((f) => <td key={f.key} className="small">{showValue(f, l.customFields?.[f.key]) || <span className="muted">—</span>}</td>)}

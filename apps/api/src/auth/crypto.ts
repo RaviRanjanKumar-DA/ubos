@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, randomInt } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, randomInt } from 'crypto';
 
 export const sha256 = (v: string) => createHash('sha256').update(v).digest('hex');
 export const randomToken = (bytes = 32) => randomBytes(bytes).toString('base64url');
@@ -24,4 +24,9 @@ export function decrypt(blob: string): string {
   const d = createDecipheriv('aes-256-gcm', key(), Buffer.from(iv, 'base64'));
   d.setAuthTag(Buffer.from(tag, 'base64'));
   return Buffer.concat([d.update(Buffer.from(data, 'base64')), d.final()]).toString('utf8');
+}
+
+/** Keyed hash for exact-match lookups of sensitive identifiers (PAN) without storing them in readable form. */
+export function keyedHash(value: string): string {
+  return createHmac('sha256', key()).update(value).digest('hex');
 }

@@ -127,6 +127,14 @@ async function main() {
     ['Kavita Nair', '9876500022', 'manual', manager.id],
   ]);
 
+  // Duplicate examples for the Customer Master "Duplicates" screen.
+  await prisma.customer.update({ where: { tenantId_code: { tenantId: own.tenant.id, code: 'C00002' } }, data: { email: 'priya.verma@example.com', city: 'Delhi' } });
+  await prisma.customer.create({
+    data: { tenantId: own.tenant.id, code: 'C00009', name: 'Priya Varma', mobile: '+919876500099', email: 'priya.verma@example.com' },
+  });
+  await prisma.customer.create({ data: { tenantId: own.tenant.id, code: 'C00010', name: 'Rohit Sharmaa', mobile: '+919876500098', city: 'Jaipur' } });
+  await prisma.customer.updateMany({ where: { tenantId: own.tenant.id, code: 'C00005' }, data: { primaryRmId: rmVastu.id } });
+
   // ── Demo customer tenant: ABC Group (Education + Real Estate) ──
   const abc = await prisma.$transaction((tx) =>
     provisionTenant(tx, {

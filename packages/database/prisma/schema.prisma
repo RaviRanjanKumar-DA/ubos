@@ -406,20 +406,58 @@ model Customer {
   tenantId     String
   code         String            // human-readable Customer ID
   name         String
-  mobile       String?           // E.164
+  mobile       String?           // E.164; unique per organization among active (unmerged) customers
+  alternateMobiles String[]      @default([])
   email        String?
+  city         String?
   panEncrypted String?
   panLast4     String?
+  panHash      String?           // keyed hash, lets us find the same PAN without decrypting
   aadhaarLast4 String?           // full number never stored by default
   primaryRmId  String?
   customFields Json?
+  mergedIntoId String?           // set when this record was merged into another customer
+  mergedAt     DateTime?
   leads        Lead[]
   packages     CustomerPackage[]
   createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @default(now()) @updatedAt
 
   @@unique([tenantId, code])
   @@index([tenantId, mobile])
   @@index([tenantId, email])
+  @@index([tenantId, panHash])
+}
+
+// History of customer merges; keeps what is needed to undo a merge.
+model CustomerMerge {
+  id              String    @id @default(uuid())
+  tenantId        String
+  primaryId       String
+  duplicateId     String
+  movedLeadIds    String[]
+  movedPackageIds String[]
+  filledFields    Json      // fields copied from the duplicate onto the primary (reverted on undo)
+  reason          String?
+  mergedById      String
+  createdAt       DateTime  @default(now())
+  undoneAt        DateTime?
+  undoneById      String?
+
+  @@index([tenantId, primaryId])
+  @@index([tenantId, duplicateId])
+}
+
+// "These two are different people" — hides the pair from duplicate suggestions.
+model CustomerDuplicateDismissal {
+  id            String   @id @default(uuid())
+  tenantId      String
+  customerAId   String   // the smaller id of the pair
+  customerBId   String
+  dismissedById String
+  createdAt     DateTime @default(now())
+
+  @@unique([tenantId, customerAId, customerBId])
 }
 
 model Lead {
