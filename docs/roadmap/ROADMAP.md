@@ -46,4 +46,6 @@ Every dashboard follows the same access rules as the data: what a person sees de
 
 **Controls** — date ranges and comparison, filters (business line, team, user, source, stage), saved custom dashboards per person, export (respects export permission), scheduled email / WhatsApp digest.
 
+**Customizable dashboards** — a dashboard builder: add widgets from a library (KPI tile, funnel, line, bar, pie / donut, table, leaderboard, heatmap, target gauge, follow-up list), pick the metric, grouping, chart type, date range and filters for each widget, then drag to arrange and resize. Each person can keep personal dashboards; admins can publish dashboards to roles, teams, business lines or named users, set one as the default landing dashboard for a role, and lock it so it cannot be changed. Start from ready templates (CEO, Business-line head, Manager, RM, Marketing) and duplicate to customise. Widgets always respect the viewer's data access, so a shared dashboard shows each person only their own permitted numbers.
+
 **Proposed placement** — Dashboards v1 (role & level dashboards, KPI tiles, charts, drill-down, statistical forecast) as slice 1.6, right after 1.5b; AI predictions in Phase 6; finance / HR dashboards arrive with those modules.
