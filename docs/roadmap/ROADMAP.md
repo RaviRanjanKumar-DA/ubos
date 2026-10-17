@@ -24,3 +24,26 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 | Workshops & Events | Event pages, registrations as leads, reminders, attendance, follow-up after the event | Phase 4 |
 | Marketing | UTM / source ROI, ad spend, AI content studio (copy, creatives, short videos) | Phase 4 |
 | Integrations with other CRMs & platforms | Catalogue now lists 36 integrations (portals, telephony, WhatsApp, Shopify / WooCommerce / WordPress, Zoho / HubSpot / Salesforce / LeadSquared / TeleCRM / Pipedrive / Freshsales, Zapier); adapters ship per phase | Catalogue: Phase 1.5 · adapters: Phases 1–5 |
+
+## Dashboards & analytics (requested 17 Oct 2026)
+
+Every dashboard follows the same access rules as the data: what a person sees depends on their organization, workspace (business line), roles and data scope.
+
+| Level | Who | Example view |
+|---|---|---|
+| Platform | You (Platform Owner) | MRR / ARR, tenants, trials, churn, usage, revenue forecast |
+| Company (organization) | CEO / Management | All business lines together, compared side by side |
+| Workspace (business line) | Business-line head | One business line: funnel, revenue, team, sources |
+| Team | Manager / Team Leader | Team leaderboard, calls, follow-up discipline |
+| User | RM / caller | My day: follow-ups due, calls, conversions, incentive estimate |
+| Function | Finance, HR, Auditor, Marketing, Ops | Collections, headcount, exceptions, source ROI, SLAs |
+
+**KPIs** — leads, first-response time, contact rate, connected calls, talk time, follow-up compliance (done on time %), stage conversion, win rate, lost reasons, sales cycle length, revenue booked / collected, average deal value, cost per lead and ROI by source, RM productivity, leaderboard; later collections, incentives, attendance, support SLAs.
+
+**Charts** — KPI tiles with trend vs previous period, funnel, line / area trends, stacked bars by business line or source, heatmap (best hour / day to call), leaderboards, target vs actual gauges; every chart drills down to the leads behind it.
+
+**Forecasting & predictions** — step 1 (statistical, no AI cost): pipeline-weighted revenue forecast by stage probability, run-rate projection to month end, target attainment. Step 2 (AI, Phase 6): lead win probability, best next action, best time to call, renewal / churn risk, anomaly alerts.
+
+**Controls** — date ranges and comparison, filters (business line, team, user, source, stage), saved custom dashboards per person, export (respects export permission), scheduled email / WhatsApp digest.
+
+**Proposed placement** — Dashboards v1 (role & level dashboards, KPI tiles, charts, drill-down, statistical forecast) as slice 1.6, right after 1.5b; AI predictions in Phase 6; finance / HR dashboards arrive with those modules.
