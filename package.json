@@ -14,6 +14,7 @@
     "db:generate": "npm run generate -w @ubos/database",
     "db:migrate": "npm run migrate -w @ubos/database",
     "db:seed": "npm run seed -w @ubos/database",
+    "db:demo": "npm run seed -w @ubos/database && npm run demo -w @ubos/database",
     "build": "npm run build -w @ubos/shared && npm run build -w @ubos/api && npm run build -w @ubos/web",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
@@ -24,7 +25,8 @@
     "verify:users": "node scripts/verify-users.mjs",
     "verify:settings": "node scripts/verify-workspace-settings.mjs",
     "verify:customers": "node scripts/verify-customers.mjs",
-    "verify:leadwork": "node scripts/verify-leadwork.mjs"
+    "verify:leadwork": "node scripts/verify-leadwork.mjs",
+    "verify:admin": "node scripts/verify-settings-admin.mjs"
   },
   "engines": {
     "node": ">=20"

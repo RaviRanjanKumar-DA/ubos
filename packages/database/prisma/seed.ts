@@ -48,6 +48,17 @@ async function main() {
     });
   }
 
+  // What the platform sells (Billing & licences). Prices in paise; GST is added at checkout.
+  await prisma.platformProduct.createMany({
+    data: [
+      { code: 'core_crm', name: 'Core CRM', description: 'Leads, customers, calling log, follow-ups, bulk upload, dashboards', kind: 'licence', planCode: 'growth', priceMonthlyPaise: 79_900, annualDiscountPct: 0, position: 0 },
+      { code: 'core_crm_whatsapp', name: 'Core CRM + WhatsApp Chat Sync', description: 'Everything in Core CRM plus WhatsApp inbox & templates', kind: 'licence', planCode: 'business', priceMonthlyPaise: 99_900, annualDiscountPct: 0, position: 1 },
+      { code: 'whatsapp_setup', name: 'WhatsApp Cloud API setup', description: 'One-time setup of your WhatsApp Business number', kind: 'service', priceOncePaise: 169_400, position: 2 },
+      { code: 'automation_consulting', name: 'Automation consultancy', description: 'One hour with an automation expert', kind: 'service', priceOncePaise: 84_700, position: 3 },
+      { code: 'data_migration', name: 'Data migration', description: 'We move your leads and customers from Excel or another CRM', kind: 'service', priceOncePaise: 249_900, position: 4 },
+    ],
+  });
+
   const owner = await prisma.platformUser.create({
     data: { name: 'Platform Owner', email: 'owner@ubos.local', passwordHash: await bcrypt.hash(DEV_PASSWORD, 10), role: 'owner' },
   });

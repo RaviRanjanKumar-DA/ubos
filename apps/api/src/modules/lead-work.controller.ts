@@ -6,7 +6,7 @@ import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
-import { activity, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
+import { activity, applyStageChange, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
 
 const LogActivity = z.object({
   type: z.enum(['call', 'remark']),
@@ -87,6 +87,7 @@ export class LeadWorkController {
         owner: full.ownerId ? { id: full.ownerId, name: users.get(full.ownerId) ?? '?' } : null,
         createdAt: full.createdAt, assignedAt: full.assignedAt, firstResponseAt: full.firstResponseAt,
         lastActivityAt: full.lastActivityAt, lastDisposition: full.lastDisposition, nextFollowUpAt: full.nextFollowUpAt,
+        score: full.score, stageChangedAt: full.stageChangedAt,
         canUpdate: !!a.permissions['crm.lead.update'], canAssign: !!a.permissions['crm.lead.assign'],
         activities: activities.map((x) => ({
           id: x.id, type: x.type, disposition: x.disposition, connected: x.connected, durationSec: x.durationSec, remark: x.remark,
@@ -245,19 +246,7 @@ export class LeadWorkController {
   private async applyStage(tx: Tx, ids: string[], stageId: string, lostReason?: string) {
     const stage = await tx.leadStage.findUnique({ where: { id: stageId } });
     if (!stage) throw new NotFoundException({ code: 'STAGE_NOT_FOUND', message: 'Stage not found' });
-    return this.applyEach(tx, ids, 'crm.lead.update', async (lead) => {
-      if (lead.pipelineId !== stage.pipelineId) return 'Lead is in a different pipeline';
-      let reason: string | null = null;
-      if (stage.isLost) {
-        const reasons = await tx.workspaceOption.findMany({ where: { workspaceId: lead.workspaceId, kind: 'lost_reason', isArchived: false } });
-        if (reasons.length && !reasons.some((r) => r.value === lostReason)) return 'Choose a lost reason of this business line';
-        reason = lostReason ?? null;
-      }
-      if (lead.stageId === stageId && lead.lostReason === reason) return null;
-      await tx.lead.update({ where: { id: lead.id }, data: { stageId, lostReason: reason } });
-      await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'stage', data: { from: lead.stageId, to: stageId, lostReason: reason } }) });
-      return null;
-    });
+    return this.applyEach(tx, ids, 'crm.lead.update', (lead) => applyStageChange(tx, lead, stage, auth().userId, lostReason));
   }
 
   private async applyStatus(tx: Tx, ids: string[], status: string | null) {

@@ -10,6 +10,7 @@ import { appendAudit, provisionTenant, slugify } from '@ubos/database';
 import { DbService } from '../common/db.service';
 import { ctx } from '../common/context';
 import { parse } from '../common/errors';
+import { CYCLE_MONTHS } from '../modules/billing.controller';
 import { decrypt } from '../auth/crypto';
 import { normalizeIp } from '../auth/ip';
 import { SessionService } from '../auth/sessions';
@@ -188,6 +189,63 @@ export class PlatformController {
         oldValue: { status: t.status }, newValue: { status },
       });
       return { id, status };
+    });
+  }
+
+  /** Orders from all organizations (billing). */
+  @UseGuards(PlatformGuard)
+  @Get('orders')
+  async orders() {
+    const orders = await this.db.platform.tenantOrder.findMany({ orderBy: { createdAt: 'desc' }, take: 300 });
+    const tenants = new Map((await this.db.platform.tenant.findMany({ where: { id: { in: [...new Set(orders.map((o) => o.tenantId))] } }, select: { id: true, name: true, slug: true } })).map((t) => [t.id, t]));
+    return orders.map((o) => ({ ...o, tenant: tenants.get(o.tenantId) ?? null }));
+  }
+
+  @UseGuards(PlatformGuard)
+  @Get('products')
+  products() {
+    return this.db.platform.platformProduct.findMany({ orderBy: { position: 'asc' } });
+  }
+
+  /**
+   * Marks a pending order as paid (bank transfer / UPI / cash until a payment gateway is connected) and applies it:
+   * licence lines switch the subscription to that plan, add the user licences and extend validity by the cycle.
+   */
+  @UseGuards(PlatformGuard)
+  @Post('orders/:id/mark-paid')
+  @HttpCode(200)
+  markPaid(@Param('id') id: string, @Body() body: unknown) {
+    const { paymentRef } = parse(z.object({ paymentRef: z.string().trim().min(2).max(100) }), body);
+    return this.db.platform.$transaction(async (tx) => {
+      const o = await tx.tenantOrder.findUnique({ where: { id } });
+      if (!o) throw new NotFoundException({ code: 'ORDER_NOT_FOUND', message: 'Order not found' });
+      if (o.status !== 'pending') throw new ConflictException({ code: 'ORDER_NOT_PENDING', message: 'Only pending orders can be marked paid' });
+      const items = o.items as { kind: string; planCode?: string | null; quantity: number }[];
+      const licences = items.filter((i) => i.kind === 'licence');
+      if (licences.length) {
+        const plan = await tx.plan.findUniqueOrThrow({ where: { code: licences[0].planCode! } });
+        const qty = licences.reduce((n, i) => n + i.quantity, 0);
+        const sub = await tx.subscription.findFirst({ where: { tenantId: o.tenantId }, orderBy: { currentPeriodEnd: 'desc' } });
+        const start = sub && sub.status === 'active' && sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
+        const end = new Date(start);
+        end.setMonth(end.getMonth() + (CYCLE_MONTHS[o.cycle] ?? 12));
+        if (sub) {
+          // A trial converts to the paid quantity; an active subscription adds the new licences.
+          await tx.subscription.update({
+            where: { id: sub.id },
+            data: { planId: plan.id, licences: sub.status === 'active' ? sub.licences + qty : qty, status: 'active', trialEndsAt: null, currentPeriodEnd: end, period: o.cycle },
+          });
+        } else {
+          await tx.subscription.create({ data: { tenantId: o.tenantId, planId: plan.id, period: o.cycle, licences: qty, status: 'active', currentPeriodEnd: end } });
+        }
+        await tx.tenant.update({ where: { id: o.tenantId }, data: { status: 'active' } });
+      }
+      await tx.tenantOrder.update({ where: { id }, data: { status: 'paid', paidAt: new Date(), paymentRef } });
+      await appendAudit(tx, {
+        tenantId: null, actorType: 'platform_user', actorId: ctx().platformUserId, ip: ctx().ip,
+        entity: 'order', entityId: id, action: 'platform.order_paid', newValue: { number: o.number, tenantId: o.tenantId, totalPaise: o.totalPaise, paymentRef },
+      });
+      return { ok: true };
     });
   }
 

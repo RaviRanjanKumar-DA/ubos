@@ -49,7 +49,7 @@ export class ApiError extends Error {
 }
 
 /** workspace: send this workspace instead of the one selected in the switcher (e.g. opening a lead of another business line). */
-type Opts = { method?: string; body?: unknown; tenant?: string; noWorkspace?: boolean; workspace?: string | null };
+type Opts = { method?: string; body?: unknown; tenant?: string; noWorkspace?: boolean; workspace?: string | null; onHeaders?: (h: Headers) => void };
 
 async function raw(url: string, init: RequestInit) {
   const res = await fetch(url, { ...init, credentials: 'include' });
@@ -67,12 +67,13 @@ function refreshOnce(path: string, headers: Record<string, string>) {
   return refreshing;
 }
 
-async function request<T>(path: string, init: { method: string; headers: Record<string, string>; body?: string }, refreshPath: string): Promise<T> {
+async function request<T>(path: string, init: { method: string; headers: Record<string, string>; body?: string }, refreshPath: string, onHeaders?: (h: Headers) => void): Promise<T> {
   let { res, body } = await raw(API_URL + path, init);
   // Access tokens live 15 minutes; refresh silently and retry once.
   if (res.status === 401 && (body as { code?: string }).code === 'TOKEN_EXPIRED') {
     if (await refreshOnce(refreshPath, init.headers)) ({ res, body } = await raw(API_URL + path, init));
   }
+  onHeaders?.(res.headers);
   if (!res.ok) {
     const b = body as { code?: string; message?: string };
     throw new ApiError(res.status, b.code ?? 'ERROR', b.message ?? 'Request failed');
@@ -88,7 +89,7 @@ export function api<T = any>(path: string, opts: Opts = {}) {
   if (tenant) headers['X-Tenant'] = tenant;
   const wsId = opts.workspace !== undefined ? opts.workspace : s?.workspaceId;
   if (wsId && !opts.noWorkspace && !opts.tenant) headers['X-Workspace'] = wsId;
-  return request<T>(path, { method: opts.method ?? 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }, '/api/v1/auth/refresh');
+  return request<T>(path, { method: opts.method ?? 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }, '/api/v1/auth/refresh', opts.onHeaders);
 }
 
 /** Platform Console API call. */

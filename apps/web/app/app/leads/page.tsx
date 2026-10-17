@@ -1,50 +1,74 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
-import { relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
+import { Adv, advCount, advParams, EMPTY_ADV, LeadFilters } from '@/components/LeadFilters';
+import { displayValue, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 
 interface Lead {
-  id: string; name: string; mobile: string | null; customerId: string; customerCode: string; source: string;
-  workspace: string; pipeline: string; stageId: string; stage: string; lostReason: string | null; status: string | null;
+  id: string; name: string; mobile: string | null; email: string | null; city: string | null; customerId: string; customerCode: string; source: string;
+  workspaceId: string; workspace: string; pipelineId: string; pipeline: string; stageId: string; stage: string; stageColor: string | null;
+  lostReason: string | null; status: string | null; inStageDays: number; slaBreached: boolean; score: number;
   customFields: Record<string, unknown>; ownerId: string | null; owner: string | null;
   nextFollowUpAt: string | null; lastActivityAt: string | null; lastDisposition: string | null; createdAt: string;
 }
 interface Person { id: string; name: string }
-type Filters = { status: string; owner: string; followUp: string; stageId: string; q: string };
+type Quick = { followUp: string; owner: string; q: string };
 type BulkAction = 'assign' | 'stage' | 'status' | 'remark' | 'follow_up';
-
-const EMPTY: Filters = { status: '', owner: '', followUp: '', stageId: '', q: '' };
+const SORTS: [string, string][] = [
+  ['created_desc', 'Newest first'], ['created_asc', 'Oldest first'], ['activity_desc', 'Recently worked'],
+  ['followup_asc', 'Next follow-up'], ['score_desc', 'Highest score'], ['stage_age_desc', 'Longest in stage'],
+];
+const EMPTY_Q: Quick = { followUp: '', owner: '', q: '' };
+const readable = (v: string) => v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ');
 
 export default function LeadsPage() {
   const { me, can, version } = useShell();
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [total, setTotal] = useState(0);
   const [ws, setWs] = useState<WorkspaceSettings | null>(null);
   const [people, setPeople] = useState<Person[]>([]);
-  const [counts, setCounts] = useState<{ today: number; overdue: number }>({ today: 0, overdue: 0 });
-  const [f, setF] = useState<Filters>(EMPTY);
+  const [counts, setCounts] = useState<{ today: number; overdue: number; stuck: number }>({ today: 0, overdue: 0, stuck: 0 });
+  const [quick, setQuick] = useState<Quick>(EMPTY_Q);
+  const [adv, setAdv] = useState<Adv>(EMPTY_ADV);
+  const [sort, setSort] = useState('created_desc');
+  const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState<BulkAction | null>(null);
   const [adding, setAdding] = useState(false);
   const [losing, setLosing] = useState<{ lead: Lead; stageId: string } | null>(null);
   const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
 
+  /** One query string for the list and the export, so an export is exactly what is on screen. */
+  const query = useCallback(() => {
+    const p: [string, string][] = [...(Object.entries(quick).filter(([, v]) => v) as [string, string][]), ...advParams(adv), ['sort', sort]];
+    // The quick "My leads / Unassigned" chip and the owners filter are combined into one list.
+    const owners = new Set([...(quick.owner ? [quick.owner] : []), ...adv.owners]);
+    const out = p.filter(([k]) => k !== 'owner' && k !== 'owners');
+    if (owners.size) out.push(['owners', [...owners].join(',')]);
+    return new URLSearchParams(out).toString();
+  }, [quick, adv, sort]);
+
   const load = useCallback(() => {
-    const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]).toString();
-    api<Lead[]>(`/api/v1/leads${qs ? `?${qs}` : ''}`).then((l) => { setLeads(l); setSelected(new Set()); }).catch((e) => setMsg({ type: 'error', text: e.message }));
-    Promise.all([api<unknown[]>('/api/v1/follow-ups?when=today'), api<unknown[]>('/api/v1/follow-ups?when=overdue')])
-      .then(([t, o]) => setCounts({ today: t.length, overdue: o.length })).catch(() => {});
-  }, [f]);
+    api<Lead[]>(`/api/v1/leads?${query()}`, { onHeaders: (h) => setTotal(Number(h.get('X-Total-Count') ?? 0)) })
+      .then((l) => { setLeads(l); setSelected(new Set()); }).catch((e) => setMsg({ type: 'error', text: e.message }));
+    const head = (qs: string) => new Promise<number>((resolve) => {
+      api<unknown[]>(`/api/v1/leads?${qs}`, { onHeaders: (h) => resolve(Number(h.get('X-Total-Count') ?? 0)) }).catch(() => resolve(0));
+    });
+    Promise.all([head('followUp=today'), head('followUp=overdue'), head('stuck=yes')])
+      .then(([today, overdue, stuck]) => setCounts({ today, overdue, stuck }));
+  }, [query]);
 
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => {
-    setF(EMPTY);
+    setQuick(EMPTY_Q);
+    setAdv(EMPTY_ADV);
     if (me.currentWorkspaceId && can('org.workspace.view')) {
       api<WorkspaceSettings>(`/api/v1/workspaces/${me.currentWorkspaceId}/settings`).then(setWs).catch(() => setWs(null));
       api<Person[]>(`/api/v1/workspaces/${me.currentWorkspaceId}/assignees`).then(setPeople).catch(() => setPeople([]));
@@ -52,13 +76,17 @@ export default function LeadsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 
-  const stagesFor = (l: Lead) => ws?.pipelines.find((p) => p.name === l.pipeline)?.stages ?? [];
-  const label = (kind: 'sources' | 'statuses' | 'dispositions', v: string | null) => (v ? ws?.[kind].find((o) => o.value === v)?.label ?? v : '');
-  const firstField = ws?.fields.find((x) => !x.isArchived);
-  const allStages = useMemo(() => ws?.pipelines.flatMap((p) => p.stages.map((s) => ({ ...s, pipeline: p.name }))) ?? [], [ws]);
-  const set = (k: keyof Filters, v: string) => setF({ ...f, [k]: f[k] === v ? '' : v });
+  const stagesFor = (l: Lead) => ws?.pipelines.find((p) => p.id === l.pipelineId)?.stages ?? [];
+  // Without a selected business line there are no option labels: show the stored value readably.
+  const label = (kind: 'sources' | 'statuses' | 'dispositions', v: string | null) => (v ? ws?.[kind].find((o) => o.value === v)?.label ?? readable(v) : '');
+  const h1 = (l: Lead) => (ws ? displayValue(ws.display.h1, l, ws.fields) : '') || l.name;
+  const h2 = (l: Lead) => (ws ? displayValue(ws.display.h2, l, ws.fields) : l.mobile ?? l.email ?? '');
+  const firstField = ws?.fields.find((x) => !x.isArchived && `cf:${x.key}` !== ws.display.h1 && `cf:${x.key}` !== ws.display.h2);
+  const setQ = (k: keyof Quick, v: string) => setQuick({ ...quick, [k]: quick[k] === v ? '' : v });
   const toggle = (id: string) => { const n = new Set(selected); if (n.has(id)) n.delete(id); else n.add(id); setSelected(n); };
   const allChecked = !!leads?.length && leads.every((l) => selected.has(l.id));
+  const nAdv = advCount(adv);
+  const filtered = nAdv > 0 || !!quick.followUp || !!quick.owner || !!quick.q;
 
   async function moveStage(l: Lead, stageId: string, lostReason?: string) {
     const target = stagesFor(l).find((s) => s.id === stageId);
@@ -67,16 +95,44 @@ export default function LeadsPage() {
       await api(`/api/v1/leads/${l.id}/stage`, { method: 'PATCH', body: { stageId, lostReason } });
       setLosing(null);
       load();
-    } catch (e) { setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Failed' }); }
+    } catch (e) { setLosing(null); setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Failed' }); }
   }
 
   async function exportCsv() {
     try {
-      const blob = await api<Blob>('/api/v1/leads/export');
+      const blob = await api<Blob>(`/api/v1/leads/export?${query()}`);
       const url = URL.createObjectURL(blob);
       Object.assign(document.createElement('a'), { href: url, download: 'leads.csv' }).click();
       URL.revokeObjectURL(url);
     } catch (e) { setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Export failed' }); }
+  }
+
+  /** Readable chips for every active advanced filter, each removable on its own. */
+  const activeChips: { label: string; clear: () => void }[] = [];
+  if (ws) {
+    const stageName = new Map(ws.pipelines.flatMap((p) => p.stages.map((s) => [s.id!, s.name] as [string, string])));
+    const multi: [keyof Adv, string, (v: string) => string][] = [
+      ['stageIds', 'Stage', (v) => stageName.get(v) ?? v],
+      ['statuses', 'Status', (v) => (v === '__none__' ? 'No status' : label('statuses', v))],
+      ['sources', 'Source', (v) => label('sources', v)],
+      ['owners', 'Owner', (v) => (v === 'me' ? 'Me' : v === 'unassigned' ? 'Unassigned' : people.find((p) => p.id === v)?.name ?? 'Someone')],
+      ['dispositions', 'Last call', (v) => label('dispositions', v)],
+      ['lostReasons', 'Lost reason', (v) => ws.lostReasons.find((r) => r.value === v)?.label ?? v],
+    ];
+    for (const [k, title, name] of multi) {
+      const vals = adv[k] as string[];
+      if (vals.length) activeChips.push({ label: `${title}: ${vals.map(name).join(', ')}`, clear: () => setAdv({ ...adv, [k]: [] }) });
+    }
+    const ranges: [keyof Adv, keyof Adv, string][] = [['createdFrom', 'createdTo', 'Created'], ['assignedFrom', 'assignedTo', 'Assigned'], ['activityFrom', 'activityTo', 'Last activity'], ['followUpFrom', 'followUpTo', 'Follow-up']];
+    for (const [a, b, title] of ranges) {
+      if (adv[a] || adv[b]) activeChips.push({ label: `${title}: ${adv[a] || '…'} → ${adv[b] || '…'}`, clear: () => setAdv({ ...adv, [a]: '', [b]: '' }) });
+    }
+    if (adv.contacted) activeChips.push({ label: adv.contacted === 'yes' ? 'Worked' : 'Not worked yet', clear: () => setAdv({ ...adv, contacted: '' }) });
+    if (adv.stuck) activeChips.push({ label: 'Stuck beyond SLA', clear: () => setAdv({ ...adv, stuck: '' }) });
+    if (adv.scoreMin || adv.scoreMax) activeChips.push({ label: `Score ${adv.scoreMin || '…'}–${adv.scoreMax || '…'}`, clear: () => setAdv({ ...adv, scoreMin: '', scoreMax: '' }) });
+    for (const [k, v] of Object.entries(adv.cf)) {
+      if (v) activeChips.push({ label: `${ws.fields.find((x) => x.key === k)?.label ?? k}: ${v}`, clear: () => setAdv({ ...adv, cf: { ...adv.cf, [k]: '' } }) });
+    }
   }
 
   const canBulk = can('crm.lead.update') || can('crm.lead.assign');
@@ -86,59 +142,65 @@ export default function LeadsPage() {
       <div className="page-head">
         <div>
           <h1>Leads</h1>
-          <div className="muted small">{ws?.name ?? 'All business lines'} · {leads?.length ?? 0} shown · your access: {me.permissions['crm.lead.view']?.toLowerCase()}</div>
+          <div className="muted small">
+            {ws?.name ?? 'All business lines'} · <b>{total}</b> {filtered ? 'match' : 'total'}{leads && total > leads.length ? ` (showing first ${leads.length})` : ''} · your access: {me.permissions['crm.lead.view']?.toLowerCase()}
+          </div>
         </div>
         <div className="row">
           <form onSubmit={(e) => { e.preventDefault(); load(); }}>
-            <input className="input" style={{ width: 210 }} placeholder="Search name or mobile" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} />
+            <input className="input" style={{ width: 210 }} placeholder="Search name, mobile, email" value={quick.q} onChange={(e) => setQuick({ ...quick, q: e.target.value })} />
           </form>
-          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}>Export</button>}
+          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv} title="Exports the leads matching the current filters">Export</button>}
           {can('crm.lead.import') && me.currentWorkspaceId && <Link className="btn outline" href="/app/leads/import">Bulk upload</Link>}
           {can('crm.lead.create') && ws && <button className="btn" onClick={() => setAdding(true)}>+ Add lead</button>}
         </div>
       </div>
 
       <div className="card" style={{ padding: 12, marginBottom: 12 }}>
-        <div className="chips" style={{ marginBottom: ws ? 10 : 0 }}>
-          <button className={`chip ${f.followUp === 'today' ? 'on' : ''}`} onClick={() => set('followUp', 'today')}>Follow-ups today <span className="count">{counts.today}</span></button>
-          <button className={`chip ${f.followUp === 'overdue' ? 'on' : counts.overdue ? 'alert' : ''}`} onClick={() => set('followUp', 'overdue')}>Overdue <span className="count">{counts.overdue}</span></button>
-          <button className={`chip ${f.followUp === 'none' ? 'on' : ''}`} onClick={() => set('followUp', 'none')}>No follow-up planned</button>
+        <div className="chips">
+          <button className={`chip ${quick.followUp === 'today' ? 'on' : ''}`} onClick={() => setQ('followUp', 'today')}>Follow-ups today <span className="count">{counts.today}</span></button>
+          <button className={`chip ${quick.followUp === 'overdue' ? 'on' : counts.overdue ? 'alert' : ''}`} onClick={() => setQ('followUp', 'overdue')}>Overdue <span className="count">{counts.overdue}</span></button>
+          <button className={`chip ${quick.followUp === 'none' ? 'on' : ''}`} onClick={() => setQ('followUp', 'none')}>No follow-up planned</button>
+          {ws && <button className={`chip ${adv.stuck ? 'on' : counts.stuck ? 'alert' : ''}`} onClick={() => setAdv({ ...adv, stuck: adv.stuck ? '' : 'yes' })} title="Longer in their stage than the stage SLA">Stuck <span className="count">{counts.stuck}</span></button>}
           <span style={{ width: 1, background: 'var(--line)', margin: '0 4px' }} />
-          <button className={`chip ${f.owner === 'me' ? 'on' : ''}`} onClick={() => set('owner', 'me')}>My leads</button>
-          {can('crm.lead.assign') && <button className={`chip ${f.owner === 'unassigned' ? 'on' : ''}`} onClick={() => set('owner', 'unassigned')}>Unassigned</button>}
-          {Object.values(f).some(Boolean) && <button className="chip" onClick={() => setF(EMPTY)}>✕ Clear filters</button>}
+          <button className={`chip ${quick.owner === 'me' ? 'on' : ''}`} onClick={() => setQ('owner', 'me')}>My leads</button>
+          {can('crm.lead.assign') && <button className={`chip ${quick.owner === 'unassigned' ? 'on' : ''}`} onClick={() => setQ('owner', 'unassigned')}>Unassigned</button>}
+          <span style={{ flex: 1 }} />
+          <select className="input" style={{ width: 'auto', height: 32 }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+            {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+          {ws && <button className={`btn sm ${nAdv ? '' : 'outline'}`} onClick={() => setShowFilters(true)}>⚲ Filters{nAdv ? ` (${nAdv})` : ''}</button>}
         </div>
-        {ws && (
-          <div className="row" style={{ gap: 8 }}>
-            <select className="input" style={{ width: 'auto' }} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value })} aria-label="Status filter">
-              <option value="">All statuses</option>
-              {ws.statuses.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <select className="input" style={{ width: 'auto' }} value={f.stageId} onChange={(e) => setF({ ...f, stageId: e.target.value })} aria-label="Stage filter">
-              <option value="">All stages</option>
-              {allStages.map((s) => <option key={s.id} value={s.id}>{ws.pipelines.length > 1 ? `${s.pipeline} · ` : ''}{s.name}</option>)}
-            </select>
-            {people.length > 0 && can('crm.lead.assign') && (
-              <select className="input" style={{ width: 'auto' }} value={['me', 'unassigned'].includes(f.owner) ? '' : f.owner} onChange={(e) => setF({ ...f, owner: e.target.value })} aria-label="Owner filter">
-                <option value="">Any owner</option>
-                {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            )}
+        {ws && ws.pipelines.length > 0 && (
+          <div className="chips" style={{ marginTop: 10 }}>
+            {ws.pipelines.flatMap((p) => p.stages.map((s) => (
+              <button key={s.id} className={`chip ${adv.stageIds.includes(s.id!) ? 'on' : ''}`}
+                onClick={() => setAdv({ ...adv, stageIds: adv.stageIds.includes(s.id!) ? adv.stageIds.filter((x) => x !== s.id) : [...adv.stageIds, s.id!] })}>
+                <span className="dot" style={{ background: s.color ?? '#e4e2ec', width: 9, height: 9, borderRadius: 9, display: 'inline-block', marginRight: 5, border: '1px solid rgba(0,0,0,.12)' }} />
+                {ws.pipelines.length > 1 ? `${p.name} · ` : ''}{s.name}
+              </button>
+            )))}
+          </div>
+        )}
+        {(activeChips.length > 0 || filtered) && (
+          <div className="chips" style={{ marginTop: 10 }}>
+            {activeChips.map((c) => <button key={c.label} className="chip on" onClick={c.clear} title="Remove this filter">{c.label} ✕</button>)}
+            {filtered && <button className="chip" onClick={() => { setQuick(EMPTY_Q); setAdv(EMPTY_ADV); }}>Clear all filters</button>}
           </div>
         )}
       </div>
-      {!me.currentWorkspaceId && can('crm.lead.create') && <div className="notice">Select a workspace (business line) at the top to add, upload or bulk-edit leads.</div>}
+      {!me.currentWorkspaceId && can('crm.lead.create') && <div className="notice">Select a workspace (business line) at the top to add, upload, filter in detail or bulk-edit leads.</div>}
       {msg && <div className={msg.type}>{msg.text}</div>}
 
       <div className="card" style={{ padding: 0 }}>
         <div className="table-wrap">
-          <table className="table" style={{ minWidth: 860 }}>
+          <table className="table" style={{ minWidth: 960 }}>
             <thead>
               <tr>
                 {canBulk && <th style={{ width: 34 }}><input type="checkbox" aria-label="Select all" checked={allChecked} onChange={() => setSelected(allChecked ? new Set() : new Set(leads?.map((l) => l.id)))} /></th>}
-                <th>Customer</th>{!me.currentWorkspaceId && <th>Business line</th>}
+                <th>Lead</th>{!me.currentWorkspaceId && <th>Business line</th>}
                 {firstField && <th>{firstField.label}</th>}
-                <th>Status</th><th>Stage</th><th>Owner</th><th>Next follow-up</th><th>Last call</th>
+                <th>Status</th><th>Stage</th><th>Owner</th><th>Next follow-up</th><th>Last call</th><th title="Lead score from custom actions">Score</th>
               </tr>
             </thead>
             <tbody>
@@ -148,25 +210,32 @@ export default function LeadsPage() {
                   <tr key={l.id} className={`clickable ${selected.has(l.id) ? 'selected' : ''}`} onClick={() => router.push(`/app/leads/${l.id}`)}>
                     {canBulk && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Select ${l.name}`} checked={selected.has(l.id)} onChange={() => toggle(l.id)} /></td>}
                     <td>
-                      <b>{l.name}</b>
-                      <div className="small muted">{l.mobile} · {label('sources', l.source)}</div>
+                      <b>{h1(l)}</b>
+                      <div className="small muted">{[h2(l), label('sources', l.source)].filter(Boolean).join(' · ')}</div>
                     </td>
                     {!me.currentWorkspaceId && <td><span className="badge">{l.workspace}</span></td>}
                     {firstField && <td className="small">{showValue(firstField, l.customFields?.[firstField.key]) || <span className="muted">—</span>}</td>}
                     <td>{l.status ? <span className={`badge ${STATUS_TONE[l.status] ?? ''}`}>{label('statuses', l.status)}</span> : <span className="muted small">—</span>}</td>
                     <td onClick={(e) => e.stopPropagation()}>
-                      {can('crm.lead.update') && stagesFor(l).length ? (
-                        <select className="input" style={{ height: 30, width: 150 }} value={l.stageId} onChange={(e) => moveStage(l, e.target.value)} aria-label="Stage">
-                          {stagesFor(l).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                      ) : <span className="badge grey">{l.stage}</span>}
-                      {l.lostReason && <div className="small muted">{l.lostReason}</div>}
+                      <div className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+                        <span aria-hidden="true" style={{ width: 10, height: 10, borderRadius: 10, background: l.stageColor ?? '#e4e2ec', border: '1px solid rgba(0,0,0,.12)', flex: 'none' }} />
+                        {can('crm.lead.update') && stagesFor(l).length ? (
+                          <select className="input" style={{ height: 30, width: 150 }} value={l.stageId} onChange={(e) => moveStage(l, e.target.value)} aria-label="Stage">
+                            {stagesFor(l).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                          </select>
+                        ) : <span className="badge grey">{l.stage}</span>}
+                      </div>
+                      <div className="small muted">
+                        {l.slaBreached ? <span className="badge bad" title="Longer than the stage SLA">Stuck {l.inStageDays}d</span> : `${l.inStageDays}d in stage`}
+                        {l.lostReason && ` · ${ws?.lostReasons.find((r) => r.value === l.lostReason)?.label ?? l.lostReason}`}
+                      </div>
                     </td>
                     <td className="small">{l.owner ?? <span className="badge warn">Unassigned</span>}</td>
                     <td className="small">
                       {l.nextFollowUpAt ? <span style={{ color: overdue ? 'var(--bad)' : undefined, fontWeight: overdue ? 600 : undefined }}>{relTime(l.nextFollowUpAt)}</span> : <span className="muted">—</span>}
                     </td>
                     <td className="small muted">{l.lastDisposition ? `${label('dispositions', l.lastDisposition)} · ${relTime(l.lastActivityAt)}` : 'Not called yet'}</td>
+                    <td>{l.score ? <span className={`badge ${l.score >= 30 ? 'ok' : ''}`}>{l.score}</span> : <span className="muted small">0</span>}</td>
                   </tr>
                 );
               })}
@@ -190,6 +259,7 @@ export default function LeadsPage() {
         </div>
       )}
 
+      {showFilters && ws && <LeadFilters ws={ws} people={people} value={adv} onClose={() => setShowFilters(false)} onApply={(a) => { setAdv(a); setShowFilters(false); }} />}
       {bulk && (
         <BulkDialog
           action={bulk} ids={[...selected]} ws={ws} people={people}
@@ -197,7 +267,10 @@ export default function LeadsPage() {
           onDone={(text) => { setBulk(null); setMsg({ type: 'notice', text }); load(); }}
         />
       )}
-      {adding && ws && <AddLead ws={ws} onClose={() => setAdding(false)} onSaved={(id) => { setAdding(false); router.push(`/app/leads/${id}`); }} />}
+      {adding && ws && (
+        <AddLead ws={ws} people={people} canAssign={can('crm.lead.assign')} meId={me.user.id} onClose={() => setAdding(false)}
+          onSaved={(id) => { setAdding(false); router.push(`/app/leads/${id}`); }} />
+      )}
       {losing && ws && (
         <LostDialog ws={ws} name={losing.lead.name} onClose={() => setLosing(null)} onPick={(r) => moveStage(losing.lead, losing.stageId, r)} />
       )}
@@ -305,24 +378,40 @@ function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
   );
 }
 
-function AddLead({ ws, onClose, onSaved }: { ws: WorkspaceSettings; onClose: () => void; onSaved: (id: string) => void }) {
+function AddLead({ ws, people, canAssign, meId, onClose, onSaved }: {
+  ws: WorkspaceSettings; people: Person[]; canAssign: boolean; meId: string; onClose: () => void; onSaved: (id: string) => void;
+}) {
   const [form, setForm] = useState({
-    name: '', mobile: '', email: '',
+    name: '', mobile: '', email: '', city: '',
     source: ws.sources.find((s) => s.value === 'manual')?.value ?? ws.sources[0]?.value ?? 'manual',
     pipelineId: ws.pipelines[0]?.id ?? '',
+    status: ws.statuses.find((s) => s.isDefault)?.value ?? '',
+    ownerId: canAssign ? 'rules' : '',
+    remark: '', followUpAt: '',
   });
   const [custom, setCustom] = useState<Record<string, unknown>>({});
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm({ ...form, [k]: e.target.value });
+  const set = (k: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setForm({ ...form, [k]: e.target.value });
   const fields = ws.fields.filter((x) => !x.isArchived);
+  const byEmail = ws.leadIdentifier === 'email';
+  const section = (t: string) => <div className="small" style={{ fontWeight: 650, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '6px 0 8px' }}>{t}</div>;
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError('');
     try {
-      const r = await api<{ id: string }>('/api/v1/leads', { method: 'POST', body: { ...form, customFields: custom } });
+      const { ownerId, status, remark, followUpAt, mobile, email, city, ...rest } = form;
+      const r = await api<{ id: string }>('/api/v1/leads', {
+        method: 'POST',
+        body: {
+          ...rest, customFields: custom,
+          ...(mobile ? { mobile } : {}), ...(email ? { email } : {}), ...(city ? { city } : {}),
+          ...(ownerId ? { ownerId } : {}), ...(status ? { status } : {}), ...(remark.trim() ? { remark: remark.trim() } : {}),
+          ...(followUpAt ? { followUpAt: new Date(followUpAt).toISOString() } : {}),
+        },
+      });
       onSaved(r.id);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed');
@@ -332,13 +421,22 @@ function AddLead({ ws, onClose, onSaved }: { ws: WorkspaceSettings; onClose: () 
 
   return (
     <div className="modal-bg" onClick={onClose}>
-      <form className="modal" style={{ maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()} onSubmit={save}>
+      <form className="modal" style={{ maxWidth: 600, maxHeight: '92vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()} onSubmit={save}>
         <h2>Add lead · {ws.name}</h2>
         {error && <div className="error">{error}</div>}
+        {section('Customer')}
         <div className="grid cols-2">
           <div className="field"><label>Name</label><input className="input" value={form.name} onChange={set('name')} required autoFocus /></div>
-          <div className="field"><label>Mobile</label><input className="input" value={form.mobile} onChange={set('mobile')} placeholder="98765 43210" required /></div>
-          <div className="field"><label>Email (optional)</label><input className="input" type="email" value={form.email} onChange={set('email')} /></div>
+          <div className="field"><label>Mobile{byEmail ? ' (optional)' : ''}</label><input className="input" value={form.mobile} onChange={set('mobile')} placeholder="98765 43210" required={!byEmail} /></div>
+          <div className="field"><label>Email{byEmail ? '' : ' (optional)'}</label><input className="input" type="email" value={form.email} onChange={set('email')} required={byEmail} /></div>
+          <div className="field"><label>City (optional)</label><input className="input" value={form.city} onChange={set('city')} /></div>
+        </div>
+        <p className="small muted" style={{ marginTop: -4 }}>
+          If a customer with this {byEmail ? 'email' : 'mobile'} already exists in any business line, the lead is linked to them — no duplicate customer is created.
+        </p>
+
+        {section('Lead')}
+        <div className="grid cols-2">
           <div className="field">
             <label>Source</label>
             <select className="input" value={form.source} onChange={set('source')}>
@@ -353,10 +451,31 @@ function AddLead({ ws, onClose, onSaved }: { ws: WorkspaceSettings; onClose: () 
               </select>
             </div>
           )}
+          <div className="field">
+            <label>Assign to</label>
+            {canAssign ? (
+              <select className="input" value={form.ownerId} onChange={set('ownerId')}>
+                <option value="rules">Automatic (assignment rules)</option>
+                {people.some((p) => p.id === meId) && <option value={meId}>Me</option>}
+                {people.filter((p) => p.id !== meId).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            ) : <input className="input" value="By the workspace assignment rules" disabled />}
+          </div>
         </div>
+        {ws.statuses.length > 0 && (
+          <div className="field">
+            <label>Status</label>
+            <div className="chips">
+              {ws.statuses.map((s) => (
+                <button type="button" key={s.value} className={`chip ${form.status === s.value ? 'on' : ''}`} onClick={() => setForm({ ...form, status: form.status === s.value ? '' : s.value ?? '' })}>{s.label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {fields.length > 0 && (
           <>
-            <div className="small" style={{ fontWeight: 650, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.04em', margin: '6px 0 8px' }}>{ws.name} details</div>
+            {section(`${ws.name} details`)}
             <div className="grid cols-2">
               {fields.map((x) => (
                 <div key={x.key} className="field" style={x.type === 'multiselect' || x.type === 'textarea' ? { gridColumn: '1 / -1' } : undefined}>
@@ -367,6 +486,10 @@ function AddLead({ ws, onClose, onSaved }: { ws: WorkspaceSettings; onClose: () 
             </div>
           </>
         )}
+
+        {section('First touch (optional)')}
+        <div className="field"><label>Remark</label><textarea className="input" style={{ height: 64, paddingTop: 8 }} value={form.remark} onChange={set('remark')} placeholder="e.g. Asked for fee details, call after 5 pm" /></div>
+        <div className="field"><label>Follow-up on</label><input className="input" type="datetime-local" value={form.followUpAt} onChange={set('followUpAt')} /></div>
         <div className="row end">
           <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
           <button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save lead'}</button>

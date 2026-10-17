@@ -32,6 +32,7 @@ export default function ConsolePage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
+  const [view, setView] = useState<'tenants' | 'orders'>('tenants');
 
   const load = useCallback(async () => {
     try {
@@ -83,12 +84,20 @@ export default function ConsolePage() {
       <div className="content" style={{ margin: '0 auto' }}>
         <div className="page-head">
           <div>
-            <h1>Organizations</h1>
-            <div className="muted small">Every company using UBOS, including your own (Tenant #1).</div>
+            <h1>{view === 'orders' ? 'Orders & payments' : 'Organizations'}</h1>
+            <div className="muted small">{view === 'orders' ? 'Licence and service orders from every organization. Confirm a payment to apply it.' : 'Every company using UBOS, including your own (Tenant #1).'}</div>
           </div>
           <button className="btn" onClick={() => setAdding(true)}>+ Onboard company</button>
         </div>
         {error && <div className="error">{error}</div>}
+        <div className="row" style={{ gap: 2, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
+          {([['tenants', 'Organizations'], ['orders', 'Orders & payments']] as const).map(([k, l]) => (
+            <button key={k} className="btn ghost" onClick={() => setView(k)}
+              style={{ borderRadius: 0, borderBottom: view === k ? '2px solid var(--brand)' : '2px solid transparent', color: view === k ? 'var(--brand)' : undefined }}>{l}</button>
+          ))}
+        </div>
+        {view === 'orders' && <Orders onChanged={load} />}
+        {view === 'tenants' && <>
         {metrics && (
           <div className="grid cols-4" style={{ marginBottom: 14 }}>
             <div className="card kpi"><div className="label">MRR</div><div className="value">{rupees(metrics.mrrPaise)}</div></div>
@@ -133,6 +142,7 @@ export default function ConsolePage() {
         <p className="small muted" style={{ marginTop: 10 }}>
           MRR counts paid, non-internal subscriptions only. Billing, invoices and usage metering arrive in Phase 3.
         </p>
+        </>}
       </div>
       {adding && <Onboard plans={plans} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
     </div>
@@ -200,5 +210,103 @@ function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => voi
         </div>
       </form>
     </div>
+  );
+}
+
+interface PlatformOrder {
+  id: string; number: string; cycle: string; status: 'pending' | 'paid' | 'cancelled'; totalPaise: number; createdAt: string; paidAt: string | null; paymentRef: string | null;
+  items: { name: string; quantity: number; kind: string }[]; tenant: { id: string; name: string; slug: string } | null;
+}
+interface Product { id: string; code: string; name: string; kind: string; planCode: string | null; priceMonthlyPaise: number | null; priceOncePaise: number | null; annualDiscountPct: number; isActive: boolean }
+
+/** Orders placed by organizations; the Platform Owner confirms the payment, which applies the licences. */
+function Orders({ onChanged }: { onChanged: () => void }) {
+  const [orders, setOrders] = useState<PlatformOrder[] | null>(null);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [status, setStatus] = useState<'' | 'pending' | 'paid' | 'cancelled'>('pending');
+  const [paying, setPaying] = useState<PlatformOrder | null>(null);
+  const [ref, setRef] = useState('');
+  const [error, setError] = useState('');
+  const load = useCallback(() => {
+    platformApi<PlatformOrder[]>('/platform/v1/orders').then(setOrders).catch((e) => setError(e.message));
+    platformApi<Product[]>('/platform/v1/products').then(setProducts).catch(() => {});
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const shown = orders?.filter((o) => !status || o.status === status) ?? [];
+
+  async function markPaid(e: React.FormEvent) {
+    e.preventDefault();
+    if (!paying) return;
+    try {
+      await platformApi(`/platform/v1/orders/${paying.id}/mark-paid`, { method: 'POST', body: { paymentRef: ref } });
+      setPaying(null); setRef(''); load(); onChanged();
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Failed'); }
+  }
+
+  return (
+    <>
+      <div className="row" style={{ marginBottom: 10 }}>
+        {(['pending', 'paid', 'cancelled', ''] as const).map((s) => (
+          <button key={s || 'all'} className={`chip ${status === s ? 'on' : ''}`} onClick={() => setStatus(s)}>
+            {s === '' ? 'All' : s === 'pending' ? 'Waiting for payment' : s === 'paid' ? 'Paid' : 'Cancelled'}
+            {s && orders && <span className="count">{orders.filter((o) => o.status === s).length}</span>}
+          </button>
+        ))}
+      </div>
+      {error && <div className="error">{error}</div>}
+      <div className="card" style={{ padding: 0, marginBottom: 14 }}>
+        <div className="table-wrap">
+          <table className="table" style={{ minWidth: 760 }}>
+            <thead><tr><th>Order</th><th>Organization</th><th>Items</th><th>Total</th><th>Status</th><th /></tr></thead>
+            <tbody>
+              {shown.map((o) => (
+                <tr key={o.id}>
+                  <td><b>{o.number}</b><div className="small muted">{new Date(o.createdAt).toLocaleDateString('en-IN')} · {o.cycle.replace('_', '-')}</div></td>
+                  <td>{o.tenant?.name ?? '—'}<div className="small muted">{o.tenant?.slug}</div></td>
+                  <td className="small">{o.items.map((i) => `${i.quantity} × ${i.name}`).join(', ')}</td>
+                  <td>{rupees(o.totalPaise)}</td>
+                  <td>
+                    <span className={`badge ${o.status === 'paid' ? 'ok' : o.status === 'pending' ? 'warn' : 'grey'}`}>{o.status}</span>
+                    {o.paymentRef && <div className="small muted">ref {o.paymentRef}</div>}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{o.status === 'pending' && <button className="btn sm" onClick={() => setPaying(o)}>Mark paid</button>}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {orders && !shown.length && <div className="empty">No orders here.</div>}
+        </div>
+      </div>
+      <div className="card">
+        <h2>Products &amp; prices</h2>
+        <p className="small muted" style={{ marginTop: -6 }}>What organizations can buy from their Billing page. Prices before GST.</p>
+        <table className="table">
+          <thead><tr><th>Product</th><th>Type</th><th>Price</th><th>Status</th></tr></thead>
+          <tbody>
+            {products.map((p) => (
+              <tr key={p.id}>
+                <td><b>{p.name}</b><div className="small muted"><code>{p.code}</code>{p.planCode ? ` · plan ${p.planCode}` : ''}</div></td>
+                <td className="small">{p.kind === 'licence' ? 'User licence' : 'Service'}</td>
+                <td className="small">{p.kind === 'licence' ? `${rupees(p.priceMonthlyPaise ?? 0)} / user / month${p.annualDiscountPct ? ` · ${p.annualDiscountPct}% off annually` : ''}` : rupees(p.priceOncePaise ?? 0)}</td>
+                <td>{p.isActive ? <span className="badge ok">On sale</span> : <span className="badge grey">Hidden</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {paying && (
+        <div className="modal-bg" onClick={() => setPaying(null)}>
+          <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={markPaid}>
+            <h2>Confirm payment · {paying.number}</h2>
+            <p className="small">{paying.tenant?.name} · {rupees(paying.totalPaise)}. Licence lines switch the plan, add the licences and extend validity by the billing cycle.</p>
+            <div className="field"><label>Payment reference (UTR / UPI / receipt no.)</label><input className="input" value={ref} onChange={(e) => setRef(e.target.value)} required minLength={2} autoFocus /></div>
+            <div className="row end">
+              <button type="button" className="btn ghost" onClick={() => setPaying(null)}>Cancel</button>
+              <button className="btn">Mark paid</button>
+            </div>
+          </form>
+        </div>
+      )}
+    </>
   );
 }

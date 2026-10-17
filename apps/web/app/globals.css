@@ -160,6 +160,21 @@ table.table { width: 100%; border-collapse: collapse; }
 .tl-item.stage .tl-dot { background: var(--brand-100); }
 .tl-item.follow_up .tl-dot { background: #e7f0ff; color: #2f6fd1; }
 
+/* Stage board */
+.stage-board { display: grid; grid-template-columns: 1fr 1.2fr 1.2fr; gap: 12px; align-items: start; }
+@media (max-width: 960px) { .stage-board { grid-template-columns: 1fr; } }
+.stage-col { background: #faf9fd; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+.stage-col-head { font-weight: 700; text-align: center; padding: 8px; margin: -10px -10px 10px; border-radius: 10px 10px 0 0; background: #efeef4; clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 0 100%); }
+.stage-col-head.active { background: #dff3e6; }
+.stage-col-head.closed { background: #c9edd4; color: #15693a; }
+.stage-chip { display: flex; align-items: center; gap: 6px; border-radius: 8px; padding: 8px 8px 8px 10px; margin-bottom: 6px; }
+.stage-chip .grip { cursor: grab; color: rgba(0,0,0,.4); font-size: 16px; }
+.stage-chip .btn.ghost { color: var(--ink-2); padding: 0 6px; }
+.stage-group { border-radius: 10px; padding: 8px 10px; margin-bottom: 10px; }
+.stage-group.won { border: 1px solid #9ad7ad; background: #f1fbf4; }
+.stage-group.lost { border: 1px solid #ec9f95; background: #fff5f3; }
+.drag-row { cursor: grab; }
+
 /* Clickable table rows */
 tr.clickable { cursor: pointer; }
 tr.clickable:hover td { background: #faf9fd; }

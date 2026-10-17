@@ -155,6 +155,7 @@ model OrganizationSetting {
   require2faRoles    String[] @default([]) // role names that must use two-factor auth
   loginMethods       String[] @default(["password", "google", "microsoft", "email_code"])
   allowedEmailDomains String[] @default([]) // empty = any domain (for Google / Microsoft / email-code login)
+  leadIdentifier     String   @default("mobile") // Lead ID: the unique key that identifies a customer — mobile | email
   maxFailedLogins    Int      @default(5)
   lockMinutes        Int      @default(15)
   updatedAt          DateTime @updatedAt
@@ -188,6 +189,8 @@ model Workspace {
   assignmentUserIds String[] @default([])            // round-robin pool / fixed owner (first id)
   assignmentCursor  Int      @default(0)
   stickyOwner       Boolean  @default(true)          // a returning customer goes back to their RM
+  displayH1         String   @default("name")        // what lists and headers show as the title of a lead
+  displayH2         String   @default("mobile")      // …and as the second line (name / mobile / email / city / cf:<key>)
   pipelines Pipeline[]
   leads     Lead[]
   packages  Package[]
@@ -211,6 +214,7 @@ model LeadField {
   position    Int       @default(0)
   isArchived  Boolean   @default(false)
   createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
 
   @@unique([workspaceId, key])
 }
@@ -227,6 +231,7 @@ model WorkspaceOption {
   position    Int       @default(0)
   isArchived  Boolean   @default(false)
   connected   Boolean   @default(false) // call_disposition only: the customer was actually reached
+  isDefault   Boolean   @default(false) // call_disposition: used when a call connects; lead_status: given to new leads
 
   @@unique([workspaceId, kind, value])
 }
@@ -252,6 +257,11 @@ model LeadStage {
   position   Int
   isWon      Boolean  @default(false)
   isLost     Boolean  @default(false)
+  color      String?             // hex colour on the stage board
+  slaDays    Int?                // warn when a lead stays longer than this in the stage
+  requiredFieldKeys String[] @default([]) // custom fields that must be filled before entering this stage
+  setStatus  String?             // lead status applied automatically on entering the stage
+  followUpDays Int?              // follow-up created automatically N days after entering the stage
 }
 
 // Routes a source (form, WhatsApp number, CallerDesk number, webhook, sheet) to a workspace + pipeline.
@@ -490,6 +500,8 @@ model Lead {
   lastActivityAt  DateTime?
   lastDisposition String?
   nextFollowUpAt  DateTime?  // earliest open follow-up, kept in sync for fast "due today" lists
+  stageChangedAt  DateTime   @default(now()) // for stage SLA ("in this stage for 4 days")
+  score           Int        @default(0)     // lead score, e.g. from custom-action scores
   importId        String?
   followUps       FollowUp[]
   activities      LeadActivity[]
@@ -681,4 +693,72 @@ model AuditLog {
   createdAt   DateTime @default(now())
 
   @@index([tenantId, entity, entityId])
+}
+
+// Custom action: a small form run from a lead (e.g. "Course Details"); answers go on the timeline and add to the lead score.
+model CustomAction {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String?   // null = available in every workspace
+  code        Int       // human-friendly code (1001, 1002…)
+  name        String
+  description String?
+  score       Int       @default(0)
+  fields      Json      // [{ key, label, type, options, required }] — same types as custom lead fields
+  isArchived  Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@unique([tenantId, code])
+}
+
+model LeadActionResponse {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  leadId      String
+  actionId    String
+  answers     Json
+  score       Int
+  userId      String
+  createdAt   DateTime @default(now())
+
+  @@index([leadId])
+  @@index([actionId])
+}
+
+// What the platform sells: licences (per user) and one-time services. Managed by the Platform Owner.
+model PlatformProduct {
+  id                String   @id @default(uuid())
+  code              String   @unique
+  name              String
+  description       String?
+  kind              String   // licence | service
+  planCode          String?  // licence: the plan it activates
+  priceMonthlyPaise Int?     // licence: per user per month
+  priceOncePaise    Int?     // service: one-time price
+  annualDiscountPct Int      @default(0)
+  isActive          Boolean  @default(true)
+  position          Int      @default(0)
+}
+
+// An organization's purchase: licences for a billing cycle and/or services. Paid via gateway later; marked paid manually for now.
+model TenantOrder {
+  id            String    @id @default(uuid())
+  tenantId      String
+  number        String    @unique
+  cycle         String    // quarterly | annual | one_time
+  items         Json      // [{ productCode, name, kind, quantity, unitPaise, amountPaise }]
+  subtotalPaise Int
+  gstPaise      Int
+  totalPaise    Int
+  status        String    @default("pending") // pending | paid | cancelled
+  createdById   String
+  createdAt     DateTime  @default(now())
+  paidAt        DateTime?
+  paymentRef    String?
+  note          String?
+
+  @@index([tenantId, createdAt])
 }

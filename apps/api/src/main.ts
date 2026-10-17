@@ -26,6 +26,7 @@ async function bootstrap() {
     origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(','),
     credentials: true,
     allowedHeaders: ['Authorization', 'Content-Type', 'X-Tenant', 'X-Workspace', 'X-UBOS-CSRF'],
+    exposedHeaders: ['X-Total-Count', 'X-Trace-Id'],
   });
   // CSRF: a browser request that relies on session cookies must also carry a custom header,
   // which other websites cannot add (CORS). Together with SameSite=Lax cookies this blocks forged requests.

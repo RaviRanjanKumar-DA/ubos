@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import type { Tx } from './tenant-context';
 import { appendAudit } from './audit';
 
+export const STAGE_COLORS = ['#e4e2ec', '#d6e6fb', '#f9e7c5', '#f7d3dc', '#e3d9f7', '#d5efe9', '#fbe0cf', '#dfe8d2'];
 export const DEFAULT_STAGES = ['New', 'Contacted', 'Interested', 'Follow-up', 'Demo', 'Negotiation', 'Won', 'Lost'];
 
 // Integrations listed in every tenant's hub; all start inactive so the tenant admin decides what to switch on.
@@ -57,7 +58,7 @@ export const DEFAULT_LOST_REASONS = ['Not interested', 'Budget issue', 'Bought e
 export const DEFAULT_STATUSES: [string, string][] = [['fresh', 'Fresh'], ['hot', 'Hot'], ['warm', 'Warm'], ['cold', 'Cold']];
 /** [value, label, connected] */
 export const DEFAULT_DISPOSITIONS: [string, string, boolean][] = [
-  ['interested', 'Connected – Interested', true], ['not_interested', 'Connected – Not interested', true],
+  ['connected', 'Connected', true], ['interested', 'Connected – Interested', true], ['not_interested', 'Connected – Not interested', true],
   ['call_back', 'Connected – Call back later', true], ['not_answered', 'Not answered', false], ['busy', 'Busy', false],
   ['switched_off', 'Switched off / Not reachable', false], ['wrong_number', 'Wrong number', false],
 ];
@@ -71,8 +72,8 @@ export async function createWorkspace(tx: Tx, tenantId: string, w: WorkspaceInpu
     data: [
       ...DEFAULT_SOURCES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_source', value, label, position })),
       ...DEFAULT_LOST_REASONS.map((label, position) => ({ tenantId, workspaceId: workspace.id, kind: 'lost_reason', value: label, label, position })),
-      ...DEFAULT_STATUSES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_status', value, label, position })),
-      ...DEFAULT_DISPOSITIONS.map(([value, label, connected], position) => ({ tenantId, workspaceId: workspace.id, kind: 'call_disposition', value, label, position, connected })),
+      ...DEFAULT_STATUSES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_status', value, label, position, isDefault: position === 0 })),
+      ...DEFAULT_DISPOSITIONS.map(([value, label, connected], position) => ({ tenantId, workspaceId: workspace.id, kind: 'call_disposition', value, label, position, connected, isDefault: value === 'connected' })),
     ],
   });
   for (const [position, p] of (w.pipelines ?? [{ name: 'Sales' }]).entries()) {
@@ -85,6 +86,7 @@ export async function createWorkspace(tx: Tx, tenantId: string, w: WorkspaceInpu
         stages: {
           create: (p.stages ?? DEFAULT_STAGES).map((name, position) => ({
             tenantId, name, position, isWon: name === 'Won', isLost: name === 'Lost',
+            color: name === 'Won' ? '#cdeed8' : name === 'Lost' ? '#f6d0cb' : STAGE_COLORS[position % STAGE_COLORS.length],
           })),
         },
       },

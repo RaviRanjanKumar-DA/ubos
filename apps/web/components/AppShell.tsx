@@ -50,6 +50,7 @@ const NAV = [
   { href: '/app/integrations', label: 'Integrations', icon: 'integrations', perm: 'integrations.view' },
   { href: '/app/audit', label: 'Audit Log', icon: 'audit', perm: 'audit.view' },
   { href: '/app/settings/security', label: 'Security Policy', icon: 'lock', perm: 'org.security.manage' },
+  { href: '/app/billing', label: 'Billing & Licences', icon: 'finance', perm: 'org.billing.manage' },
   { section: 'Account' },
   { href: '/app/security', label: 'My Security', icon: 'lock', perm: null },
 ] as const;

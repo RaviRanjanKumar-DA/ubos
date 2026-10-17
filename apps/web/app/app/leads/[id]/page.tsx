@@ -6,7 +6,8 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { api, ApiError, session } from '@/lib/api';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
-import { relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
+import { Field, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
+import type { CustomAction } from '@/components/CustomActions';
 
 interface Activity { id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
 interface FollowUp { id: string; dueAt: string; note: string | null; doneAt: string | null; outcome: string | null; user: string | null }
@@ -15,12 +16,12 @@ interface LeadDetail {
   workspace: { id: string; name: string }; pipeline: { id: string; name: string; stages: { id: string; name: string; isWon: boolean; isLost: boolean }[] };
   stageId: string; status: string | null; lostReason: string | null; source: string; customFields: Record<string, unknown>;
   owner: { id: string; name: string } | null; createdAt: string; assignedAt: string | null; firstResponseAt: string | null;
-  lastActivityAt: string | null; lastDisposition: string | null; nextFollowUpAt: string | null; canUpdate: boolean; canAssign: boolean;
+  lastActivityAt: string | null; lastDisposition: string | null; nextFollowUpAt: string | null; score: number; stageChangedAt: string; canUpdate: boolean; canAssign: boolean;
   activities: Activity[]; followUps: FollowUp[];
 }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆' };
+const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔' };
 const at = (h: number, addDays: number) => { const d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
@@ -69,6 +70,10 @@ function LeadPage() {
   const label = (kind: 'sources' | 'statuses' | 'dispositions', v: string | null) => (v ? ws?.[kind].find((o) => o.value === v)?.label ?? v : '');
   const stageName = (sid: unknown) => lead.pipeline.stages.find((s) => s.id === sid)?.name ?? 'another stage';
   const openFollowUps = lead.followUps.filter((f) => !f.doneAt);
+  const wsStage = (sid: string) => ws?.pipelines.find((p) => p.id === lead.pipeline.id)?.stages.find((s) => s.id === sid);
+  const stageRules = (sid: string) => wsStage(sid)?.requiredFieldKeys?.map((k) => ws?.fields.find((f) => f.key === k)?.label ?? k) ?? [];
+  const inStage = Math.max(0, Math.floor((Date.now() - new Date(lead.stageChangedAt).getTime()) / 86_400_000));
+  const sla = current ? wsStage(current.id)?.slaDays ?? null : null;
   const moveTo = (stageId: string, reason?: string) => {
     const st = lead.pipeline.stages.find((s) => s.id === stageId)!;
     if (st.isLost && !reason && ws?.lostReasons.length) return setLosing(stageId);
@@ -85,6 +90,7 @@ function LeadPage() {
       case 'stage': return `Stage → ${stageName(d.to)}${d.lostReason ? ` (${d.lostReason})` : ''}`;
       case 'follow_up': return `Follow-up planned for ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
       case 'import': return `Imported from ${String(d.file ?? 'file')}`;
+      case 'action': return `${String(d.name ?? 'Custom action')}${d.score ? ` · ${Number(d.score) > 0 ? '+' : ''}${d.score} score` : ''}`;
       default: return a.type;
     }
   }
@@ -94,7 +100,8 @@ function LeadPage() {
       <div className="page-head" style={{ alignItems: 'flex-start' }}>
         <div>
           <div className="small muted"><Link href="/app/leads">Leads</Link> / {lead.workspace.name} · {lead.pipeline.name}</div>
-          <h1>{lead.name} {lead.status && <span className={`badge ${STATUS_TONE[lead.status] ?? ''}`} style={{ verticalAlign: 'middle' }}>{label('statuses', lead.status)}</span>}</h1>
+          <h1>{lead.name} {lead.status && <span className={`badge ${STATUS_TONE[lead.status] ?? ''}`} style={{ verticalAlign: 'middle' }}>{label('statuses', lead.status)}</span>}
+            {' '}<span className={`badge ${lead.score >= 30 ? 'ok' : 'grey'}`} style={{ verticalAlign: 'middle' }} title="Lead score from custom actions">Score {lead.score}</span></h1>
           <div className="small muted">
             {lead.mobile && <a href={`tel:${lead.mobile}`}>{lead.mobile}</a>}{lead.email ? ` · ${lead.email}` : ''}{lead.city ? ` · ${lead.city}` : ''}
             {' · '}<Link href={`/app/customers/${lead.customerId}`}>Customer {lead.customerCode} (360°)</Link>
@@ -121,10 +128,13 @@ function LeadPage() {
           {lead.pipeline.stages.map((s, i) => (
             <button key={s.id} role="listitem" disabled={!lead.canUpdate || s.id === lead.stageId}
               className={`${i < stageIdx ? 'passed' : ''} ${s.id === lead.stageId ? 'current' : ''} ${s.isWon ? 'won' : ''} ${s.isLost ? 'lost' : ''}`}
-              onClick={() => moveTo(s.id)} title={s.name}>{s.name}</button>
+              onClick={() => moveTo(s.id)} title={stageRules(s.id).length ? `${s.name} — needs ${stageRules(s.id).join(', ')}` : s.name}>{s.name}</button>
           ))}
         </div>
-        {current?.isLost && lead.lostReason && <div className="small" style={{ color: 'var(--bad)' }}>Lost: {lead.lostReason}</div>}
+        {current?.isLost && lead.lostReason && <div className="small" style={{ color: 'var(--bad)' }}>Lost: {ws?.lostReasons.find((r) => r.value === lead.lostReason)?.label ?? lead.lostReason}</div>}
+        <div className="small muted" style={{ marginTop: 4 }}>
+          In <b>{current?.name}</b> for {inStage} day(s){sla && !current?.isWon && !current?.isLost ? (inStage >= sla ? <span className="badge bad" style={{ marginLeft: 6 }}>Over the {sla}-day SLA</span> : ` · SLA ${sla} days`) : ''}
+        </div>
         <div className="grid cols-4 small" style={{ marginTop: 10 }}>
           <div><span className="muted">Enquiry</span><br />{new Date(lead.createdAt).toLocaleDateString('en-IN')} · {label('sources', lead.source)}</div>
           <div><span className="muted">First response</span><br />{lead.firstResponseAt ? relTime(lead.firstResponseAt) : <span style={{ color: 'var(--warn)' }}>Not called yet</span>}</div>
@@ -148,6 +158,7 @@ function LeadPage() {
               </div>
             </div>
           )}
+          {lead.canUpdate && <ActionsCard lead={lead} act={act} call={call} />}
           <div className="card">
             <h2>Follow-ups</h2>
             {!openFollowUps.length && <p className="small muted">No open follow-up. Plan one so this lead is not forgotten.</p>}
@@ -176,6 +187,7 @@ function LeadPage() {
                   <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{relTime(a.at)}</span>
                 </div>
                 {a.remark && <div style={{ fontSize: 13.5, margin: '2px 0' }}>{a.remark}</div>}
+                {a.type === 'action' && a.data?.answers ? <Answers answers={a.data.answers as Record<string, unknown>} labels={a.data.labels as Record<string, string> | undefined} /> : null}
                 <div className="small muted">{a.user ?? 'System'} · {new Date(a.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
               </div>
             ))}
@@ -198,11 +210,12 @@ function ActionPanel({ ws, lead, act, call }: {
   act: (fn: () => Promise<unknown>, text: string) => Promise<boolean>; call: (p: string, m: string, b?: unknown) => Promise<unknown>;
 }) {
   const [tab, setTab] = useState<Tab>('call');
-  const [disposition, setDisposition] = useState('');
+  const defaultDisposition = ws.dispositions.find((d) => d.isDefault)?.value ?? '';
+  const [disposition, setDisposition] = useState(defaultDisposition);
   const [minutes, setMinutes] = useState('');
   const [remark, setRemark] = useState('');
   const [next, setNext] = useState('');
-  const reset = () => { setDisposition(''); setMinutes(''); setRemark(''); setNext(''); };
+  const reset = () => { setDisposition(defaultDisposition); setMinutes(''); setRemark(''); setNext(''); };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -297,6 +310,75 @@ function DetailsCard({ ws, lead, act, call }: {
           </div>
         </form>
       )}
+    </div>
+  );
+}
+
+/** Answers of a custom action, shown on the timeline. */
+function Answers({ answers, labels }: { answers: Record<string, unknown>; labels?: Record<string, string> }) {
+  const entries = Object.entries(answers).filter(([, v]) => v !== null && v !== undefined && v !== '');
+  if (!entries.length) return null;
+  return (
+    <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '2px 10px', margin: '4px 0', fontSize: 13 }}>
+      {entries.map(([k, v]) => [
+        <dt key={`${k}-l`} className="muted">{labels?.[k] ?? k.replace(/_/g, ' ')}</dt>,
+        <dd key={`${k}-v`} style={{ margin: 0 }}>{Array.isArray(v) ? v.join(', ') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}</dd>,
+      ])}
+    </dl>
+  );
+}
+
+/** Custom actions available for this lead's business line; running one saves the answers and adds its score. */
+function ActionsCard({ lead, act, call }: {
+  lead: LeadDetail; act: (fn: () => Promise<unknown>, text: string) => Promise<boolean>; call: (p: string, m: string, b?: unknown) => Promise<unknown>;
+}) {
+  const [actions, setActions] = useState<CustomAction[]>([]);
+  const [running, setRunning] = useState<CustomAction | null>(null);
+  useEffect(() => {
+    api<CustomAction[]>(`/api/v1/custom-actions?workspaceId=${lead.workspace.id}&archived=false`, { workspace: lead.workspace.id }).then(setActions).catch(() => setActions([]));
+  }, [lead.workspace.id]);
+  if (!actions.length) return null;
+  const done = new Map<string, number>();
+  for (const a of lead.activities) if (a.type === 'action') done.set(String(a.data?.actionId), (done.get(String(a.data?.actionId)) ?? 0) + 1);
+  return (
+    <div className="card">
+      <h2>Custom actions</h2>
+      <p className="small muted" style={{ marginTop: -6 }}>Fill a short form for this lead. The answers go on the journey and add to the score.</p>
+      <div className="chips">
+        {actions.map((x) => (
+          <button key={x.id} className="chip" onClick={() => setRunning(x)} title={x.description ?? undefined}>
+            {done.has(x.id) ? '✔ ' : ''}{x.name} <span className="count">{x.score > 0 ? `+${x.score}` : x.score}</span>
+          </button>
+        ))}
+      </div>
+      {running && <RunAction action={running} onClose={() => setRunning(null)}
+        onSubmit={async (answers) => { if (await act(() => call(`/api/v1/leads/${lead.id}/actions/${running.id}`, 'POST', { answers }), `${running.name} saved.`)) setRunning(null); }} />}
+    </div>
+  );
+}
+
+function RunAction({ action, onClose, onSubmit }: { action: CustomAction; onClose: () => void; onSubmit: (answers: Record<string, unknown>) => void }) {
+  const [values, setValues] = useState<Record<string, unknown>>({});
+  const fields: Field[] = action.fields.map((q, i) => ({
+    id: q.key ?? String(i), key: q.key ?? String(i), label: q.label, type: q.type, options: q.options, required: q.required, isArchived: false,
+  }));
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <form className="modal" style={{ maxWidth: 560, maxHeight: '92vh', overflowY: 'auto' }} onClick={(e) => e.stopPropagation()}
+        onSubmit={(e) => { e.preventDefault(); onSubmit(values); }}>
+        <h2>{action.name} <span className="muted small">· {action.code}</span></h2>
+        {action.description && <p className="small muted" style={{ marginTop: -6 }}>{action.description}</p>}
+        {fields.map((f) => (
+          <div key={f.key} className="field">
+            <label htmlFor={`f_${f.key}`}>{f.label}{f.required && ' *'}</label>
+            <FieldInput field={f} value={values[f.key]} onChange={(v) => setValues({ ...values, [f.key]: v })} />
+          </div>
+        ))}
+        <div className="row end">
+          <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn">Save · {action.score > 0 ? `+${action.score}` : action.score} score</button>
+        </div>
+      </form>
     </div>
   );
 }

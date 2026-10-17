@@ -8,7 +8,7 @@ import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { findCustomer, nextCustomerCode } from '../common/customers';
-import { activity, eligibleOwners, makeAssigner } from '../common/lead-ops';
+import { activity, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
 
 const MAX_ROWS = 5000;
 const ImportBody = z.object({
@@ -26,7 +26,7 @@ type RowResult = {
 };
 type Prepared = RowResult & {
   data?: {
-    name: string; mobile: string; email: string | null; city: string | null; source: string; status: string | null; stageId: string;
+    name: string; mobile: string | null; email: string | null; city: string | null; source: string; status: string | null; stageId: string;
     remark: string | null; followUpAt: Date | null; ownerId: string | null; customFields: Record<string, unknown>;
     customerId: string | null; customerRm: string | null;
   };
@@ -58,6 +58,8 @@ export class LeadImportController {
     return this.db.tenant(async (tx) => {
       const ws = await tx.workspace.findUniqueOrThrow({ where: { id: a.workspaceId! } });
       const rows = await this.prepare(tx, input);
+      const byEmail = (await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() } }))?.leadIdentifier === 'email';
+      const initialStatus = await defaultStatus(tx, ws.id);
       const eligible = (await eligibleOwners(tx, ws.id)).map((u) => u.id);
       const assigner = makeAssigner(
         input.assign.mode === 'users'
@@ -80,7 +82,7 @@ export class LeadImportController {
         let customerId = d.customerId;
         if (!customerId) {
           // Re-check inside the loop: an earlier row of this file may have created the customer.
-          const again = await findCustomer(tx, { mobile: d.mobile, email: d.email });
+          const again = await findCustomer(tx, { mobile: d.mobile, email: d.email, preferEmail: byEmail });
           customerId = again?.customer.id ?? (await tx.customer.create({
             data: { tenantId: tenantId(), name: d.name, mobile: d.mobile, email: d.email, city: d.city, code: await nextCustomerCode(tx) },
           })).id;
@@ -89,7 +91,7 @@ export class LeadImportController {
         const lead = await tx.lead.create({
           data: {
             tenantId: tenantId(), workspaceId: ws.id, pipelineId: input.pipelineId, stageId: d.stageId, customerId,
-            source: d.source, status: d.status, ownerId, assignedAt: now, customFields: d.customFields as Prisma.InputJsonObject,
+            source: d.source, status: d.status ?? initialStatus, ownerId, assignedAt: now, customFields: d.customFields as Prisma.InputJsonObject,
             importId: imp.id, nextFollowUpAt: d.followUpAt,
           },
         });
@@ -149,6 +151,7 @@ export class LeadImportController {
       }
     }
     const ownerByEmail = new Map(owners.map((o) => [o.email.toLowerCase(), o.id]));
+    const byEmail = (await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() } }))?.leadIdentifier === 'email';
     const openStageIds = new Set(pipeline.stages.filter((s) => !s.isLost).map((s) => s.id));
     const seen = new Set<string>();
     const out: Prepared[] = [];
@@ -158,32 +161,35 @@ export class LeadImportController {
       const fail = (message: string, extra: Partial<RowResult> = {}): Prepared => ({ row, status: 'error', message, ...extra });
       const name = (raw.name ?? '').trim();
       const mobileRaw = (raw.mobile ?? '').trim();
-      const mobile = normalizeMobile(mobileRaw);
-      if (!mobileRaw) { out.push(fail('Mobile is missing', { name })); continue; }
-      if (!mobile) { out.push(fail(`"${mobileRaw}" is not a valid mobile number`, { name })); continue; }
-      if (name.length < 2) { out.push(fail('Name is missing', { mobile })); continue; }
-      if (seen.has(mobile)) { out.push({ row, status: 'duplicate', message: 'Same mobile appears earlier in this file', name, mobile }); continue; }
-      seen.add(mobile);
-
+      const mobile = mobileRaw ? normalizeMobile(mobileRaw) : null;
       const email = (raw.email ?? '').trim().toLowerCase() || null;
-      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { out.push(fail(`"${email}" is not a valid email`, { name, mobile })); continue; }
+      const m = mobile ?? undefined;
+      // The Lead ID (organization setting) must be present: mobile by default, or email.
+      if (!byEmail && !mobileRaw) { out.push(fail('Mobile is missing', { name })); continue; }
+      if (byEmail && !email) { out.push(fail('Email is missing (it is your Lead ID)', { name, mobile: m })); continue; }
+      if (mobileRaw && !mobile) { out.push(fail(`"${mobileRaw}" is not a valid mobile number`, { name })); continue; }
+      if (name.length < 2) { out.push(fail('Name is missing', { mobile: m })); continue; }
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { out.push(fail(`"${email}" is not a valid email`, { name, mobile: m })); continue; }
+      const idKey = byEmail ? `e:${email}` : `m:${mobile}`;
+      if (seen.has(idKey)) { out.push({ row, status: 'duplicate', message: `Same ${byEmail ? 'email' : 'mobile'} appears earlier in this file`, name, mobile: m }); continue; }
+      seen.add(idKey);
       const source = raw.source?.trim() ? pick('lead_source', raw.source) : defaultSource;
-      if (!source) { out.push(fail(`Unknown source "${raw.source}"`, { name, mobile })); continue; }
+      if (!source) { out.push(fail(`Unknown source "${raw.source}"`, { name, mobile: m })); continue; }
       const status = raw.status?.trim() ? pick('lead_status', raw.status) ?? null : null;
-      if (raw.status?.trim() && !status) { out.push(fail(`Unknown status "${raw.status}"`, { name, mobile })); continue; }
+      if (raw.status?.trim() && !status) { out.push(fail(`Unknown status "${raw.status}"`, { name, mobile: m })); continue; }
       let stageId = pipeline.stages[0].id;
       if (raw.stage?.trim()) {
         const st = pipeline.stages.find((s) => s.name.toLowerCase() === raw.stage.trim().toLowerCase());
-        if (!st) { out.push(fail(`Unknown stage "${raw.stage}"`, { name, mobile })); continue; }
-        if (!openStageIds.has(st.id)) { out.push(fail('Lost leads cannot be imported — import them open and use bulk "Change stage"', { name, mobile })); continue; }
+        if (!st) { out.push(fail(`Unknown stage "${raw.stage}"`, { name, mobile: m })); continue; }
+        if (!openStageIds.has(st.id)) { out.push(fail('Lost leads cannot be imported — import them open and use bulk "Change stage"', { name, mobile: m })); continue; }
         stageId = st.id;
       }
       const followUpAt = raw.follow_up?.trim() ? parseDateInput(raw.follow_up) : null;
-      if (raw.follow_up?.trim() && !followUpAt) { out.push(fail(`Follow-up date "${raw.follow_up}" not understood (use DD/MM/YYYY)`, { name, mobile })); continue; }
+      if (raw.follow_up?.trim() && !followUpAt) { out.push(fail(`Follow-up date "${raw.follow_up}" not understood (use DD/MM/YYYY)`, { name, mobile: m })); continue; }
       let ownerId: string | null = null;
       if (raw.owner?.trim()) {
         ownerId = ownerByEmail.get(raw.owner.trim().toLowerCase()) ?? null;
-        if (!ownerId) { out.push(fail(`Owner "${raw.owner}" is not a user of this business line`, { name, mobile })); continue; }
+        if (!ownerId) { out.push(fail(`Owner "${raw.owner}" is not a user of this business line`, { name, mobile: m })); continue; }
       }
 
       // Custom fields: accept options case-insensitively; multi-select split by comma or semicolon.
@@ -196,9 +202,9 @@ export class LeadImportController {
         else cfInput[d.key] = v;
       }
       const { values, errors } = validateCustomFields(defs, cfInput);
-      if (Object.keys(errors).length) { out.push(fail(Object.values(errors)[0], { name, mobile })); continue; }
+      if (Object.keys(errors).length) { out.push(fail(Object.values(errors)[0], { name, mobile: m })); continue; }
 
-      const match = await findCustomer(tx, { mobile, email });
+      const match = await findCustomer(tx, { mobile, email, preferEmail: byEmail });
       let status2: RowResult['status'] = match ? 'linked' : 'new';
       let message: string | undefined = match ? `Existing customer ${match.customer.code} (matched by ${match.matchedBy})` : undefined;
       if (match) {
@@ -209,7 +215,7 @@ export class LeadImportController {
         if (open) { status2 = 'duplicate'; message = `${match.customer.code} already has an open lead in this business line`; }
       }
       out.push({
-        row, status: status2, message, name, mobile,
+        row, status: status2, message, name, mobile: m,
         data: {
           name, mobile, email, city: raw.city?.trim() || null, source, status, stageId, remark: raw.remark?.trim() || null,
           followUpAt, ownerId, customFields: values, customerId: match?.customer.id ?? null, customerRm: match?.customer.primaryRmId ?? null,

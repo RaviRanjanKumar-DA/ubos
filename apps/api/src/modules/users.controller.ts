@@ -1,8 +1,9 @@
-import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import type { Tx } from '@ubos/database';
-import { DataScope, normalizeMobile } from '@ubos/shared';
+import { ADMIN_ROLE, DataScope, normalizeMobile, toCsv } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { RequirePermission } from '../common/auth.guard';
 import { auth, ctx, tenantId } from '../common/context';
@@ -33,6 +34,11 @@ const CreateUser = z.object({
 });
 const UpdateUser = z.object({ ...Profile, name: Profile.name.optional(), isActive: z.boolean().optional() });
 const SetRoles = z.object({ roles: z.array(RoleAssignment).max(20) });
+const BulkUsers = z.object({
+  dryRun: z.boolean().default(true),
+  sendInvite: z.boolean().default(true),
+  rows: z.array(z.record(z.string().max(200))).min(1).max(500),
+});
 
 type Assignment = z.infer<typeof RoleAssignment>;
 
@@ -161,6 +167,125 @@ export class UsersController {
   }
 
   /** Replaces all of a user's role assignments (each for one workspace or the whole organization). */
+  /** Licence usage for the Users page: bought, used, free, plan and expiry. */
+  @Get('licences')
+  @RequirePermission('org.user.view')
+  licences() {
+    return this.db.tenant(async (tx) => {
+      const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, include: { plan: true }, orderBy: { currentPeriodEnd: 'desc' } });
+      const used = await tx.user.count({ where: { isActive: true } });
+      return {
+        plan: sub?.plan.name ?? null, status: sub?.status ?? null, licences: sub?.licences ?? 0, used,
+        available: Math.max(0, (sub?.licences ?? 0) - used), expiresAt: sub?.currentPeriodEnd ?? null, trialEndsAt: sub?.trialEndsAt ?? null,
+      };
+    });
+  }
+
+  /** CSV of the users the viewer can see. */
+  @Get('export')
+  @RequirePermission('org.user.view', 'ORGANIZATION')
+  async export(@Res() res: Response) {
+    const rows = await this.db.tenant(async (tx) => {
+      const users = await tx.user.findMany({
+        orderBy: { name: 'asc' },
+        include: { team: { select: { name: true } }, roles: { include: { role: { select: { name: true } } } } },
+      });
+      const workspaces = new Map((await tx.workspace.findMany({ select: { id: true, name: true } })).map((w) => [w.id, w.name]));
+      const sub = await tx.subscription.findFirst({ include: { plan: true }, orderBy: { currentPeriodEnd: 'desc' } });
+      await this.db.audit(tx, { entity: 'user', entityId: 'export', action: 'user.exported', newValue: { rows: users.length } });
+      return [
+        ['Name', 'Email', 'Username', 'Mobile', 'Roles', 'Team', 'Status', '2FA', 'Licence', 'Licence expiry'],
+        ...users.map((u) => [
+          u.name, u.email, u.username ?? '', u.mobile ?? '',
+          u.roles.map((r) => `${r.role.name} (${r.workspaceId ? workspaces.get(r.workspaceId) ?? '?' : 'All workspaces'})`).join('; '),
+          u.team?.name ?? '', !u.isActive ? 'Inactive' : u.lockedUntil && u.lockedUntil > new Date() ? 'Locked' : 'Active', u.totpEnabled ? 'On' : 'Off',
+          u.isActive ? sub?.plan.name ?? '' : '', u.isActive && sub ? sub.currentPeriodEnd.toISOString().slice(0, 10) : '',
+        ]),
+      ];
+    });
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename="users.csv"');
+    res.send('\uFEFF' + toCsv(rows));
+  }
+
+  /**
+   * Bulk add users from Excel / CSV rows: name, email, mobile, username, role, workspace ("All" = organization-wide).
+   * dryRun=true only checks; dryRun=false creates the valid rows. Invitations replace temporary passwords here:
+   * people sign in with "Email me a code" and set their password.
+   */
+  @Post('bulk')
+  @HttpCode(200)
+  @RequirePermission('org.user.manage', 'ORGANIZATION')
+  bulk(@Body() body: unknown) {
+    const input = parse(BulkUsers, body);
+    const org = ctx().tenant!;
+    return this.db.tenant(async (tx) => {
+      const roles = await tx.role.findMany({ include: { permissions: { include: { permission: true } } } });
+      const workspaces = await tx.workspace.findMany({ where: { isArchived: false } });
+      const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, orderBy: { currentPeriodEnd: 'desc' } });
+      let free = Math.max(0, (sub?.licences ?? 0) - (await tx.user.count({ where: { isActive: true } })));
+      const seenEmail = new Set<string>();
+      const results: { row: number; status: 'ok' | 'error'; message?: string; name?: string; email?: string }[] = [];
+      const toInvite: { name: string; email: string }[] = [];
+
+      for (const [i, raw] of input.rows.entries()) {
+        const row = i + 2;
+        const name = (raw.name ?? '').trim();
+        const email = (raw.email ?? '').trim().toLowerCase();
+        const fail = (message: string) => results.push({ row, status: 'error', message, name, email });
+        if (name.length < 2) { fail('Name is missing'); continue; }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { fail('Valid email is required'); continue; }
+        if (seenEmail.has(email)) { fail('Same email appears earlier in this file'); continue; }
+        seenEmail.add(email);
+        const roleName = (raw.role ?? '').trim();
+        const role = roles.find((r) => r.name.toLowerCase() === roleName.toLowerCase());
+        if (!role) { fail(`Unknown role "${roleName}"`); continue; }
+        const wsName = (raw.workspace ?? '').trim();
+        const ws = !wsName || /^all( workspaces)?$/i.test(wsName) ? null : workspaces.find((w) => w.name.toLowerCase() === wsName.toLowerCase());
+        if (ws === undefined) { fail(`Unknown workspace "${wsName}"`); continue; }
+        let mobile: string | null = null;
+        if (raw.mobile?.trim()) {
+          mobile = normalizeMobile(raw.mobile);
+          if (!mobile) { fail(`"${raw.mobile}" is not a valid mobile number`); continue; }
+        }
+        const username = raw.username?.trim().toLowerCase() || null;
+        if (username && !/^[a-z0-9._-]{3,30}$/.test(username)) { fail('Username: 3–30 letters, numbers, dot, dash or underscore'); continue; }
+        try {
+          await this.assertUnique(tx, { email, username, mobile });
+          if (role.name === ADMIN_ROLE && !auth().assignments.some((r) => r.roleName === ADMIN_ROLE && r.workspaceId === null)) throw new ForbiddenException({ message: `Only an ${ADMIN_ROLE} can assign that role` });
+          await this.validateAssignments(tx, [{ roleId: role.id, workspaceId: ws?.id ?? null }]);
+        } catch (e) {
+          fail((e as { response?: { message?: string } }).response?.message ?? 'Not allowed');
+          continue;
+        }
+        if (free <= 0) { fail('No free user licence — buy more licences first'); continue; }
+        free--;
+        if (!input.dryRun) {
+          const user = await tx.user.create({
+            data: { tenantId: tenantId(), name, email, username, mobile, passwordHash: await bcrypt.hash(`Ub${randomToken(12)}9`, 10), mustChangePassword: true },
+          });
+          await this.writeAssignments(tx, user.id, [{ roleId: role.id, workspaceId: ws?.id ?? null }]);
+          toInvite.push({ name, email });
+        }
+        results.push({ row, status: 'ok', name, email });
+      }
+      if (!input.dryRun) {
+        await this.db.audit(tx, { entity: 'user', entityId: 'bulk', action: 'user.bulk_created', newValue: { created: toInvite.length, failed: results.filter((r) => r.status === 'error').length } });
+      }
+      return { dryRun: input.dryRun, ok: results.filter((r) => r.status === 'ok').length, errors: results.filter((r) => r.status === 'error').length, results, toInvite };
+    }, { timeoutMs: 120_000 }).then(async (r) => {
+      if (!r.dryRun && input.sendInvite) {
+        const web = (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(',')[0];
+        for (const u of r.toInvite) {
+          await this.mailer.send(u.email, `You have been added to ${org.name} on UBOS`,
+            `Hello ${u.name},\n\nYou have been added to ${org.name} on UBOS.\nSign in: ${web}/login?org=${org.slug} (organization code ${org.slug})\n\nChoose "Email me a sign-in code" with this email, then set your own password.`).catch(() => undefined);
+        }
+      }
+      const { toInvite: _t, ...rest } = r;
+      return rest;
+    });
+  }
+
   @Put(':id/roles')
   @RequirePermission('org.user.manage', 'ORGANIZATION')
   setRoles(@Param('id') id: string, @Body() body: unknown) {

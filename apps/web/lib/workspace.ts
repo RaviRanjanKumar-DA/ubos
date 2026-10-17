@@ -1,9 +1,12 @@
 // Shared types for workspace settings (used by the settings page and the lead forms).
 
-export interface Stage { id?: string; name: string; isWon: boolean; isLost: boolean; leadCount?: number }
+export interface Stage {
+  id?: string; name: string; isWon: boolean; isLost: boolean; leadCount?: number;
+  color?: string | null; slaDays?: number | null; requiredFieldKeys?: string[]; setStatus?: string | null; followUpDays?: number | null;
+}
 export interface Pipeline { id: string; name: string; stages: Stage[] }
-export interface Field { id: string; key: string; label: string; type: string; options: string[]; required: boolean; isArchived: boolean }
-export interface Option { id?: string; value?: string; label: string }
+export interface Field { id: string; key: string; label: string; type: string; options: string[]; required: boolean; isArchived: boolean; createdAt?: string; updatedAt?: string }
+export interface Option { id?: string; value?: string; label: string; isDefault?: boolean }
 
 export interface WorkspaceSettings {
   id: string;
@@ -18,7 +21,20 @@ export interface WorkspaceSettings {
   statuses: Option[];
   dispositions: (Option & { connected: boolean })[];
   assignment: { mode: 'round_robin' | 'creator' | 'fixed'; userIds: string[]; sticky: boolean };
+  display: { h1: string; h2: string };
+  leadIdentifier: 'mobile' | 'email';
 }
+
+/** Value shown for a display slot (H1 / H2) of a lead row. */
+export function displayValue(slot: string, row: { name?: string | null; mobile?: string | null; email?: string | null; city?: string | null; source?: string | null; customerCode?: string | null; customFields?: Record<string, unknown> }, fields: Field[]): string {
+  if (slot.startsWith('cf:')) {
+    const f = fields.find((x) => x.key === slot.slice(3));
+    return showValue(f, row.customFields?.[slot.slice(3)]);
+  }
+  return String((row as Record<string, unknown>)[slot] ?? '');
+}
+
+export const STAGE_PALETTE = ['#e4e2ec', '#d6e6fb', '#f9e7c5', '#f7d3dc', '#e3d9f7', '#d5efe9', '#fbe0cf', '#dfe8d2', '#cdeed8', '#f6d0cb'];
 
 export const STATUS_TONE: Record<string, string> = { hot: 'bad', warm: 'warn', cold: 'grey', fresh: '' };
 

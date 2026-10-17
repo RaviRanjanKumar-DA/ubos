@@ -22,6 +22,7 @@ export const PERMISSIONS = {
   'org.user.manage': 'Create users and assign roles',
   'org.role.manage': 'Create and edit roles',
   'org.structure.manage': 'Branches, departments and teams',
+  'org.billing.manage': 'Buy licences and services, see orders and transactions',
   'org.security.manage': 'Security policy: login methods, 2FA rules, IP allow-list, session timeout',
   'integrations.view': 'View integrations',
   'integrations.manage': 'Activate / deactivate integrations',

@@ -7,8 +7,13 @@ export const maskPan = (last4: string | null) => (last4 ? `••••••${l
  * Finds the existing active customer for these identifiers (exact matches only — auto-link rule):
  * main or alternate mobile, then PAN, then email. Merged records are never matched.
  */
-export async function findCustomer(tx: Tx, ids: { mobile?: string | null; email?: string | null; panHash?: string | null }) {
+export async function findCustomer(tx: Tx, ids: { mobile?: string | null; email?: string | null; panHash?: string | null; preferEmail?: boolean }) {
   const active = { mergedIntoId: null };
+  // Lead ID = email: match by email first.
+  if (ids.preferEmail && ids.email) {
+    const byEmail = await tx.customer.findFirst({ where: { ...active, email: { equals: ids.email, mode: 'insensitive' } }, orderBy: { createdAt: 'asc' } });
+    if (byEmail) return { customer: byEmail, matchedBy: 'email' as const };
+  }
   if (ids.mobile) {
     const byMobile = await tx.customer.findFirst({
       where: { ...active, OR: [{ mobile: ids.mobile }, { alternateMobiles: { has: ids.mobile } }] },

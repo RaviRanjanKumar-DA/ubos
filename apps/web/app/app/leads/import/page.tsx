@@ -58,7 +58,7 @@ export default function ImportPage() {
     ...fields.map((f) => [`cf:${f.key}`, `${f.label}${f.required ? ' *' : ''}`] as [string, string]),
   ];
   const mapped = new Set(mapping.filter(Boolean));
-  const missingRequired = ['name', 'mobile', ...fields.filter((f) => f.required).map((f) => `cf:${f.key}`)].filter((k) => !mapped.has(k));
+  const missingRequired = ['name', ws?.leadIdentifier === 'email' ? 'email' : 'mobile', ...fields.filter((f) => f.required).map((f) => `cf:${f.key}`)].filter((k) => !mapped.has(k));
 
   if (!me.currentWorkspaceId) return <div className="notice">Select a workspace (business line) at the top first — leads are uploaded into one business line at a time.</div>;
 

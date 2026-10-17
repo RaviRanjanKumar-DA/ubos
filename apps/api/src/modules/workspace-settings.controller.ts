@@ -14,6 +14,11 @@ const Stage = z.object({
   name: z.string().trim().min(1).max(40),
   isWon: z.boolean().default(false),
   isLost: z.boolean().default(false),
+  color: z.string().regex(/^#[0-9a-fA-F]{6}$/).nullable().optional(),
+  slaDays: z.number().int().min(1).max(365).nullable().optional(),
+  requiredFieldKeys: z.array(z.string().max(60)).max(30).optional(),
+  setStatus: z.string().max(60).nullable().optional(),
+  followUpDays: z.number().int().min(0).max(365).nullable().optional(),
 });
 const Stages = z.object({ stages: z.array(Stage).min(2, 'A pipeline needs at least 2 stages').max(20) });
 const NewPipeline = z.object({ name: Name, stages: z.array(z.string().trim().min(1).max(40)).min(2).max(20).optional() });
@@ -31,7 +36,7 @@ const FieldPatch = z.object({
 });
 const Order = z.object({ ids: z.array(z.string().uuid()).max(200) });
 const OptionList = z.object({
-  options: z.array(z.object({ id: z.string().uuid().optional(), label: z.string().trim().min(1).max(60), connected: z.boolean().optional() })).max(100),
+  options: z.array(z.object({ id: z.string().uuid().optional(), label: z.string().trim().min(1).max(60), connected: z.boolean().optional(), isDefault: z.boolean().optional() })).max(100),
 });
 const KINDS = ['lead_source', 'lost_reason', 'lead_status', 'call_disposition'] as const;
 const Assignment = z.object({
@@ -67,14 +72,19 @@ export class WorkspaceSettingsController {
         canManage: this.canManage(id),
         pipelines: ws.pipelines.map((p) => ({
           id: p.id, name: p.name,
-          stages: p.stages.map((s) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost, leadCount: perStage.get(s.id) ?? 0 })),
+          stages: p.stages.map((s) => ({
+            id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost, leadCount: perStage.get(s.id) ?? 0,
+            color: s.color, slaDays: s.slaDays, requiredFieldKeys: s.requiredFieldKeys, setStatus: s.setStatus, followUpDays: s.followUpDays,
+          })),
         })),
-        fields: ws.fields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options, required: f.required, isArchived: f.isArchived })),
+        fields: ws.fields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options, required: f.required, isArchived: f.isArchived, createdAt: f.createdAt, updatedAt: f.updatedAt })),
         sources: ws.options.filter((o) => o.kind === 'lead_source').map((o) => ({ id: o.id, value: o.value, label: o.label })),
         lostReasons: ws.options.filter((o) => o.kind === 'lost_reason').map((o) => ({ id: o.id, value: o.value, label: o.label })),
-        statuses: ws.options.filter((o) => o.kind === 'lead_status').map((o) => ({ id: o.id, value: o.value, label: o.label })),
-        dispositions: ws.options.filter((o) => o.kind === 'call_disposition').map((o) => ({ id: o.id, value: o.value, label: o.label, connected: o.connected })),
+        statuses: ws.options.filter((o) => o.kind === 'lead_status').map((o) => ({ id: o.id, value: o.value, label: o.label, isDefault: o.isDefault })),
+        dispositions: ws.options.filter((o) => o.kind === 'call_disposition').map((o) => ({ id: o.id, value: o.value, label: o.label, connected: o.connected, isDefault: o.isDefault })),
         assignment: { mode: ws.assignmentMode, userIds: ws.assignmentUserIds, sticky: ws.stickyOwner },
+        display: { h1: ws.displayH1, h2: ws.displayH2 },
+        leadIdentifier: (await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() }, select: { leadIdentifier: true } }))?.leadIdentifier ?? 'mobile',
       };
     });
   }
@@ -175,6 +185,13 @@ export class WorkspaceSettingsController {
       const p = await this.pipeline(tx, pid);
       this.assertManage(p.workspaceId);
       const existing = await tx.leadStage.findMany({ where: { pipelineId: pid }, orderBy: { position: 'asc' } });
+      const fieldKeys = new Set((await tx.leadField.findMany({ where: { workspaceId: p.workspaceId }, select: { key: true } })).map((f) => f.key));
+      const statusValues = new Set((await tx.workspaceOption.findMany({ where: { workspaceId: p.workspaceId, kind: 'lead_status', isArchived: false }, select: { value: true } })).map((o) => o.value));
+      for (const s of stages) {
+        const bad = (s.requiredFieldKeys ?? []).find((k) => !fieldKeys.has(k));
+        if (bad) throw new BadRequestException({ code: 'UNKNOWN_FIELD', message: `Stage "${s.name}": field "${bad}" does not exist in this workspace` });
+        if (s.setStatus && !statusValues.has(s.setStatus)) throw new BadRequestException({ code: 'UNKNOWN_STATUS', message: `Stage "${s.name}": status "${s.setStatus}" does not exist` });
+      }
       const keepIds = new Set(stages.filter((s) => s.id).map((s) => s.id!));
       for (const s of stages) {
         if (s.id && !existing.some((e) => e.id === s.id)) throw new BadRequestException({ code: 'STAGE_NOT_FOUND', message: 'Stage does not belong to this pipeline' });
@@ -185,7 +202,10 @@ export class WorkspaceSettingsController {
         await tx.leadStage.delete({ where: { id: removed.id } });
       }
       for (const [position, s] of stages.entries()) {
-        const data = { name: s.name, position, isWon: s.isWon, isLost: s.isLost };
+        const data = {
+          name: s.name, position, isWon: s.isWon, isLost: s.isLost, color: s.color ?? null, slaDays: s.slaDays ?? null,
+          requiredFieldKeys: s.requiredFieldKeys ?? [], setStatus: s.setStatus ?? null, followUpDays: s.followUpDays ?? null,
+        };
         if (s.id) await tx.leadStage.update({ where: { id: s.id }, data });
         else await tx.leadStage.create({ data: { ...data, tenantId: tenantId(), pipelineId: pid } });
       }
@@ -280,6 +300,8 @@ export class WorkspaceSettingsController {
     this.assertManage(id);
     if (!KINDS.includes(kind as (typeof KINDS)[number])) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Unknown list' });
     const { options } = parse(OptionList, body);
+    if (options.filter((o) => o.isDefault).length > 1) throw new BadRequestException({ code: 'ONE_DEFAULT', message: 'Only one entry can be the default' });
+    if (options.some((o) => o.isDefault) && !['lead_status', 'call_disposition'].includes(kind)) throw new BadRequestException({ code: 'NO_DEFAULT', message: 'This list has no default' });
     const labels = options.map((o) => o.label.toLowerCase());
     if (new Set(labels).size !== labels.length) throw new BadRequestException({ code: 'DUPLICATE_OPTION', message: 'Each entry must be unique' });
     return this.db.tenant(async (tx) => {
@@ -290,11 +312,11 @@ export class WorkspaceSettingsController {
       for (const [position, o] of options.entries()) {
         const match = o.id ? existing.find((e) => e.id === o.id) : existing.find((e) => e.label.toLowerCase() === o.label.toLowerCase());
         if (match) {
-          await tx.workspaceOption.update({ where: { id: match.id }, data: { label: o.label, position, isArchived: false, ...(kind === 'call_disposition' ? { connected: !!o.connected } : {}) } });
+          await tx.workspaceOption.update({ where: { id: match.id }, data: { label: o.label, position, isArchived: false, isDefault: !!o.isDefault, ...(kind === 'call_disposition' ? { connected: !!o.connected } : {}) } });
         } else {
           // Sources are stored on leads as short codes ("google_ads"); reasons as their text.
           const value = kind === 'lost_reason' ? o.label : fieldKey(o.label, existing.map((e) => e.value));
-          await tx.workspaceOption.create({ data: { tenantId: tenantId(), workspaceId: id, kind, value, label: o.label, position, connected: kind === 'call_disposition' && !!o.connected } });
+          await tx.workspaceOption.create({ data: { tenantId: tenantId(), workspaceId: id, kind, value, label: o.label, position, connected: kind === 'call_disposition' && !!o.connected, isDefault: !!o.isDefault } });
         }
       }
       await this.db.audit(tx, {
@@ -313,6 +335,38 @@ export class WorkspaceSettingsController {
   assignees(@Param('id') id: string) {
     this.assertAccess(id);
     return this.db.tenant((tx) => eligibleOwners(tx, id));
+  }
+
+  /** Primary display: which values show as the title (H1) and second line (H2) of a lead in lists and headers. */
+  @Put('workspaces/:id/display')
+  @RequirePermission('org.workspace.view')
+  saveDisplay(@Param('id') id: string, @Body() body: unknown) {
+    this.assertManage(id);
+    const { h1, h2 } = parse(z.object({ h1: z.string().max(70), h2: z.string().max(70) }), body);
+    return this.db.tenant(async (tx) => {
+      const fieldKeys = new Set((await tx.leadField.findMany({ where: { workspaceId: id, isArchived: false }, select: { key: true } })).map((f) => `cf:${f.key}`));
+      const allowed = (v: string) => ['name', 'mobile', 'email', 'city', 'source', 'customerCode'].includes(v) || fieldKeys.has(v);
+      if (!allowed(h1) || !allowed(h2)) throw new BadRequestException({ code: 'INVALID_DISPLAY', message: 'Choose name, mobile, email, city, source, customer ID or a lead field' });
+      await tx.workspace.update({ where: { id }, data: { displayH1: h1, displayH2: h2 } });
+      await this.db.audit(tx, { workspaceId: id, entity: 'workspace', entityId: id, action: 'workspace.display_changed', newValue: { h1, h2 } });
+      return { ok: true };
+    });
+  }
+
+  /** Lead ID: the identifier that makes a customer unique in the whole organization (mobile or email). */
+  @Put('settings/lead-identifier')
+  @RequirePermission('org.workspace.manage', 'ORGANIZATION')
+  saveLeadIdentifier(@Body() body: unknown) {
+    const { leadIdentifier } = parse(z.object({ leadIdentifier: z.enum(['mobile', 'email']) }), body);
+    return this.db.tenant(async (tx) => {
+      const old = await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() } });
+      await tx.organizationSetting.upsert({ where: { tenantId: tenantId() }, create: { tenantId: tenantId(), leadIdentifier }, update: { leadIdentifier } });
+      await this.db.audit(tx, {
+        entity: 'settings', entityId: 'lead_identifier', action: 'settings.lead_identifier_changed',
+        oldValue: { leadIdentifier: old?.leadIdentifier ?? 'mobile' }, newValue: { leadIdentifier },
+      });
+      return { leadIdentifier };
+    });
   }
 
   /** Who receives new leads from forms, integrations and imports: round-robin pool, fixed owner or creator; sticky RM. */
