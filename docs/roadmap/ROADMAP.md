@@ -25,6 +25,37 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 | Marketing | UTM / source ROI, ad spend, AI content studio (copy, creatives, short videos) | Phase 4 |
 | Integrations with other CRMs & platforms | Catalogue now lists 36 integrations (portals, telephony, WhatsApp, Shopify / WooCommerce / WordPress, Zoho / HubSpot / Salesforce / LeadSquared / TeleCRM / Pipedrive / Freshsales, Zapier); adapters ship per phase | Catalogue: Phase 1.5 · adapters: Phases 1–5 |
 
+## Setup Guide & onboarding checklist (requested 17 Oct 2026)
+
+A **Setup Guide** page for organization admins (TeleCRM-style reference): a greeting, guide groups in a left menu, cards with a progress bar (e.g. 2/5), and steps marked **Basic** or **Advanced**. Steps tick themselves off from real data (a step is done when the thing exists, e.g. "Add team members" = at least 2 active users), so nobody ticks boxes by hand; a step can also be skipped. Each step links straight to the screen that does it. Steps whose feature is not built yet show "Coming in Phase N" instead of a link, so the guide grows with the product. Per organization, not per user; the Platform Console shows each tenant's setup progress (useful for onboarding paying customers). Resources block: Download app, Contact our team (support ticket), Help videos, Product updates (changelog).
+
+| Guide · step | In UBOS | When |
+|---|---|---|
+| Get started · lead fields, lead stages, add leads manually, import from Excel | Fields settings, stage board, Add lead, bulk upload | **Built** (1.3 – 1.5b) |
+| Get started · import historical actions (calls / remarks) from another CRM | Bulk upload in "activity history" mode | 1.5c |
+| Team · add members, team structure, member access | Users (incl. bulk add), Org structure, Roles & permissions | **Built** (1.2, 1.5b) |
+| Team · role SOPs (custom dashboards per role) | Role dashboards | 1.6 |
+| Customise · call feedback, custom actions | Status & call feedback, Custom actions | **Built** (1.5b) |
+| Customise · labels | Tags on leads (colour, filter, bulk add / remove) | 1.5c |
+| Customise · SOP forms | Stage required fields + custom actions (built); full process templates with step forms | 1.5d |
+| Calling & messaging · SIM call recording, SIM mode | Android app logs SIM calls and recordings | Phase 2 |
+| Calling & messaging · WhatsApp / SMS / email templates, calling campaigns | Templates, campaign lists with dialer queue | Phase 2 |
+| Calling & messaging · call summariser | AI call notes (Gemini / Claude / OpenAI, tenant's own key) | Phase 4 |
+| WhatsApp · chat sync, Business API, templates, first broadcast | WhatsApp integration (user can turn it on / off) | Phase 2 |
+| IVR / cloud telephony · CallerDesk, TeleCMI, Tata Tele, Knowlarity, MCube, Maqsam | Telephony adapters, CallerDesk first | Phase 2 |
+| Integrations · Facebook Lead Ads, Google Sheets, IndiaMART / JustDial | Lead-source adapters | 1.7 |
+| Integrations · Shopify, WooCommerce, Razorpay | E-commerce leads, payment links on leads | Phase 3 |
+| Automation · flowcharts, schedules, sequences, API templates | Workflow builder | Phase 2 (rules) · Phase 3 (visual builder) |
+| Automation · webhooks | Outgoing webhooks per event | 1.7 |
+| Reports · leaderboard, call reports, lead reports | Dashboards & analytics | 1.6 |
+| Move data · export leads, bulk edit in app | Filtered export, bulk actions | **Built** |
+| Move data · export actions, bulk edit through Excel | Activity export; upload in "update existing" mode | 1.5c |
+| AI connectors · Claude / ChatGPT via MCP | UBOS MCP server on top of the public API, per-user keys and permissions | Phase 4 |
+| Developer · API keys | Organization API keys with scopes, rate limits, audit | 1.7 |
+| Developer · embedded apps & iframes | Custom tabs on lead / dashboard pages | Phase 5 |
+
+Proposed build: the Setup Guide page itself as small slice **1.5e** (it only reads existing data), then every later slice adds its steps.
+
 ## Dashboards & analytics (requested 17 Oct 2026)
 
 Every dashboard follows the same access rules as the data: what a person sees depends on their organization, workspace (business line), roles and data scope.
