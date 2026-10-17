@@ -34,7 +34,7 @@ A **Setup Guide** page for organization admins (TeleCRM-style reference): a gree
 | Get started · lead fields, lead stages, add leads manually, import from Excel | Fields settings, stage board, Add lead, bulk upload | **Built** (1.3 – 1.5b) |
 | Get started · import historical actions (calls / remarks) from another CRM | Bulk upload in "activity history" mode | 1.5c |
 | Team · add members, team structure, member access | Users (incl. bulk add), Org structure, Roles & permissions | **Built** (1.2, 1.5b) |
-| Team · role SOPs (custom dashboards per role) | Role dashboards | 1.6 |
+| Team · role SOPs (custom dashboards per role) | Shared dashboards with a landing dashboard per role | **Built** (1.6) |
 | Customise · call feedback, custom actions | Status & call feedback, Custom actions | **Built** (1.5b) |
 | Customise · labels | Tags on leads (colour, filter, bulk add / remove) | 1.5c |
 | Customise · SOP forms | Stage required fields + custom actions (built); full process templates with step forms | 1.5d |
@@ -47,7 +47,7 @@ A **Setup Guide** page for organization admins (TeleCRM-style reference): a gree
 | Integrations · Shopify, WooCommerce, Razorpay | E-commerce leads, payment links on leads | Phase 3 |
 | Automation · flowcharts, schedules, sequences, API templates | Workflow builder | Phase 2 (rules) · Phase 3 (visual builder) |
 | Automation · webhooks | Outgoing webhooks per event | 1.7 |
-| Reports · leaderboard, call reports, lead reports | Dashboards & analytics | 1.6 |
+| Reports · leaderboard, call reports, lead reports | Dashboards & analytics | **Built** (1.6) |
 | Move data · export leads, bulk edit in app | Filtered export, bulk actions | **Built** |
 | Move data · export actions, bulk edit through Excel | Activity export; upload in "update existing" mode | 1.5c |
 | AI connectors · Claude / ChatGPT via MCP | UBOS MCP server on top of the public API, per-user keys and permissions | Phase 4 |

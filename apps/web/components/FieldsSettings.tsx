@@ -73,6 +73,16 @@ export function FieldsSettings({ ws, readOnly, isOrgAdmin, act }: { ws: Workspac
         )}
       </div>
 
+      <div className="small muted" style={{ marginBottom: 4 }}>Deal value — the amount used for pipeline value and month-end forecasts on dashboards</div>
+      <div className="card row" style={{ marginBottom: 14, padding: 10 }}>
+        <select className="input" style={{ maxWidth: 280 }} disabled={readOnly} value={ws.valueFieldKey ?? ''}
+          onChange={(e) => act(() => api(`/api/v1/workspaces/${ws.id}/value-field`, { method: 'PUT', body: { key: e.target.value || null } }), 'Deal value field saved.')}>
+          <option value="">No deal value</option>
+          {ws.fields.filter((f) => !f.isArchived && (f.type === 'currency' || f.type === 'number')).map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
+        </select>
+        <span className="small muted">Only Amount (₹) and Number fields can be used.</span>
+      </div>
+
       <div className="small muted" style={{ marginBottom: 4 }}>Other fields</div>
       <div className="row" style={{ marginBottom: 8 }}>
         <input className="input" style={{ flex: 1, minWidth: 180 }} placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} />

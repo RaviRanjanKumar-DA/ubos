@@ -5,7 +5,7 @@ export type GroupBy =
   | 'none' | 'day' | 'week' | 'month' | 'stage' | 'status' | 'source' | 'owner' | 'workspace'
   | 'disposition' | 'lost_reason' | 'heatmap';
 export type RangePreset = 'today' | 'yesterday' | 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom';
-export type WidgetType = 'kpi' | 'line' | 'bar' | 'pie' | 'funnel' | 'table' | 'leaderboard' | 'heatmap' | 'gauge' | 'followups';
+export type WidgetType = 'kpi' | 'line' | 'bar' | 'pie' | 'funnel' | 'table' | 'leaderboard' | 'heatmap' | 'gauge' | 'followups' | 'forecast';
 
 export interface MetricDef {
   label: string;
@@ -54,11 +54,11 @@ export const RANGE_LABELS: Record<RangePreset, string> = {
 
 export const WIDGET_LABELS: Record<WidgetType, string> = {
   kpi: 'KPI tile', line: 'Line / trend', bar: 'Bar chart', pie: 'Donut', funnel: 'Funnel', table: 'Table', leaderboard: 'Leaderboard',
-  heatmap: 'Heatmap (best time to call)', gauge: 'Target gauge', followups: 'Follow-up list',
+  heatmap: 'Heatmap (best time to call)', gauge: 'Target gauge', followups: 'Follow-up list', forecast: 'Month-end forecast',
 };
 
 /** Widgets that need no metric of their own. */
-export const SPECIAL_WIDGETS: WidgetType[] = ['funnel', 'leaderboard', 'followups'];
+export const SPECIAL_WIDGETS: WidgetType[] = ['funnel', 'leaderboard', 'followups', 'forecast'];
 
 export interface WidgetConfig {
   id: string;
@@ -83,7 +83,7 @@ export const DASHBOARD_TEMPLATES: { key: string; name: string; description: stri
       kpi('k1', 'leads'), kpi('k2', 'won'), kpi('k3', 'win_rate'), kpi('k4', 'weighted_pipeline'),
       { id: 'c1', type: 'bar', title: 'New leads by business line', metric: 'leads', groupBy: 'workspace', w: 6, h: 2 },
       { id: 'c2', type: 'line', title: 'New leads per day', metric: 'leads', groupBy: 'day', w: 6, h: 2 },
-      { id: 'c3', type: 'gauge', title: 'Wins vs target', metric: 'won', groupBy: 'none', target: 50, w: 4, h: 2 },
+      { id: 'c3', type: 'forecast', title: 'Month-end forecast', w: 4, h: 2 },
       { id: 'c4', type: 'bar', title: 'Win rate by business line', metric: 'win_rate', groupBy: 'workspace', w: 4, h: 2 },
       { id: 'c5', type: 'pie', title: 'Leads by source', metric: 'leads', groupBy: 'source', w: 4, h: 2 },
       { id: 'c6', type: 'leaderboard', title: 'Leaderboard', w: 12, h: 2 },
@@ -97,8 +97,7 @@ export const DASHBOARD_TEMPLATES: { key: string; name: string; description: stri
       { id: 'c2', type: 'bar', title: 'Open leads by stage', metric: 'open_leads', groupBy: 'stage', w: 6, h: 2 },
       { id: 'c3', type: 'table', title: 'Win rate by source', metric: 'win_rate', groupBy: 'source', w: 4, h: 2 },
       { id: 'c4', type: 'pie', title: 'Why leads are lost', metric: 'lost', groupBy: 'lost_reason', w: 4, h: 2 },
-      { id: 'c5', type: 'kpi', title: 'Pipeline value', metric: 'pipeline_value', groupBy: 'none', w: 4, h: 1 },
-      { id: 'c6', type: 'kpi', title: 'Weighted pipeline', metric: 'weighted_pipeline', groupBy: 'none', w: 4, h: 1 },
+      { id: 'c5', type: 'forecast', title: 'Month-end forecast', w: 4, h: 2 },
       { id: 'c7', type: 'leaderboard', title: 'Team leaderboard', w: 12, h: 2 },
     ],
   },

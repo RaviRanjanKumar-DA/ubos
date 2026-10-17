@@ -2,7 +2,7 @@
 
 export interface Stage {
   id?: string; name: string; isWon: boolean; isLost: boolean; leadCount?: number;
-  color?: string | null; slaDays?: number | null; requiredFieldKeys?: string[]; setStatus?: string | null; followUpDays?: number | null;
+  color?: string | null; slaDays?: number | null; requiredFieldKeys?: string[]; setStatus?: string | null; followUpDays?: number | null; winProbability?: number | null;
 }
 export interface Pipeline { id: string; name: string; stages: Stage[] }
 export interface Field { id: string; key: string; label: string; type: string; options: string[]; required: boolean; isArchived: boolean; createdAt?: string; updatedAt?: string }
@@ -22,6 +22,7 @@ export interface WorkspaceSettings {
   dispositions: (Option & { connected: boolean })[];
   assignment: { mode: 'round_robin' | 'creator' | 'fixed'; userIds: string[]; sticky: boolean };
   display: { h1: string; h2: string };
+  valueFieldKey: string | null;
   leadIdentifier: 'mobile' | 'email';
 }
 

@@ -19,6 +19,7 @@ const Stage = z.object({
   requiredFieldKeys: z.array(z.string().max(60)).max(30).optional(),
   setStatus: z.string().max(60).nullable().optional(),
   followUpDays: z.number().int().min(0).max(365).nullable().optional(),
+  winProbability: z.number().int().min(0).max(100).nullable().optional(),
 });
 const Stages = z.object({ stages: z.array(Stage).min(2, 'A pipeline needs at least 2 stages').max(20) });
 const NewPipeline = z.object({ name: Name, stages: z.array(z.string().trim().min(1).max(40)).min(2).max(20).optional() });
@@ -74,7 +75,7 @@ export class WorkspaceSettingsController {
           id: p.id, name: p.name,
           stages: p.stages.map((s) => ({
             id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost, leadCount: perStage.get(s.id) ?? 0,
-            color: s.color, slaDays: s.slaDays, requiredFieldKeys: s.requiredFieldKeys, setStatus: s.setStatus, followUpDays: s.followUpDays,
+            color: s.color, slaDays: s.slaDays, requiredFieldKeys: s.requiredFieldKeys, setStatus: s.setStatus, followUpDays: s.followUpDays, winProbability: s.winProbability,
           })),
         })),
         fields: ws.fields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options, required: f.required, isArchived: f.isArchived, createdAt: f.createdAt, updatedAt: f.updatedAt })),
@@ -84,6 +85,7 @@ export class WorkspaceSettingsController {
         dispositions: ws.options.filter((o) => o.kind === 'call_disposition').map((o) => ({ id: o.id, value: o.value, label: o.label, connected: o.connected, isDefault: o.isDefault })),
         assignment: { mode: ws.assignmentMode, userIds: ws.assignmentUserIds, sticky: ws.stickyOwner },
         display: { h1: ws.displayH1, h2: ws.displayH2 },
+        valueFieldKey: ws.valueFieldKey,
         leadIdentifier: (await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() }, select: { leadIdentifier: true } }))?.leadIdentifier ?? 'mobile',
       };
     });
@@ -204,7 +206,7 @@ export class WorkspaceSettingsController {
       for (const [position, s] of stages.entries()) {
         const data = {
           name: s.name, position, isWon: s.isWon, isLost: s.isLost, color: s.color ?? null, slaDays: s.slaDays ?? null,
-          requiredFieldKeys: s.requiredFieldKeys ?? [], setStatus: s.setStatus ?? null, followUpDays: s.followUpDays ?? null,
+          requiredFieldKeys: s.requiredFieldKeys ?? [], setStatus: s.setStatus ?? null, followUpDays: s.followUpDays ?? null, winProbability: s.isWon || s.isLost ? null : s.winProbability ?? null,
         };
         if (s.id) await tx.leadStage.update({ where: { id: s.id }, data });
         else await tx.leadStage.create({ data: { ...data, tenantId: tenantId(), pipelineId: pid } });
@@ -335,6 +337,23 @@ export class WorkspaceSettingsController {
   assignees(@Param('id') id: string) {
     this.assertAccess(id);
     return this.db.tenant((tx) => eligibleOwners(tx, id));
+  }
+
+  /** Deal value: the amount / number field used for pipeline value and forecasts (null = none). */
+  @Put('workspaces/:id/value-field')
+  @RequirePermission('org.workspace.view')
+  saveValueField(@Param('id') id: string, @Body() body: unknown) {
+    this.assertManage(id);
+    const { key } = parse(z.object({ key: z.string().max(60).nullable() }), body);
+    return this.db.tenant(async (tx) => {
+      if (key) {
+        const f = await tx.leadField.findFirst({ where: { workspaceId: id, key, isArchived: false } });
+        if (!f || !['currency', 'number'].includes(f.type)) throw new BadRequestException({ code: 'INVALID_VALUE_FIELD', message: 'Choose an Amount or Number field' });
+      }
+      await tx.workspace.update({ where: { id }, data: { valueFieldKey: key } });
+      await this.db.audit(tx, { workspaceId: id, entity: 'workspace', entityId: id, action: 'workspace.value_field_changed', newValue: { key } });
+      return { ok: true };
+    });
   }
 
   /** Primary display: which values show as the title (H1) and second line (H2) of a lead in lists and headers. */

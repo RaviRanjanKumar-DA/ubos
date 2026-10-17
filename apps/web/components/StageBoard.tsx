@@ -50,7 +50,7 @@ export function StageBoard({ pipeline, fields, statuses, lostReasons, readOnly, 
 
   const chip = (i: number, draggable = false) => {
     const s = stages[i];
-    const rules = [s.slaDays ? `SLA ${s.slaDays}d` : '', s.requiredFieldKeys?.length ? `${s.requiredFieldKeys.length} required` : '', s.setStatus ? `→ ${statuses.find((x) => x.value === s.setStatus)?.label ?? s.setStatus}` : '', s.followUpDays ? `follow-up +${s.followUpDays}d` : ''].filter(Boolean);
+    const rules = [s.slaDays ? `SLA ${s.slaDays}d` : '', s.requiredFieldKeys?.length ? `${s.requiredFieldKeys.length} required` : '', s.setStatus ? `→ ${statuses.find((x) => x.value === s.setStatus)?.label ?? s.setStatus}` : '', s.followUpDays ? `follow-up +${s.followUpDays}d` : '', s.winProbability !== null && s.winProbability !== undefined ? `${s.winProbability}% win` : ''].filter(Boolean);
     return (
       <div key={s.id ?? `n-${i}`} className="stage-chip" style={{ background: colorOf(s, i) }}
         draggable={draggable && !readOnly} onDragStart={() => setDragFrom(i)} onDragOver={(e) => draggable && e.preventDefault()} onDrop={() => draggable && drop(i)}>
@@ -121,7 +121,7 @@ export function StageBoard({ pipeline, fields, statuses, lostReasons, readOnly, 
           <button type="button" className="btn ghost" onClick={() => { setStages(pipeline.stages); setDirty(false); }}>Undo</button>
           <button type="button" className="btn" onClick={() => act(() => api(`/api/v1/pipelines/${pipeline.id}/stages`, {
             method: 'PUT',
-            body: { stages: stages.map((s, i) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost, color: colorOf(s, i), slaDays: s.slaDays ?? null, requiredFieldKeys: s.requiredFieldKeys ?? [], setStatus: s.setStatus ?? null, followUpDays: s.followUpDays ?? null })) },
+            body: { stages: stages.map((s, i) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost, color: colorOf(s, i), slaDays: s.slaDays ?? null, requiredFieldKeys: s.requiredFieldKeys ?? [], setStatus: s.setStatus ?? null, followUpDays: s.followUpDays ?? null, winProbability: s.winProbability ?? null })) },
           }), 'Stages saved.')}>Save stages</button>
         </div>
       )}
@@ -159,6 +159,7 @@ function StageDialog({ stage, fields, statuses, isInitial, onClose, onSave }: {
             <div className="grid cols-2">
               <div className="field"><label>Warn after (days in stage)</label><input className="input" type="number" min={1} value={s.slaDays ?? ''} onChange={(e) => setS({ ...s, slaDays: e.target.value ? Number(e.target.value) : null })} placeholder="No limit" /></div>
               <div className="field"><label>Auto follow-up after (days)</label><input className="input" type="number" min={0} value={s.followUpDays ?? ''} onChange={(e) => setS({ ...s, followUpDays: e.target.value ? Number(e.target.value) : null })} placeholder="None" /></div>
+              <div className="field"><label>Win probability (%) for forecasts</label><input className="input" type="number" min={0} max={100} value={s.winProbability ?? ''} onChange={(e) => setS({ ...s, winProbability: e.target.value === '' ? null : Math.max(0, Math.min(100, Number(e.target.value))) })} placeholder="Automatic (by position)" /></div>
             </div>
             <div className="field">
               <label>Set lead status automatically</label>

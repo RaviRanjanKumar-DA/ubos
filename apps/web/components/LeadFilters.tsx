@@ -25,6 +25,17 @@ export function advParams(a: Adv): [string, string][] {
 }
 export const advCount = (a: Adv) => advParams(a).length;
 
+/** Reads filters from a query string (links from dashboards: ?stageIds=…&createdFrom=…). */
+export function advFromQuery(q: URLSearchParams): Adv {
+  const a: Adv = { ...EMPTY_ADV, cf: {} };
+  for (const k of ['stageIds', 'statuses', 'sources', 'owners', 'dispositions', 'lostReasons'] as const) { const v = q.get(k); if (v) a[k] = v.split(',').filter(Boolean); }
+  for (const k of ['createdFrom', 'createdTo', 'assignedFrom', 'assignedTo', 'activityFrom', 'activityTo', 'followUpFrom', 'followUpTo', 'scoreMin', 'scoreMax'] as const) { const v = q.get(k); if (v) a[k] = v; }
+  if (q.get('contacted') === 'yes' || q.get('contacted') === 'no') a.contacted = q.get('contacted') as 'yes' | 'no';
+  if (q.get('stuck') === 'yes') a.stuck = 'yes';
+  for (const [k, v] of q) if (k.startsWith('cf_') && v) a.cf[k.slice(3)] = v;
+  return a;
+}
+
 /**
  * Flexible filters to follow leads end to end: by stage, status, source, owner, last call outcome, lost reason,
  * dates (created / assigned / last activity / follow-up), contact, SLA breach, score and any custom field.

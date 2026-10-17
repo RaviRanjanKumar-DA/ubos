@@ -192,6 +192,7 @@ model Workspace {
   stickyOwner       Boolean  @default(true)          // a returning customer goes back to their RM
   displayH1         String   @default("name")        // what lists and headers show as the title of a lead
   displayH2         String   @default("mobile")      // …and as the second line (name / mobile / email / city / cf:<key>)
+  valueFieldKey     String?  // a number / amount lead field holding the deal value (for pipeline value and forecasts)
   pipelines Pipeline[]
   leads     Lead[]
   packages  Package[]
@@ -263,6 +264,7 @@ model LeadStage {
   requiredFieldKeys String[] @default([]) // custom fields that must be filled before entering this stage
   setStatus  String?             // lead status applied automatically on entering the stage
   followUpDays Int?              // follow-up created automatically N days after entering the stage
+  winProbability Int?            // % chance an open lead in this stage is won (forecast); null = default by position
 }
 
 // Routes a source (form, WhatsApp number, CallerDesk number, webhook, sheet) to a workspace + pipeline.
@@ -742,6 +744,27 @@ model PlatformProduct {
   annualDiscountPct Int      @default(0)
   isActive          Boolean  @default(true)
   position          Int      @default(0)
+}
+
+// A saved dashboard: widgets with their metric, chart and size. Personal, or shared with roles / teams / business lines / people.
+model Dashboard {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  name               String
+  description        String?
+  ownerId            String
+  widgets            Json     // WidgetConfig[] (see @ubos/shared analytics)
+  range              String   @default("this_month")
+  sharedRoleIds      String[] @default([])
+  sharedTeamIds      String[] @default([])
+  sharedWorkspaceIds String[] @default([])
+  sharedUserIds      String[] @default([])
+  defaultForRoleIds  String[] @default([]) // landing dashboard for these roles
+  isLocked           Boolean  @default(false) // only the owner / dashboard managers may change it
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([tenantId, ownerId])
 }
 
 // An organization's purchase: licences for a billing cycle and/or services. Paid via gateway later; marked paid manually for now.

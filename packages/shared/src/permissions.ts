@@ -6,6 +6,7 @@ export type DataScope = (typeof DATA_SCOPES)[number];
 
 export const PERMISSIONS = {
   'dashboard.view': 'View dashboards',
+  'dashboard.manage': 'Share dashboards with roles, teams and business lines; set default dashboards',
   'crm.lead.view': 'View leads',
   'crm.lead.create': 'Create leads',
   'crm.lead.update': 'Edit leads',

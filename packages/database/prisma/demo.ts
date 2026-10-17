@@ -112,6 +112,14 @@ async function fillWorkspace(tenantId: string, workspaceId: string, count: numbe
     if (stage.position > 0) acts.push({ tenantId, workspaceId, leadId: lead.id, type: 'stage', data: { from: pipeline.stages[0].id, to: stage.id }, userId: ownerId, createdAt: stageChangedAt });
     if (acts.length) await prisma.leadActivity.createMany({ data: acts });
     if (followUp && ownerId) await prisma.followUp.create({ data: { tenantId, leadId: lead.id, dueAt: followUp, userId: ownerId, createdById: ownerId, note: pick(['Call back as promised', 'Share fee details', 'Confirm visit', 'Check decision']) } });
+    // Earlier follow-ups already handled — most on the day, some late — for follow-up discipline reports.
+    if (ownerId && calls && age >= 2) {
+      for (let k = 0; k < 1 + Math.floor(rnd() * 2); k++) {
+        const dueAt = daysAgo(1 + Math.floor(rnd() * (age - 1)), 10 + Math.floor(rnd() * 6));
+        const doneAt = new Date(dueAt.getTime() + (chance(0.72) ? 30 + Math.floor(rnd() * 300) : 1440 + Math.floor(rnd() * 2880)) * 60_000);
+        await prisma.followUp.create({ data: { tenantId, leadId: lead.id, dueAt, doneAt: doneAt < new Date() ? doneAt : new Date(), outcome: 'Done', userId: ownerId, createdById: ownerId, note: 'Follow-up call' } });
+      }
+    }
   }
 }
 
@@ -124,6 +132,15 @@ async function main() {
   };
 
   const wsOwn = await prisma.workspace.findMany({ where: { tenantId: own.id }, orderBy: { name: 'asc' } });
+  // Deal value per business line (pipeline value and forecasts): Logo uses its Budget field, the others get a Deal value field.
+  for (const w of await prisma.workspace.findMany({ where: { tenantId: { in: [own.id, abc.id] } } })) {
+    const budget = await prisma.leadField.findFirst({ where: { workspaceId: w.id, key: 'budget' } });
+    if (!budget) {
+      const position = await prisma.leadField.count({ where: { workspaceId: w.id } });
+      await prisma.leadField.create({ data: { tenantId: w.tenantId, workspaceId: w.id, key: 'deal_value', label: 'Deal value', type: 'currency', options: [], required: false, position } });
+    }
+    await prisma.workspace.update({ where: { id: w.id }, data: { valueFieldKey: budget ? 'budget' : 'deal_value' } });
+  }
   for (const w of wsOwn) await fillWorkspace(own.id, w.id, 50, codeMaker(own.id));
   for (const w of await prisma.workspace.findMany({ where: { tenantId: abc.id } })) await fillWorkspace(abc.id, w.id, 20, codeMaker(abc.id));
 

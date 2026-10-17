@@ -1,13 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
-import { Adv, advCount, advParams, EMPTY_ADV, LeadFilters } from '@/components/LeadFilters';
+import { Adv, advCount, advFromQuery, advParams, EMPTY_ADV, LeadFilters } from '@/components/LeadFilters';
 import { displayValue, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 
 interface Lead {
@@ -27,7 +27,12 @@ const SORTS: [string, string][] = [
 const EMPTY_Q: Quick = { followUp: '', owner: '', q: '' };
 const readable = (v: string) => v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ');
 
-export default function LeadsPage() {
+export default function LeadsPageRoute() {
+  return <Suspense fallback={null}><LeadsPage /></Suspense>;
+}
+
+function LeadsPage() {
+  const params = useSearchParams();
   const { me, can, version } = useShell();
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[] | null>(null);
@@ -37,6 +42,8 @@ export default function LeadsPage() {
   const [counts, setCounts] = useState<{ today: number; overdue: number; stuck: number }>({ today: 0, overdue: 0, stuck: 0 });
   const [quick, setQuick] = useState<Quick>(EMPTY_Q);
   const [adv, setAdv] = useState<Adv>(EMPTY_ADV);
+  const seenVersion = useRef<number | null>(null);
+  const lastReq = useRef(0);
   const [sort, setSort] = useState('created_desc');
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -56,8 +63,12 @@ export default function LeadsPage() {
   }, [quick, adv, sort]);
 
   const load = useCallback(() => {
-    api<Lead[]>(`/api/v1/leads?${query()}`, { onHeaders: (h) => setTotal(Number(h.get('X-Total-Count') ?? 0)) })
-      .then((l) => { setLeads(l); setSelected(new Set()); }).catch((e) => setMsg({ type: 'error', text: e.message }));
+    // Only the latest request may update the list (an older, slower one must not overwrite newer filters).
+    const req = ++lastReq.current;
+    let count = 0;
+    api<Lead[]>(`/api/v1/leads?${query()}`, { onHeaders: (h) => { count = Number(h.get('X-Total-Count') ?? 0); } })
+      .then((l) => { if (req !== lastReq.current) return; setTotal(count); setLeads(l); setSelected(new Set()); })
+      .catch((e) => { if (req === lastReq.current) setMsg({ type: 'error', text: e.message }); });
     const head = (qs: string) => new Promise<number>((resolve) => {
       api<unknown[]>(`/api/v1/leads?${qs}`, { onHeaders: (h) => resolve(Number(h.get('X-Total-Count') ?? 0)) }).catch(() => resolve(0));
     });
@@ -68,7 +79,10 @@ export default function LeadsPage() {
   useEffect(() => { load(); }, [load, version]);
   useEffect(() => {
     setQuick(EMPTY_Q);
-    setAdv(EMPTY_ADV);
+    // First visit may carry filters in the address (drill-down from a dashboard); later workspace switches reset them.
+    if (seenVersion.current === null) setAdv(advFromQuery(new URLSearchParams(params.toString())));
+    else if (seenVersion.current !== version) setAdv(EMPTY_ADV);
+    seenVersion.current = version;
     if (me.currentWorkspaceId && can('org.workspace.view')) {
       api<WorkspaceSettings>(`/api/v1/workspaces/${me.currentWorkspaceId}/settings`).then(setWs).catch(() => setWs(null));
       api<Person[]>(`/api/v1/workspaces/${me.currentWorkspaceId}/assignees`).then(setPeople).catch(() => setPeople([]));

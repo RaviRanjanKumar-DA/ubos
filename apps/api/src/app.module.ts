@@ -25,6 +25,7 @@ import { CustomersController } from './modules/customers.controller';
 import { LeadWorkController } from './modules/lead-work.controller';
 import { LeadImportController } from './modules/lead-import.controller';
 import { SetupGuideController } from './modules/setup-guide.controller';
+import { AnalyticsController } from './modules/analytics/analytics.controller';
 import { CustomActionsController } from './modules/custom-actions.controller';
 import { BillingController } from './modules/billing.controller';
 
@@ -44,7 +45,7 @@ class HealthController {
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
-    WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, LeadWorkController,
+    WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, AnalyticsController, LeadWorkController,
     CustomActionsController, BillingController,
   ],
   providers: [

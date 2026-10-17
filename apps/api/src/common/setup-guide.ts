@@ -11,7 +11,7 @@ interface Ctx { db: Db; tenantId: string; workspaceId: string | null; audit: (pr
 const WS = (tab: string) => (c: { workspaceId: string | null }) => (c.workspaceId ? `/app/workspaces/${c.workspaceId}?tab=${tab}` : '/app/workspaces');
 const hrefs: Record<string, (c: { workspaceId: string | null }) => string> = {
   lead_fields: WS('fields'), lead_stages: WS('stages'), call_feedback: WS('feedback'), custom_actions: WS('actions'),
-  sop_forms: WS('stages'), assignment_rules: WS('assignment'),
+  sop_forms: WS('stages'), assignment_rules: WS('assignment'), lead_reports: WS('fields'),
 };
 
 /**
@@ -37,7 +37,7 @@ export const GUIDES: GuideDef[] = [
           { id: 'team_structure', title: 'Configure branches, departments and teams', level: 'basic', href: '/app/org', done: async (c) => (await c.db.team.count({ where: { tenantId: c.tenantId } })) > 0 },
           { id: 'member_access', title: 'Configure roles and access', level: 'advanced', href: '/app/roles', done: async (c) => (await c.audit('role.')) || (await c.audit('user.roles_changed')) },
           { id: 'assignment_rules', title: 'Set lead assignment rules', level: 'basic', done: (c) => c.audit('workspace.assignment_changed') },
-          { id: 'role_dashboards', title: 'Configure dashboards per role', level: 'advanced', phase: '1.6' },
+          { id: 'role_dashboards', title: 'Share a dashboard with a role and make it their landing page', level: 'advanced', href: '/app/dashboard', done: (c) => c.audit('dashboard.shared') },
         ],
       },
       {
@@ -138,9 +138,9 @@ export const GUIDES: GuideDef[] = [
     id: 'reports', title: 'Reports & Analytics', icon: '📊', hint: 'Numbers your team can act on.',
     cards: [
       { id: 'numbers', title: 'Explore your numbers', hint: 'The three reports every team should know.', tone: '#cdeed8', steps: [
-        { id: 'leaderboard', title: 'View the leaderboard', level: 'basic', phase: '1.6' },
-        { id: 'call_reports', title: 'Review call reports', level: 'basic', phase: '1.6' },
-        { id: 'lead_reports', title: 'Review lead reports', level: 'basic', phase: '1.6' },
+        { id: 'leaderboard', title: 'View the leaderboard (Company overview / Team dashboards)', level: 'basic', href: '/app/dashboard', done: (c) => c.audit('dashboard.') },
+        { id: 'call_reports', title: 'Build your own dashboard with call numbers', level: 'basic', href: '/app/dashboard', done: (c) => c.audit('dashboard.created') },
+        { id: 'lead_reports', title: 'Set a deal value field for pipeline value & forecasts', level: 'basic', done: (c) => c.audit('workspace.value_field_changed') },
       ] },
     ],
   },
