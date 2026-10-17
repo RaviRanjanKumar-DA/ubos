@@ -7,7 +7,7 @@ import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 import { Field, FIELD_TYPE_LABELS, Option, Pipeline, Stage, WorkspaceSettings } from '@/lib/workspace';
 
-type Tab = 'pipelines' | 'fields' | 'lists' | 'general';
+type Tab = 'pipelines' | 'fields' | 'lists' | 'calling' | 'assignment' | 'general';
 type Msg = { type: 'error' | 'notice'; text: string } | null;
 
 export default function WorkspaceSettingsPage() {
@@ -48,7 +48,7 @@ export default function WorkspaceSettingsPage() {
         </div>
       </div>
       <div className="row" style={{ gap: 4, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
-        {([['pipelines', 'Pipelines & stages'], ['fields', 'Lead fields'], ['lists', 'Sources & lost reasons'], ['general', 'General']] as [Tab, string][]).map(([k, label]) => (
+        {([['pipelines', 'Pipelines & stages'], ['fields', 'Lead fields'], ['lists', 'Sources & lost reasons'], ['calling', 'Status & call outcomes'], ['assignment', 'Lead assignment'], ['general', 'General']] as [Tab, string][]).map(([k, label]) => (
           <button key={k} onClick={() => { setTab(k); setMsg(null); }} className="btn ghost"
             style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}>
             {label}
@@ -77,6 +77,15 @@ export default function WorkspaceSettingsPage() {
             onSave={(options) => act(() => api(`/api/v1/workspaces/${id}/options/lost_reason`, { method: 'PUT', body: { options } }), 'Lost reasons saved.')} />
         </div>
       )}
+      {tab === 'calling' && (
+        <div className="grid cols-2" style={{ alignItems: 'start' }}>
+          <OptionList title="Lead statuses" hint="How warm a lead is (Hot / Warm / Cold …). Separate from the pipeline stage." items={data.statuses} readOnly={ro}
+            onSave={(options) => act(() => api(`/api/v1/workspaces/${id}/options/lead_status`, { method: 'PUT', body: { options } }), 'Lead statuses saved.')} />
+          <OptionList title="Call dispositions" hint="The outcome a caller picks after every call. Tick the ones where the customer was actually reached." items={data.dispositions} readOnly={ro} withConnected
+            onSave={(options) => act(() => api(`/api/v1/workspaces/${id}/options/call_disposition`, { method: 'PUT', body: { options } }), 'Call dispositions saved.')} />
+        </div>
+      )}
+      {tab === 'assignment' && <AssignmentEditor ws={data} readOnly={ro} act={act} />}
       {tab === 'general' && (
         <div className="card" style={{ maxWidth: 520 }}>
           <h2>General</h2>
@@ -271,10 +280,11 @@ function FieldsEditor({ ws, readOnly, act }: { ws: WorkspaceSettings; readOnly: 
   );
 }
 
-function OptionList({ title, hint, items, readOnly, onSave }: {
-  title: string; hint: string; items: Option[]; readOnly: boolean; onSave: (options: { id?: string; label: string }[]) => Promise<boolean>;
+function OptionList({ title, hint, items, readOnly, onSave, withConnected }: {
+  title: string; hint: string; items: (Option & { connected?: boolean })[]; readOnly: boolean; withConnected?: boolean;
+  onSave: (options: { id?: string; label: string; connected?: boolean }[]) => Promise<boolean>;
 }) {
-  const [list, setList] = useState<Option[]>(items);
+  const [list, setList] = useState<(Option & { connected?: boolean })[]>(items);
   const [draft, setDraft] = useState('');
   const [dirty, setDirty] = useState(false);
   useEffect(() => { setList(items); setDirty(false); }, [items]);
@@ -286,9 +296,14 @@ function OptionList({ title, hint, items, readOnly, onSave }: {
       <p className="small muted" style={{ marginTop: -4 }}>{hint}</p>
       {list.map((o, i) => (
         <div key={o.id ?? `n-${i}`} className="row" style={{ flexWrap: 'nowrap', marginBottom: 6 }}>
-          {readOnly ? <span>{o.label}</span> : (
+          {readOnly ? <span>{o.label}{withConnected && o.connected && <span className="badge ok" style={{ marginLeft: 6 }}>Reached</span>}</span> : (
             <>
               <input className="input" style={{ height: 30 }} value={o.label} onChange={(e) => change(list.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+              {withConnected && (
+                <label className="small row" style={{ gap: 4, whiteSpace: 'nowrap' }} title="Customer was reached on this call">
+                  <input type="checkbox" checked={!!o.connected} onChange={(e) => change(list.map((x, j) => (j === i ? { ...x, connected: e.target.checked } : x)))} /> Reached
+                </label>
+              )}
               <button type="button" className="btn sm ghost" aria-label="Remove" onClick={() => change(list.filter((_, j) => j !== i))}>✕</button>
             </>
           )}
@@ -301,9 +316,50 @@ function OptionList({ title, hint, items, readOnly, onSave }: {
             <button className="btn sm outline">Add</button>
           </form>
           <div className="row end" style={{ marginTop: 10 }}>
-            <button className="btn" disabled={!dirty} onClick={() => onSave(list.map(({ id, label }) => ({ id, label })))}>Save</button>
+            <button className="btn" disabled={!dirty} onClick={() => onSave(list.map(({ id, label, connected }) => ({ id, label, ...(withConnected ? { connected: !!connected } : {}) })))}>Save</button>
           </div>
         </>
+      )}
+    </div>
+  );
+}
+
+function AssignmentEditor({ ws, readOnly, act }: { ws: WorkspaceSettings; readOnly: boolean; act: (fn: () => Promise<unknown>, text: string) => Promise<boolean> }) {
+  const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+  const [mode, setMode] = useState(ws.assignment.mode);
+  const [userIds, setUserIds] = useState<string[]>(ws.assignment.userIds);
+  const [sticky, setSticky] = useState(ws.assignment.sticky);
+  useEffect(() => { api<{ id: string; name: string }[]>(`/api/v1/workspaces/${ws.id}/assignees`).then(setPeople).catch(() => {}); }, [ws.id]);
+  const toggle = (id: string) => setUserIds(mode === 'fixed' ? [id] : userIds.includes(id) ? userIds.filter((x) => x !== id) : [...userIds, id]);
+
+  return (
+    <div className="card" style={{ maxWidth: 680 }}>
+      <h2>Who gets new leads?</h2>
+      <p className="small muted" style={{ marginTop: -4 }}>Applies to leads from bulk uploads (when "use assignment rules" is chosen), website forms and integrations. Leads you add by hand stay with you.</p>
+      {([
+        ['round_robin', 'Round-robin', 'New leads are shared one by one between the selected people. Select nobody to include everyone in this business line.'],
+        ['fixed', 'One person', 'Every new lead goes to one person (e.g. a team leader who distributes them).'],
+        ['creator', 'Whoever creates or uploads the lead', ''],
+      ] as ['round_robin' | 'fixed' | 'creator', string, string][]).map(([k, l, h]) => (
+        <label key={k} className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', marginBottom: 8 }}>
+          <input type="radio" name="mode" disabled={readOnly} checked={mode === k} onChange={() => { setMode(k); if (k === 'fixed') setUserIds(userIds.slice(0, 1)); }} style={{ marginTop: 3 }} />
+          <span><b>{l}</b>{h && <span className="small muted" style={{ display: 'block' }}>{h}</span>}</span>
+        </label>
+      ))}
+      {mode !== 'creator' && (
+        <div className="chips" style={{ margin: '4px 0 14px 22px' }}>
+          {people.map((p) => <button type="button" key={p.id} disabled={readOnly} className={`chip ${userIds.includes(p.id) ? 'on' : ''}`} onClick={() => toggle(p.id)}>{p.name}</button>)}
+        </div>
+      )}
+      <label className="row" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', marginBottom: 12 }}>
+        <input type="checkbox" disabled={readOnly} checked={sticky} onChange={(e) => setSticky(e.target.checked)} style={{ marginTop: 3 }} />
+        <span><b>Sticky RM</b><span className="small muted" style={{ display: 'block' }}>A returning customer goes back to their own Relationship Manager, if that person works in this business line.</span></span>
+      </label>
+      {!readOnly && (
+        <div className="row end">
+          <button className="btn" disabled={mode === 'fixed' && !userIds.length}
+            onClick={() => act(() => api(`/api/v1/workspaces/${ws.id}/assignment`, { method: 'PUT', body: { mode, userIds, sticky } }), 'Assignment rules saved.')}>Save rules</button>
+        </div>
       )}
     </div>
   );

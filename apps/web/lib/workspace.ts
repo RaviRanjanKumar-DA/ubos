@@ -15,6 +15,21 @@ export interface WorkspaceSettings {
   fields: Field[];
   sources: Option[];
   lostReasons: Option[];
+  statuses: Option[];
+  dispositions: (Option & { connected: boolean })[];
+  assignment: { mode: 'round_robin' | 'creator' | 'fixed'; userIds: string[]; sticky: boolean };
+}
+
+export const STATUS_TONE: Record<string, string> = { hot: 'bad', warm: 'warn', cold: 'grey', fresh: '' };
+
+/** "in 2 h", "3 days ago" — short relative time for lists. */
+export function relTime(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const diff = new Date(iso).getTime() - Date.now();
+  const abs = Math.abs(diff);
+  const fmt = (n: number, u: string) => `${n} ${u}${n === 1 ? '' : 's'}`;
+  const v = abs < 3_600_000 ? fmt(Math.max(1, Math.round(abs / 60_000)), 'min') : abs < 86_400_000 ? fmt(Math.round(abs / 3_600_000), 'hour') : fmt(Math.round(abs / 86_400_000), 'day');
+  return diff >= 0 ? `in ${v}` : `${v} ago`;
 }
 
 export const FIELD_TYPE_LABELS: Record<string, string> = {

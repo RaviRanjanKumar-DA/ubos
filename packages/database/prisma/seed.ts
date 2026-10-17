@@ -127,6 +127,20 @@ async function main() {
     ['Kavita Nair', '9876500022', 'manual', manager.id],
   ]);
 
+  // Lead work examples: statuses, a logged call, follow-ups due today and overdue.
+  const vastuLeads = await prisma.lead.findMany({ where: { workspaceId: vastu.id }, include: { customer: true }, orderBy: { createdAt: 'asc' } });
+  const today = new Date(); today.setHours(16, 0, 0, 0);
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  for (const [i, l] of vastuLeads.entries()) {
+    const status = ['hot', 'warm', 'cold'][i % 3];
+    const due = i === 0 ? today : i === 1 ? yesterday : null;
+    await prisma.lead.update({ where: { id: l.id }, data: { status, nextFollowUpAt: due, lastActivityAt: i === 0 ? new Date() : null, firstResponseAt: i === 0 ? new Date() : null, lastDisposition: i === 0 ? 'call_back' : null, assignedAt: l.createdAt } });
+    if (i === 0) {
+      await prisma.leadActivity.create({ data: { tenantId: own.tenant.id, workspaceId: vastu.id, leadId: l.id, type: 'call', disposition: 'call_back', connected: true, remark: 'Wants a site visit after Diwali, call back in the evening', userId: l.ownerId } });
+    }
+    if (due) await prisma.followUp.create({ data: { tenantId: own.tenant.id, leadId: l.id, dueAt: due, userId: l.ownerId!, createdById: l.ownerId, note: i === 0 ? 'Call back about site visit' : 'Share consultation fees' } });
+  }
+
   // Duplicate examples for the Customer Master "Duplicates" screen.
   await prisma.customer.update({ where: { tenantId_code: { tenantId: own.tenant.id, code: 'C00002' } }, data: { email: 'priya.verma@example.com', city: 'Delhi' } });
   await prisma.customer.create({
@@ -168,6 +182,7 @@ async function seedLeads(tenantId: string, workspaceId: string, rows: [string, s
         customerId: customer.id, source, ownerId,
       },
     });
+    await prisma.customer.updateMany({ where: { id: customer.id, primaryRmId: null }, data: { primaryRmId: ownerId } });
     await prisma.$transaction((tx) =>
       appendAudit(tx, { tenantId, workspaceId, actorType: 'system', entity: 'lead', entityId: lead.id, action: 'lead.created', newValue: { name, source } }),
     );

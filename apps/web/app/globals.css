@@ -117,6 +117,54 @@ table.table { width: 100%; border-collapse: collapse; }
 .auth .form .card { width: 100%; max-width: 380px; padding: 26px; }
 @media (max-width: 860px) { .auth { grid-template-columns: 1fr; } .auth .pitch { display: none; } }
 
+/* Stepper (wizards) */
+.steps { display: flex; gap: 0; margin-bottom: 18px; counter-reset: step; overflow-x: auto; }
+.steps .step { flex: 1; min-width: 110px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 3px solid var(--line); color: var(--muted); font-weight: 550; font-size: 13px; white-space: nowrap; }
+.steps .step .num { width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #efeef4; font-size: 12px; flex: none; }
+.steps .step.active { color: var(--brand); border-color: var(--brand); }
+.steps .step.active .num { background: var(--brand); color: #fff; }
+.steps .step.done { color: var(--ok); border-color: var(--ok); }
+.steps .step.done .num { background: var(--ok-bg); color: var(--ok); }
+
+/* Stage journey bar */
+.journey { display: flex; gap: 3px; margin: 6px 0 4px; overflow-x: auto; }
+.journey button { flex: 1; min-width: 86px; border: 0; padding: 8px 10px; font: inherit; font-size: 12.5px; font-weight: 600; background: #efeef4; color: var(--ink-2); cursor: pointer; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%); }
+.journey button:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); border-radius: 6px 0 0 6px; }
+.journey button.passed { background: var(--brand-100); color: var(--brand); }
+.journey button.current { background: var(--brand); color: #fff; }
+.journey button.won.current { background: var(--ok); }
+.journey button.lost.current { background: var(--bad); }
+.journey button:disabled { cursor: default; }
+
+/* Chips / filters */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 12px; font: inherit; font-size: 12.5px; font-weight: 550; color: var(--ink-2); cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.chip:hover { border-color: var(--brand); color: var(--brand); }
+.chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+.chip .count { background: rgba(0,0,0,.08); border-radius: 999px; padding: 0 7px; font-size: 11.5px; }
+.chip.on .count { background: rgba(255,255,255,.25); }
+.chip.alert .count { background: var(--bad-bg); color: var(--bad); }
+
+/* Bulk action bar */
+.bulkbar { position: sticky; bottom: 12px; z-index: 6; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 14px; margin-top: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+.bulkbar .btn { background: rgba(255,255,255,.12); border-color: transparent; color: #fff; }
+.bulkbar .btn:hover { background: rgba(255,255,255,.22); }
+
+/* Timeline */
+.timeline { position: relative; padding-left: 26px; }
+.timeline::before { content: ''; position: absolute; left: 9px; top: 6px; bottom: 6px; width: 2px; background: var(--line); }
+.tl-item { position: relative; padding: 2px 0 14px; }
+.tl-item .tl-dot { position: absolute; left: -26px; top: 2px; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; background: var(--brand-50); color: var(--brand); border: 2px solid #fff; box-shadow: 0 0 0 1px var(--line); }
+.tl-item.call .tl-dot { background: var(--ok-bg); color: var(--ok); }
+.tl-item.call.missed .tl-dot { background: var(--warn-bg); color: var(--warn); }
+.tl-item.stage .tl-dot { background: var(--brand-100); }
+.tl-item.follow_up .tl-dot { background: #e7f0ff; color: #2f6fd1; }
+
+/* Clickable table rows */
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: #faf9fd; }
+tr.selected td { background: var(--brand-50) !important; }
+
 /* Modal */
 .modal-bg { position: fixed; inset: 0; background: rgba(29, 27, 46, 0.35); display: grid; place-items: center; z-index: 50; padding: 16px; }
 .modal { background: #fff; border-radius: 12px; width: 100%; max-width: 440px; padding: 22px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }

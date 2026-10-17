@@ -22,6 +22,8 @@ import { RolesController } from './modules/roles.controller';
 import { OrgController } from './modules/org.controller';
 import { WorkspaceSettingsController } from './modules/workspace-settings.controller';
 import { CustomersController } from './modules/customers.controller';
+import { LeadWorkController } from './modules/lead-work.controller';
+import { LeadImportController } from './modules/lead-import.controller';
 
 @Controller('health')
 class HealthController {
@@ -39,7 +41,7 @@ class HealthController {
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
-    WorkspaceSettingsController, CustomersController,
+    WorkspaceSettingsController, CustomersController, LeadImportController, LeadWorkController,
   ],
   providers: [
     DbService,

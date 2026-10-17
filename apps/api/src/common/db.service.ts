@@ -13,8 +13,8 @@ export class DbService implements OnModuleDestroy {
   readonly platform = new PrismaClient({ datasourceUrl: process.env.PLATFORM_DATABASE_URL });
 
   /** Runs `fn` inside a transaction scoped to the current request's tenant. */
-  tenant<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
-    return withTenant(this.app, tenantId(), fn);
+  tenant<T>(fn: (tx: Tx) => Promise<T>, opts?: { timeoutMs?: number }): Promise<T> {
+    return withTenant(this.app, tenantId(), fn, opts);
   }
 
   /** Audit helper that fills actor, IP and workspace from the request context. */

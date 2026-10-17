@@ -14,6 +14,10 @@ import { findCustomer, nextCustomerCode } from '../common/customers';
 const ListQuery = z.object({
   pipelineId: z.string().uuid().optional(),
   stageId: z.string().uuid().optional(),
+  status: z.string().max(60).optional(),
+  owner: z.union([z.literal('me'), z.literal('unassigned'), z.string().uuid()]).optional(),
+  source: z.string().max(60).optional(),
+  followUp: z.enum(['today', 'overdue', 'none']).optional(),
   q: z.string().max(100).optional(),
 });
 const CreateLead = z.object({
@@ -28,6 +32,7 @@ const MoveStage = z.object({ stageId: z.string().uuid(), lostReason: z.string().
 const UpdateFields = z.object({ customFields: z.record(z.unknown()) });
 
 const EXPORT_LIMIT = 5000;
+const dayStart = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
 
 @Controller('api/v1/leads')
 @RequireFeature('module.crm')
@@ -46,12 +51,18 @@ export class LeadsController {
             scope,
             q.pipelineId ? { pipelineId: q.pipelineId } : {},
             q.stageId ? { stageId: q.stageId } : {},
+            q.status ? { status: q.status === '__none__' ? null : q.status } : {},
+            q.owner === 'me' ? { ownerId: auth().userId } : q.owner === 'unassigned' ? { ownerId: null } : q.owner ? { ownerId: q.owner } : {},
+            q.source ? { source: q.source } : {},
+            q.followUp === 'today' ? { nextFollowUpAt: { gte: dayStart(), lt: new Date(dayStart().getTime() + 86_400_000) } }
+              : q.followUp === 'overdue' ? { nextFollowUpAt: { lt: new Date() } }
+              : q.followUp === 'none' ? { nextFollowUpAt: null } : {},
             q.q ? { customer: { OR: [{ name: { contains: q.q, mode: 'insensitive' } }, { mobile: { contains: q.q } }] } } : {},
           ],
         },
         include: { customer: true, workspace: { select: { name: true } }, pipeline: { select: { name: true } } },
         orderBy: { createdAt: 'desc' },
-        take: 200,
+        take: 500,
       });
       const stageIds = [...new Set(leads.map((l) => l.stageId))];
       const ownerIds = [...new Set(leads.map((l) => l.ownerId).filter(Boolean) as string[])];
@@ -73,8 +84,13 @@ export class LeadsController {
         stageId: l.stageId,
         stage: stageName.get(l.stageId),
         lostReason: l.lostReason,
+        status: l.status,
         customFields: l.customFields ?? {},
+        ownerId: l.ownerId,
         owner: l.ownerId ? ownerName.get(l.ownerId) : null,
+        nextFollowUpAt: l.nextFollowUpAt,
+        lastActivityAt: l.lastActivityAt,
+        lastDisposition: l.lastDisposition,
         createdAt: l.createdAt,
       }));
     });
@@ -114,9 +130,11 @@ export class LeadsController {
       const lead = await tx.lead.create({
         data: {
           tenantId: tenantId(), workspaceId: a.workspaceId!, pipelineId: pipeline.id, stageId: pipeline.stages[0].id,
-          customerId: customer.id, source: input.source, ownerId: a.userId, customFields,
+          customerId: customer.id, source: input.source, ownerId: a.userId, assignedAt: new Date(), customFields,
         },
       });
+      // First owner of a customer becomes the sticky Primary RM.
+      await tx.customer.updateMany({ where: { id: customer.id, primaryRmId: null }, data: { primaryRmId: a.userId } });
       await this.db.audit(tx, {
         entity: 'lead', entityId: lead.id, action: 'lead.created',
         newValue: { name: input.name, source: input.source, customerCode: customer.code, existingCustomer: isExistingCustomer },

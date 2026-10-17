@@ -54,6 +54,13 @@ export const DEFAULT_SOURCES: [string, string][] = [
   ['indiamart', 'IndiaMart'], ['justdial', 'JustDial'], ['walk_in', 'Walk-in'], ['cross_sell', 'Cross-sell'],
 ];
 export const DEFAULT_LOST_REASONS = ['Not interested', 'Budget issue', 'Bought elsewhere', 'Not reachable', 'Wrong number', 'Duplicate enquiry'];
+export const DEFAULT_STATUSES: [string, string][] = [['fresh', 'Fresh'], ['hot', 'Hot'], ['warm', 'Warm'], ['cold', 'Cold']];
+/** [value, label, connected] */
+export const DEFAULT_DISPOSITIONS: [string, string, boolean][] = [
+  ['interested', 'Connected – Interested', true], ['not_interested', 'Connected – Not interested', true],
+  ['call_back', 'Connected – Call back later', true], ['not_answered', 'Not answered', false], ['busy', 'Busy', false],
+  ['switched_off', 'Switched off / Not reachable', false], ['wrong_number', 'Wrong number', false],
+];
 
 /** Creates a workspace with its pipelines, stages, lead sources and lost reasons inside an existing tenant. */
 export async function createWorkspace(tx: Tx, tenantId: string, w: WorkspaceInput) {
@@ -64,6 +71,8 @@ export async function createWorkspace(tx: Tx, tenantId: string, w: WorkspaceInpu
     data: [
       ...DEFAULT_SOURCES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_source', value, label, position })),
       ...DEFAULT_LOST_REASONS.map((label, position) => ({ tenantId, workspaceId: workspace.id, kind: 'lost_reason', value: label, label, position })),
+      ...DEFAULT_STATUSES.map(([value, label], position) => ({ tenantId, workspaceId: workspace.id, kind: 'lead_status', value, label, position })),
+      ...DEFAULT_DISPOSITIONS.map(([value, label, connected], position) => ({ tenantId, workspaceId: workspace.id, kind: 'call_disposition', value, label, position, connected })),
     ],
   });
   for (const [position, p] of (w.pipelines ?? [{ name: 'Sales' }]).entries()) {

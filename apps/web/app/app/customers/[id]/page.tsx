@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
 
 interface Lead {
-  id: string; workspace: string; pipeline: string; stage: string; isWon: boolean; isLost: boolean; lostReason: string | null;
+  id: string; workspace: string; workspaceId: string; pipeline: string; stage: string; isWon: boolean; isLost: boolean; lostReason: string | null;
   source: string; owner: string | null; createdAt: string;
 }
 interface Event { id: string; at: string; action: string; actor: string; context: string | null; oldValue: unknown; newValue: unknown }
@@ -122,7 +122,7 @@ export default function Customer360Page() {
               <tbody>
                 {c.leads.map((l) => (
                   <tr key={l.id}>
-                    <td><span className="badge">{l.workspace}</span><div className="small muted">{l.pipeline}</div></td>
+                    <td><Link href={`/app/leads/${l.id}?ws=${l.workspaceId}`}><span className="badge">{l.workspace}</span></Link><div className="small muted">{l.pipeline}</div></td>
                     <td>
                       <span className={`badge ${l.isWon ? 'ok' : l.isLost ? 'bad' : 'grey'}`}>{l.stage}</span>
                       {l.lostReason && <div className="small muted">{l.lostReason}</div>}

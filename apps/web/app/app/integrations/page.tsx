@@ -1,20 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 
 interface Integration {
-  key: string;
-  name: string;
-  description: string;
-  status: 'active' | 'inactive' | 'paused';
-  activatedAt: string | null;
+  key: string; name: string; description: string; category: string; phase: string;
+  status: 'active' | 'inactive' | 'paused'; activatedAt: string | null;
 }
+const ORDER = ['Lead sources', 'Calling', 'Messaging', 'Website & e-commerce', 'Payments', 'Productivity', 'Other CRMs'];
 
 export default function IntegrationsPage() {
   const { me, version } = useShell();
   const [list, setList] = useState<Integration[] | null>(null);
+  const [q, setQ] = useState('');
+  const [cat, setCat] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const canManage = me.permissions['integrations.manage'] === 'ORGANIZATION';
@@ -35,54 +35,58 @@ export default function IntegrationsPage() {
     }
   }
 
-  const active = list?.filter((i) => i.status === 'active') ?? [];
-  const available = list?.filter((i) => i.status !== 'active') ?? [];
-
-  const Table = ({ rows, kind }: { rows: Integration[]; kind: 'active' | 'available' }) => (
-    <div className="card" style={{ padding: 0, marginBottom: 18 }}>
-      <table className="table">
-        <thead><tr><th>Integration</th><th>Status</th><th style={{ textAlign: 'right' }}>{canManage ? 'Action' : ''}</th></tr></thead>
-        <tbody>
-          {rows.map((i) => (
-            <tr key={i.key}>
-              <td><b>{i.name}</b><div className="small muted">{i.description}</div></td>
-              <td>
-                {i.status === 'active'
-                  ? <span className="badge ok"><span className="dot" />Active</span>
-                  : <span className="badge grey">Inactive</span>}
-              </td>
-              <td style={{ textAlign: 'right' }}>
-                {canManage && (
-                  <button className={`btn sm ${kind === 'active' ? 'danger' : 'outline'}`} disabled={busy === i.key} onClick={() => toggle(i)}>
-                    {kind === 'active' ? 'Deactivate' : 'Activate now'}
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      {!rows.length && <div className="empty">{kind === 'active' ? 'No active integrations yet.' : 'Everything is active.'}</div>}
-    </div>
-  );
+  const shown = useMemo(() => (list ?? []).filter((i) => (!cat || i.category === cat) && (!q || `${i.name} ${i.description}`.toLowerCase().includes(q.toLowerCase()))), [list, q, cat]);
+  const active = (list ?? []).filter((i) => i.status === 'active');
 
   return (
     <>
       <div className="page-head">
         <div>
           <h1>Integrations</h1>
-          <div className="muted small">Switch each service on or off for {me.tenant.name}. Connection settings (API keys, numbers) arrive with each integration in Phase 1–2.</div>
+          <div className="muted small">{active.length} active of {list?.length ?? 0} · switch each service on or off for {me.tenant.name}. Connection settings arrive with each integration in the phase shown.</div>
         </div>
+        <input className="input" style={{ width: 220 }} placeholder="Search integrations" value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="chips" style={{ marginBottom: 14 }}>
+        <button className={`chip ${!cat ? 'on' : ''}`} onClick={() => setCat('')}>All <span className="count">{list?.length ?? 0}</span></button>
+        {ORDER.map((c) => (
+          <button key={c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(cat === c ? '' : c)}>
+            {c} <span className="count">{list?.filter((i) => i.category === c).length ?? 0}</span>
+          </button>
+        ))}
       </div>
       {error && <div className="error">{error}</div>}
-      {!list ? <div className="muted">Loading…</div> : (
-        <>
-          <h2>Active integrations ({active.length})</h2>
-          <Table rows={active} kind="active" />
-          <h2>Available integrations ({available.length})</h2>
-          <Table rows={available} kind="available" />
-        </>
-      )}
+      {!list && <div className="muted">Loading…</div>}
+      {ORDER.filter((c) => shown.some((i) => i.category === c)).map((c) => (
+        <div key={c} style={{ marginBottom: 18 }}>
+          <h2>{c}</h2>
+          <div className="card" style={{ padding: 0 }}>
+            <div className="table-wrap">
+              <table className="table" style={{ minWidth: 560 }}>
+                <tbody>
+                  {shown.filter((i) => i.category === c).map((i) => (
+                    <tr key={i.key}>
+                      <td style={{ width: '55%' }}><b>{i.name}</b><div className="small muted">{i.description}</div></td>
+                      <td>
+                        {i.status === 'active' ? <span className="badge ok"><span className="dot" />Active</span> : <span className="badge grey">Inactive</span>}
+                        <span className="badge" style={{ marginLeft: 6, fontWeight: 500 }} title="When the live connection ships">{i.phase}</span>
+                      </td>
+                      <td style={{ textAlign: 'right' }}>
+                        {canManage && (
+                          <button className={`btn sm ${i.status === 'active' ? 'danger' : 'outline'}`} disabled={busy === i.key} onClick={() => toggle(i)}>
+                            {i.status === 'active' ? 'Deactivate' : 'Activate now'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ))}
+      {list && !shown.length && <div className="card empty">No integration matches “{q}”.</div>}
     </>
   );
 }

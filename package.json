@@ -23,7 +23,8 @@
     "verify:auth": "node scripts/verify-auth.mjs",
     "verify:users": "node scripts/verify-users.mjs",
     "verify:settings": "node scripts/verify-workspace-settings.mjs",
-    "verify:customers": "node scripts/verify-customers.mjs"
+    "verify:customers": "node scripts/verify-customers.mjs",
+    "verify:leadwork": "node scripts/verify-leadwork.mjs"
   },
   "engines": {
     "node": ">=20"

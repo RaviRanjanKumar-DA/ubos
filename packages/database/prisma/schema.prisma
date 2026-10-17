@@ -183,6 +183,11 @@ model Workspace {
   invoiceSeries String?
   gstin     String?    // when a business line bills under a separate entity
   isArchived Boolean   @default(false)
+  // Who gets new leads from forms, integrations and imports (manual entries stay with their creator).
+  assignmentMode    String   @default("round_robin") // round_robin | creator | fixed
+  assignmentUserIds String[] @default([])            // round-robin pool / fixed owner (first id)
+  assignmentCursor  Int      @default(0)
+  stickyOwner       Boolean  @default(true)          // a returning customer goes back to their RM
   pipelines Pipeline[]
   leads     Lead[]
   packages  Package[]
@@ -216,11 +221,12 @@ model WorkspaceOption {
   tenantId    String
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id])
-  kind        String    // lead_source | lost_reason
-  value       String    // stored on records (lead.source / lead.lostReason)
+  kind        String    // lead_source | lost_reason | lead_status | call_disposition
+  value       String    // stored on records (lead.source / lead.lostReason / lead.status / activity.disposition)
   label       String
   position    Int       @default(0)
   isArchived  Boolean   @default(false)
+  connected   Boolean   @default(false) // call_disposition only: the customer was actually reached
 
   @@unique([workspaceId, kind, value])
 }
@@ -473,26 +479,79 @@ model Lead {
   source          String     // website, facebook, whatsapp, google_sheets, referral, api, manual, cross_sell...
   referredFromLeadId String? // cross-sell from another workspace
   ownerId         String?
+  assignedAt      DateTime?
+  status          String?    // lead status value (Hot / Warm / Cold …) from the workspace list; separate from stage
   rating          Int?
   customFields    Json?
   lostReason      String?
   createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @default(now()) @updatedAt
   firstResponseAt DateTime?
+  lastActivityAt  DateTime?
+  lastDisposition String?
+  nextFollowUpAt  DateTime?  // earliest open follow-up, kept in sync for fast "due today" lists
+  importId        String?
   followUps       FollowUp[]
+  activities      LeadActivity[]
 
   @@index([tenantId, workspaceId, pipelineId, stageId])
   @@index([tenantId, ownerId])
+  @@index([tenantId, nextFollowUpAt])
 }
 
 model FollowUp {
-  id       String    @id @default(uuid())
-  tenantId String
-  leadId   String
-  lead     Lead      @relation(fields: [leadId], references: [id])
-  dueAt    DateTime
-  doneAt   DateTime?
-  outcome  String?
-  userId   String
+  id          String    @id @default(uuid())
+  tenantId    String
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  dueAt       DateTime
+  note        String?
+  doneAt      DateTime?
+  outcome     String?
+  userId      String
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, userId, doneAt, dueAt])
+  @@index([leadId])
+}
+
+// Everything that happens on a lead: calls (with disposition), remarks, status changes, assignments, imports.
+model LeadActivity {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id])
+  type        String    // call | remark | status | assignment | stage | follow_up | import
+  disposition String?   // call: workspace call_disposition value
+  connected   Boolean?  // call: reached the customer
+  durationSec Int?
+  remark      String?
+  data        Json?     // extra details (old/new values etc.)
+  userId      String?
+  createdAt   DateTime  @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([tenantId, workspaceId, createdAt])
+}
+
+// One bulk upload (CSV / Excel) with its outcome.
+model LeadImport {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  fileName    String
+  total       Int
+  created     Int
+  linked      Int      // rows that matched an existing customer
+  skipped     Int      // duplicates in this business line that were skipped
+  failed      Int
+  errors      Json     // [{ row, message }]
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, workspaceId, createdAt])
 }
 
 model Package {

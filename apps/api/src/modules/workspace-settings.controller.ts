@@ -6,6 +6,7 @@ import { DbService } from '../common/db.service';
 import { RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
+import { eligibleOwners } from '../common/lead-ops';
 
 const Name = z.string().trim().min(2).max(60);
 const Stage = z.object({
@@ -30,9 +31,14 @@ const FieldPatch = z.object({
 });
 const Order = z.object({ ids: z.array(z.string().uuid()).max(200) });
 const OptionList = z.object({
-  options: z.array(z.object({ id: z.string().uuid().optional(), label: z.string().trim().min(1).max(60) })).max(100),
+  options: z.array(z.object({ id: z.string().uuid().optional(), label: z.string().trim().min(1).max(60), connected: z.boolean().optional() })).max(100),
 });
-const KINDS = ['lead_source', 'lost_reason'] as const;
+const KINDS = ['lead_source', 'lost_reason', 'lead_status', 'call_disposition'] as const;
+const Assignment = z.object({
+  mode: z.enum(['round_robin', 'creator', 'fixed']),
+  userIds: z.array(z.string().uuid()).max(100),
+  sticky: z.boolean(),
+});
 const WorkspacePatch = z.object({ name: Name.optional(), isArchived: z.boolean().optional() });
 
 /** Pipelines & stages, custom lead fields, lead sources and lost reasons of one workspace (business line). */
@@ -66,6 +72,9 @@ export class WorkspaceSettingsController {
         fields: ws.fields.map((f) => ({ id: f.id, key: f.key, label: f.label, type: f.type, options: f.options, required: f.required, isArchived: f.isArchived })),
         sources: ws.options.filter((o) => o.kind === 'lead_source').map((o) => ({ id: o.id, value: o.value, label: o.label })),
         lostReasons: ws.options.filter((o) => o.kind === 'lost_reason').map((o) => ({ id: o.id, value: o.value, label: o.label })),
+        statuses: ws.options.filter((o) => o.kind === 'lead_status').map((o) => ({ id: o.id, value: o.value, label: o.label })),
+        dispositions: ws.options.filter((o) => o.kind === 'call_disposition').map((o) => ({ id: o.id, value: o.value, label: o.label, connected: o.connected })),
+        assignment: { mode: ws.assignmentMode, userIds: ws.assignmentUserIds, sticky: ws.stickyOwner },
       };
     });
   }
@@ -281,16 +290,50 @@ export class WorkspaceSettingsController {
       for (const [position, o] of options.entries()) {
         const match = o.id ? existing.find((e) => e.id === o.id) : existing.find((e) => e.label.toLowerCase() === o.label.toLowerCase());
         if (match) {
-          await tx.workspaceOption.update({ where: { id: match.id }, data: { label: o.label, position, isArchived: false } });
+          await tx.workspaceOption.update({ where: { id: match.id }, data: { label: o.label, position, isArchived: false, ...(kind === 'call_disposition' ? { connected: !!o.connected } : {}) } });
         } else {
           // Sources are stored on leads as short codes ("google_ads"); reasons as their text.
-          const value = kind === 'lead_source' ? fieldKey(o.label, existing.map((e) => e.value)) : o.label;
-          await tx.workspaceOption.create({ data: { tenantId: tenantId(), workspaceId: id, kind, value, label: o.label, position } });
+          const value = kind === 'lost_reason' ? o.label : fieldKey(o.label, existing.map((e) => e.value));
+          await tx.workspaceOption.create({ data: { tenantId: tenantId(), workspaceId: id, kind, value, label: o.label, position, connected: kind === 'call_disposition' && !!o.connected } });
         }
       }
       await this.db.audit(tx, {
         workspaceId: id, entity: 'workspace', entityId: id, action: `workspace.${kind}s_changed`,
         oldValue: existing.filter((e) => !e.isArchived).map((e) => e.label), newValue: options.map((o) => o.label),
+      });
+      return { ok: true };
+    });
+  }
+
+  // ── Lead assignment ──
+
+  /** People who can own leads in this workspace (for assignment pickers). */
+  @Get('workspaces/:id/assignees')
+  @RequirePermission('org.workspace.view')
+  assignees(@Param('id') id: string) {
+    this.assertAccess(id);
+    return this.db.tenant((tx) => eligibleOwners(tx, id));
+  }
+
+  /** Who receives new leads from forms, integrations and imports: round-robin pool, fixed owner or creator; sticky RM. */
+  @Put('workspaces/:id/assignment')
+  @RequirePermission('org.workspace.view')
+  saveAssignment(@Param('id') id: string, @Body() body: unknown) {
+    this.assertManage(id);
+    const input = parse(Assignment, body);
+    return this.db.tenant(async (tx) => {
+      const ws = await this.workspace(tx, id);
+      const eligible = new Set((await eligibleOwners(tx, id)).map((u) => u.id));
+      if (input.userIds.some((u) => !eligible.has(u))) {
+        throw new BadRequestException({ code: 'INVALID_ASSIGNEES', message: 'Choose people who work in this business line' });
+      }
+      if (input.mode === 'fixed' && !input.userIds.length) {
+        throw new BadRequestException({ code: 'OWNER_REQUIRED', message: 'Choose the person who receives all new leads' });
+      }
+      await tx.workspace.update({ where: { id }, data: { assignmentMode: input.mode, assignmentUserIds: input.userIds, stickyOwner: input.sticky, assignmentCursor: 0 } });
+      await this.db.audit(tx, {
+        workspaceId: id, entity: 'workspace', entityId: id, action: 'workspace.assignment_changed',
+        oldValue: { mode: ws.assignmentMode, userIds: ws.assignmentUserIds, sticky: ws.stickyOwner }, newValue: input,
       });
       return { ok: true };
     });

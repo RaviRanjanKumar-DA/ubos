@@ -48,7 +48,8 @@ export class ApiError extends Error {
   }
 }
 
-type Opts = { method?: string; body?: unknown; tenant?: string; noWorkspace?: boolean };
+/** workspace: send this workspace instead of the one selected in the switcher (e.g. opening a lead of another business line). */
+type Opts = { method?: string; body?: unknown; tenant?: string; noWorkspace?: boolean; workspace?: string | null };
 
 async function raw(url: string, init: RequestInit) {
   const res = await fetch(url, { ...init, credentials: 'include' });
@@ -85,7 +86,8 @@ export function api<T = any>(path: string, opts: Opts = {}) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-UBOS-CSRF': '1' };
   const tenant = opts.tenant ?? s?.tenant;
   if (tenant) headers['X-Tenant'] = tenant;
-  if (s?.workspaceId && !opts.noWorkspace && !opts.tenant) headers['X-Workspace'] = s.workspaceId;
+  const wsId = opts.workspace !== undefined ? opts.workspace : s?.workspaceId;
+  if (wsId && !opts.noWorkspace && !opts.tenant) headers['X-Workspace'] = wsId;
   return request<T>(path, { method: opts.method ?? 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }, '/api/v1/auth/refresh');
 }
 
