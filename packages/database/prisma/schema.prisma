@@ -158,6 +158,7 @@ model OrganizationSetting {
   leadIdentifier     String   @default("mobile") // Lead ID: the unique key that identifies a customer — mobile | email
   maxFailedLogins    Int      @default(5)
   lockMinutes        Int      @default(15)
+  setupSkipped       String[] @default([]) // Setup Guide steps the admins chose to skip
   updatedAt          DateTime @updatedAt
 }
 

@@ -186,3 +186,27 @@ tr.selected td { background: var(--brand-50) !important; }
 .modal h2 { font-size: 17px; }
 .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .row.end { justify-content: flex-end; }
+
+/* Setup Guide */
+.setup { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 28px; align-items: start; max-width: 1080px; }
+.setup-nav { position: sticky; top: 74px; display: grid; gap: 2px; }
+.setup-label { font-size: 11px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 6px 8px; }
+.setup-nav-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: 0; border-radius: 8px; padding: 7px 8px; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
+.setup-nav-item:hover { background: #f4f2fa; }
+.setup-nav-item.on { background: #ece8fb; color: var(--brand); font-weight: 600; }
+.setup-res-icon { width: 22px; height: 22px; border-radius: 6px; background: #ece8fb; display: grid; place-items: center; font-size: 11px; flex: none; }
+.setup-card { padding: 14px; margin-bottom: 12px; }
+.setup-swatch { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+.setup-bar { height: 5px; background: #ecebf2; border-radius: 5px; overflow: hidden; flex: none; }
+.setup-bar > div { height: 100%; background: var(--ok); border-radius: 5px; }
+.setup-step { display: flex; align-items: center; gap: 10px; background: #f7f6fb; border-radius: 8px; padding: 9px 12px; margin-top: 6px; }
+.setup-step .setup-title { font-size: 13.5px; }
+.setup-step.done .setup-title { text-decoration: line-through; color: var(--muted); }
+.setup-check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid #c9c5d8; display: grid; place-items: center; font-size: 11px; color: #fff; flex: none; }
+.setup-check.done { background: var(--ok); border-color: var(--ok); }
+.setup-check.skipped { color: var(--muted); }
+@media (max-width: 860px) {
+  .setup { grid-template-columns: 1fr; gap: 14px; }
+  .setup-nav { position: static; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  .setup-step { flex-wrap: wrap; }
+}

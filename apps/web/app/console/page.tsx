@@ -20,6 +20,7 @@ interface Tenant {
   users: number;
   workspaces: number;
   mrrPaise: number;
+  setup?: { done: number; total: number };
 }
 interface Metrics { mrrPaise: number; arrPaise: number; tenants: number; paying: number; trials: number; suspended: number; users: number }
 interface Plan { code: string; name: string; pricePerUserPaise: number; maxWorkspaces: number | null }
@@ -109,7 +110,7 @@ export default function ConsolePage() {
         <div className="card" style={{ padding: 0 }}>
           <div className="table-wrap">
             <table className="table">
-              <thead><tr><th>Organization</th><th>Plan</th><th>Status</th><th>Workspaces</th><th>Users</th><th>MRR</th><th /></tr></thead>
+              <thead><tr><th>Organization</th><th>Plan</th><th>Status</th><th>Setup</th><th>Workspaces</th><th>Users</th><th>MRR</th><th /></tr></thead>
               <tbody>
                 {tenants?.map((t) => (
                   <tr key={t.id}>
@@ -124,6 +125,7 @@ export default function ConsolePage() {
                         <div className="small muted">ends {new Date(t.trialEndsAt).toLocaleDateString('en-IN')}</div>
                       )}
                     </td>
+                    <td className="small" title="Setup Guide steps done (available steps)">{t.setup ? `${Math.round((t.setup.done / Math.max(1, t.setup.total)) * 100)}% · ${t.setup.done}/${t.setup.total}` : '—'}</td>
                     <td>{t.workspaces}</td>
                     <td>{t.users}</td>
                     <td>{t.mrrPaise ? rupees(t.mrrPaise) : '—'}</td>

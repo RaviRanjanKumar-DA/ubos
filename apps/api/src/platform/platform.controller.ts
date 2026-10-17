@@ -15,6 +15,7 @@ import { decrypt } from '../auth/crypto';
 import { normalizeIp } from '../auth/ip';
 import { SessionService } from '../auth/sessions';
 import { authTransaction, CommitThenThrow } from '../auth/tx';
+import { setupGuide } from '../common/setup-guide';
 
 /** Platform staff guard: separate cookies and signing secret, so tenant sessions can never reach these routes. */
 @Injectable()
@@ -138,12 +139,14 @@ export class PlatformController {
         _count: { select: { users: true, workspaces: true } },
       },
     });
+    // Setup Guide progress per organization (built steps only) — helps onboard new customers.
+    const setup = new Map(await Promise.all(tenants.map(async (t) => [t.id, (await setupGuide(this.db.platform, t.id)).available] as const)));
     return tenants.map((t) => {
       const s = t.subscriptions[0];
       return {
         id: t.id, name: t.name, slug: t.slug, status: t.status, industry: t.industry, isInternal: t.isInternal,
         plan: s?.plan.name, planCode: s?.plan.code, licences: s?.licences, subscriptionStatus: s?.status,
-        trialEndsAt: s?.trialEndsAt, users: t._count.users, workspaces: t._count.workspaces, createdAt: t.createdAt,
+        trialEndsAt: s?.trialEndsAt, users: t._count.users, workspaces: t._count.workspaces, createdAt: t.createdAt, setup: setup.get(t.id),
         mrrPaise: s && !t.isInternal && s.status === 'active' ? s.licences * s.plan.pricePerUserPaise : 0,
       };
     });

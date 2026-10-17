@@ -43,6 +43,7 @@ const NAV = [
   { label: 'Finance', icon: 'finance', phase: 3 },
   { label: 'AI Suite', icon: 'ai', phase: 4 },
   { section: 'Organization' },
+  { href: '/app/setup', label: 'Setup Guide', icon: 'menu', perm: 'org.workspace.manage' },
   { href: '/app/workspaces', label: 'Workspaces', icon: 'workspaces', perm: 'org.workspace.view' },
   { href: '/app/users', label: 'Users', icon: 'hr', perm: 'org.user.view' },
   { href: '/app/roles', label: 'Roles & Permissions', icon: 'audit', perm: 'org.user.view' },

@@ -287,6 +287,32 @@ const audit = (await call('/api/v1/audit-logs', { token: abc, tenant: 'abc' })).
 const chain = (await call('/api/v1/audit-logs/verify', { token: abc, tenant: 'abc' })).body;
 check('orders are on the audit log and the chain is intact', JSON.stringify(audit).includes('billing.order_placed') && chain.valid, chain);
 
+// ── Setup Guide ──
+const guide = await call('/api/v1/setup-guide', { token: admin });
+const step = (g, id) => g.guides.flatMap((x) => x.cards.flatMap((c) => c.steps)).find((x) => x.id === id);
+check('Setup Guide: steps tick themselves off from real data',
+  guide.status === 200 && step(guide.body, 'lead_fields').done && step(guide.body, 'add_members').done && step(guide.body, 'custom_actions').done
+  && step(guide.body, 'export_leads').done && step(guide.body, 'bulk_edit').done && step(guide.body, 'sop_forms').done && !step(guide.body, 'import_leads').done,
+  guide.body.guides?.[0]?.cards?.map((c) => c.steps.map((x) => x.id + ':' + x.done)));
+check('Setup Guide: steps not built yet carry their phase and no link', step(guide.body, 'wa_business').available === false && step(guide.body, 'wa_business').phase === '2' && step(guide.body, 'wa_business').href === null, step(guide.body, 'wa_business'));
+check('Setup Guide: workspace steps link to the right settings tab', /^\/app\/workspaces\/[0-9a-f-]+\?tab=fields$/.test(step(guide.body, 'lead_fields').href), step(guide.body, 'lead_fields').href);
+const rmGuide = await call('/api/v1/setup-guide', { token: rm });
+const mgrGuide = await call('/api/v1/setup-guide', { token: manager });
+check('Setup Guide is for organization admins only', rmGuide.status === 403 && mgrGuide.status === 403, [rmGuide.status, mgrGuide.status]);
+const skipIt = await call('/api/v1/setup-guide/steps/import_leads/skip', { token: admin, method: 'POST', body: { skipped: true } });
+const afterSkip = (await call('/api/v1/setup-guide', { token: admin })).body;
+check('a step can be skipped and then counts as handled', skipIt.status === 200 && step(afterSkip, 'import_leads').skipped && afterSkip.available.done === guide.body.available.done + 1, [afterSkip.available, guide.body.available]);
+await call('/api/v1/setup-guide/steps/import_leads/skip', { token: admin, method: 'POST', body: { skipped: false } });
+const afterUndo = (await call('/api/v1/setup-guide', { token: admin })).body;
+check('skipping can be undone', !step(afterUndo, 'import_leads').skipped && afterUndo.available.done === guide.body.available.done, afterUndo.available);
+const badStep = await call('/api/v1/setup-guide/steps/hack_the_planet/skip', { token: admin, method: 'POST', body: { skipped: true } });
+check('unknown steps are refused', badStep.status === 400 && badStep.body.code === 'UNKNOWN_STEP', badStep.body);
+const abcGuide = (await call('/api/v1/setup-guide', { token: abc, tenant: 'abc' })).body;
+check('each organization has its own progress', !step(abcGuide, 'custom_actions').done && step(abcGuide, 'add_members').done && step(abcGuide, 'licences').done, [step(abcGuide, 'custom_actions'), step(abcGuide, 'licences')]);
+const pTenants = (await call('/platform/v1/tenants', { token: owner, tenant: null })).body;
+const pMine = pTenants.find((t) => t.slug === 'mycompany');
+check('Platform Console shows setup progress per organization', pMine?.setup?.total === guide.body.available.total && pMine.setup.done === afterUndo.available.done, pMine?.setup);
+
 // ── Isolation ──
 const abcActions = await call('/api/v1/custom-actions?archived=true', { token: abc, tenant: 'abc' });
 check('custom actions never leak across organizations', abcActions.status === 200 && !abcActions.body.some((x) => x.id === action.id), abcActions.body.length);

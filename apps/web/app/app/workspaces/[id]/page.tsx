@@ -28,6 +28,11 @@ export default function WorkspaceSettingsPage() {
 
   const load = useCallback(() => api<WorkspaceSettings>(`/api/v1/workspaces/${id}/settings`, { workspace: id }).then(setData).catch((e) => setMsg({ type: 'error', text: e.message })), [id]);
   useEffect(() => { load(); }, [load]);
+  // Deep links such as ?tab=fields (used by the Setup Guide).
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t && TABS.some(([k]) => k === t)) setTab(t as Tab);
+  }, []);
 
   /** Runs a save, shows the result, reloads. */
   const act = async (fn: () => Promise<unknown>, text: string) => {
