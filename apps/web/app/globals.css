@@ -210,3 +210,40 @@ tr.selected td { background: var(--brand-50) !important; }
   .setup-nav { position: static; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
   .setup-step { flex-wrap: wrap; }
 }
+
+/* Roles & Permissions */
+.roles-grid { display: grid; grid-template-columns: minmax(220px, 270px) minmax(0, 1fr); gap: 14px; align-items: start; }
+.roles-grid > .card:first-child { position: sticky; top: 74px; }
+.role-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; border: 0; background: none; font: inherit; color: inherit; border-radius: 8px; padding: 9px 10px; cursor: pointer; }
+.role-item:hover { background: #f4f2fa; }
+.role-item.on { background: #ece8fb; }
+.role-item.on b { color: var(--brand); }
+.level-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.level-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.lvl-NONE { background: #ecebf2; color: var(--muted); }
+.lvl-OWN { background: #dcecff; color: #1d5fb8; }
+.lvl-TEAM, .lvl-DEPARTMENT, .lvl-BRANCH { background: #e3dcfa; color: #5b3cc4; }
+.lvl-WORKSPACE { background: #d9f0e4; color: #1f7a4a; }
+.lvl-ORGANIZATION { background: #1f9d55; color: #fff; }
+.lvl-DENY { background: #fbe0de; color: #b42318; }
+.perm-section { padding: 0; margin-bottom: 10px; overflow: hidden; }
+.perm-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 14px; background: #faf9fd; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.perm-toggle { border: 0; background: none; font: inherit; color: inherit; cursor: pointer; padding: 0; display: flex; align-items: center; gap: 6px; }
+.perm-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 14px; border-bottom: 1px solid var(--line); }
+.perm-row:last-child { border-bottom: 0; }
+.seg { display: inline-flex; flex: none; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; }
+.seg-btn { border: 0; border-left: 1px solid var(--line); background: none; font: inherit; font-size: 12px; padding: 5px 9px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.seg-btn:first-child { border-left: 0; }
+.seg-btn:hover:not(:disabled) { background: #f4f2fa; }
+.seg-btn.on { font-weight: 650; }
+.seg-btn:disabled { cursor: default; }
+.save-bar { position: sticky; bottom: 12px; display: flex; align-items: center; gap: 10px; background: #1d1b2e; color: #fff; border-radius: 10px; padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.2); margin-top: 12px; z-index: 5; }
+.save-bar .btn.ghost { color: #fff; }
+@media (max-width: 1100px) { .perm-row { flex-direction: column; align-items: flex-start; } .seg { flex-wrap: wrap; } }
+@media (max-width: 860px) { .roles-grid { grid-template-columns: 1fr; } .roles-grid > .card:first-child { position: static; } }
+.seg-btn.on.lvl-NONE { background: #dddbe8; color: #4b4864; }
+.seg-btn.on.lvl-OWN { background: #bcd8ff; color: #1d5fb8; }
+.seg-btn.on.lvl-TEAM, .seg-btn.on.lvl-DEPARTMENT, .seg-btn.on.lvl-BRANCH { background: #d2c6f7; color: #5b3cc4; }
+.seg-btn.on.lvl-WORKSPACE { background: #b5e3c8; color: #1f7a4a; }
+.seg-btn.on.lvl-ORGANIZATION { background: #1f9d55; color: #fff; }
+.seg-btn.on.lvl-DENY { background: #f7c4bf; color: #b42318; }

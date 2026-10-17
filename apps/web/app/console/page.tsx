@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, platformApi, rupees } from '@/lib/api';
 import { Icon } from '@/components/Icon';
+import { Pricing } from '@/components/console/Pricing';
+import { BusinessLinePicker, PickedLine } from '@/components/console/BusinessLinePicker';
 
 interface Tenant {
   id: string;
@@ -23,7 +25,7 @@ interface Tenant {
   setup?: { done: number; total: number };
 }
 interface Metrics { mrrPaise: number; arrPaise: number; tenants: number; paying: number; trials: number; suspended: number; users: number }
-interface Plan { code: string; name: string; pricePerUserPaise: number; maxWorkspaces: number | null }
+interface Plan { code: string; name: string; pricePerUserPaise: number; maxWorkspaces: number | null; isPublic: boolean }
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -33,7 +35,7 @@ export default function ConsolePage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<'tenants' | 'orders'>('tenants');
+  const [view, setView] = useState<'tenants' | 'orders' | 'pricing'>('tenants');
 
   const load = useCallback(async () => {
     try {
@@ -85,19 +87,20 @@ export default function ConsolePage() {
       <div className="content" style={{ margin: '0 auto' }}>
         <div className="page-head">
           <div>
-            <h1>{view === 'orders' ? 'Orders & payments' : 'Organizations'}</h1>
-            <div className="muted small">{view === 'orders' ? 'Licence and service orders from every organization. Confirm a payment to apply it.' : 'Every company using UBOS, including your own (Tenant #1).'}</div>
+            <h1>{view === 'orders' ? 'Orders & payments' : view === 'pricing' ? 'Plans & prices' : 'Organizations'}</h1>
+            <div className="muted small">{view === 'orders' ? 'Licence and service orders from every organization. Confirm a payment to apply it.' : view === 'pricing' ? 'Create packages, change prices and choose what organizations can buy.' : 'Every company using UBOS, including your own (Tenant #1).'}</div>
           </div>
           <button className="btn" onClick={() => setAdding(true)}>+ Onboard company</button>
         </div>
         {error && <div className="error">{error}</div>}
         <div className="row" style={{ gap: 2, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
-          {([['tenants', 'Organizations'], ['orders', 'Orders & payments']] as const).map(([k, l]) => (
+          {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices']] as const).map(([k, l]) => (
             <button key={k} className="btn ghost" onClick={() => setView(k)}
               style={{ borderRadius: 0, borderBottom: view === k ? '2px solid var(--brand)' : '2px solid transparent', color: view === k ? 'var(--brand)' : undefined }}>{l}</button>
           ))}
         </div>
         {view === 'orders' && <Orders onChanged={load} />}
+        {view === 'pricing' && <Pricing onChanged={load} />}
         {view === 'tenants' && <>
         {metrics && (
           <div className="grid cols-4" style={{ marginBottom: 14 }}>
@@ -152,7 +155,8 @@ export default function ConsolePage() {
 }
 
 function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => void; onDone: () => void }) {
-  const [f, setF] = useState({ name: '', slug: '', industry: '', planCode: 'growth', adminName: '', adminEmail: '', adminPassword: '', workspaces: 'Sales' });
+  const [f, setF] = useState({ name: '', slug: '', industry: '', planCode: plans.find((p) => p.code === 'growth')?.code ?? plans[0]?.code ?? '', adminName: '', adminEmail: '', adminPassword: '' });
+  const [lines, setLines] = useState<PickedLine[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
@@ -169,7 +173,7 @@ function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => voi
           ...f,
           slug: f.slug || undefined,
           industry: f.industry || undefined,
-          workspaces: f.workspaces.split(',').map((w) => w.trim()).filter(Boolean),
+          workspaces: lines,
         },
       });
       onDone();
@@ -191,14 +195,14 @@ function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => voi
           <div className="field">
             <label>Plan</label>
             <select className="input" value={f.planCode} onChange={set('planCode')}>
-              {plans.map((p) => <option key={p.code} value={p.code}>{p.name}{p.pricePerUserPaise ? ` · ${rupees(p.pricePerUserPaise)}/user` : ''}</option>)}
+              {plans.filter((p) => p.isPublic || p.code === f.planCode).map((p) => <option key={p.code} value={p.code}>{p.name} · {p.pricePerUserPaise ? `${rupees(p.pricePerUserPaise)}/user/month` : 'custom price'}</option>)}
             </select>
           </div>
         </div>
         <div className="field">
-          <label>Workspaces / business lines (comma separated)</label>
-          <input className="input" value={f.workspaces} onChange={set('workspaces')} placeholder="Education, Real Estate" />
-          <span className="small muted">{plan?.maxWorkspaces ? `${plan.name} allows up to ${plan.maxWorkspaces}` : 'Unlimited on this plan'}</span>
+          <label>Business lines (workspaces)</label>
+          <BusinessLinePicker value={lines} onChange={setLines} max={plan?.maxWorkspaces ?? null} />
+          <span className="small muted">Pick from the list or type your own. {plan?.maxWorkspaces ? `${plan.name} allows up to ${plan.maxWorkspaces}.` : 'Unlimited on this plan.'}</span>
         </div>
         <div className="grid cols-2">
           <div className="field"><label>Admin name</label><input className="input" value={f.adminName} onChange={set('adminName')} required /></div>
@@ -208,7 +212,7 @@ function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => voi
         <p className="small muted">Starts a 14-day trial with default roles, the integrations catalogue and one pipeline per workspace.</p>
         <div className="row end">
           <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn" disabled={busy}>{busy ? 'Creating…' : 'Create organization'}</button>
+          <button className="btn" disabled={busy || !lines.length}>{busy ? 'Creating…' : 'Create organization'}</button>
         </div>
       </form>
     </div>
@@ -219,19 +223,16 @@ interface PlatformOrder {
   id: string; number: string; cycle: string; status: 'pending' | 'paid' | 'cancelled'; totalPaise: number; createdAt: string; paidAt: string | null; paymentRef: string | null;
   items: { name: string; quantity: number; kind: string }[]; tenant: { id: string; name: string; slug: string } | null;
 }
-interface Product { id: string; code: string; name: string; kind: string; planCode: string | null; priceMonthlyPaise: number | null; priceOncePaise: number | null; annualDiscountPct: number; isActive: boolean }
 
 /** Orders placed by organizations; the Platform Owner confirms the payment, which applies the licences. */
 function Orders({ onChanged }: { onChanged: () => void }) {
   const [orders, setOrders] = useState<PlatformOrder[] | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [status, setStatus] = useState<'' | 'pending' | 'paid' | 'cancelled'>('pending');
   const [paying, setPaying] = useState<PlatformOrder | null>(null);
   const [ref, setRef] = useState('');
   const [error, setError] = useState('');
   const load = useCallback(() => {
     platformApi<PlatformOrder[]>('/platform/v1/orders').then(setOrders).catch((e) => setError(e.message));
-    platformApi<Product[]>('/platform/v1/products').then(setProducts).catch(() => {});
   }, []);
   useEffect(() => { load(); }, [load]);
   const shown = orders?.filter((o) => !status || o.status === status) ?? [];
@@ -278,23 +279,6 @@ function Orders({ onChanged }: { onChanged: () => void }) {
           </table>
           {orders && !shown.length && <div className="empty">No orders here.</div>}
         </div>
-      </div>
-      <div className="card">
-        <h2>Products &amp; prices</h2>
-        <p className="small muted" style={{ marginTop: -6 }}>What organizations can buy from their Billing page. Prices before GST.</p>
-        <table className="table">
-          <thead><tr><th>Product</th><th>Type</th><th>Price</th><th>Status</th></tr></thead>
-          <tbody>
-            {products.map((p) => (
-              <tr key={p.id}>
-                <td><b>{p.name}</b><div className="small muted"><code>{p.code}</code>{p.planCode ? ` · plan ${p.planCode}` : ''}</div></td>
-                <td className="small">{p.kind === 'licence' ? 'User licence' : 'Service'}</td>
-                <td className="small">{p.kind === 'licence' ? `${rupees(p.priceMonthlyPaise ?? 0)} / user / month${p.annualDiscountPct ? ` · ${p.annualDiscountPct}% off annually` : ''}` : rupees(p.priceOncePaise ?? 0)}</td>
-                <td>{p.isActive ? <span className="badge ok">On sale</span> : <span className="badge grey">Hidden</span>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
       </div>
       {paying && (
         <div className="modal-bg" onClick={() => setPaying(null)}>

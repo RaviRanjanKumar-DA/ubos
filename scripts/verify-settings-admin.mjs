@@ -313,6 +313,49 @@ const pTenants = (await call('/platform/v1/tenants', { token: owner, tenant: nul
 const pMine = pTenants.find((t) => t.slug === 'mycompany');
 check('Platform Console shows setup progress per organization', pMine?.setup?.total === guide.body.available.total && pMine.setup.done === afterUndo.available.done, pMine?.setup);
 
+// ── Plans & prices (Platform Owner) ──
+const tenantPlan = await call('/platform/v1/plans', { token: abc, tenant: null, method: 'POST', body: {} });
+check('organizations cannot manage plans', tenantPlan.status === 401 || tenantPlan.status === 403, tenantPlan.status);
+const planBody = { code: 'pro_test', name: 'Pro Test', pricePerUserPaise: 129_900, maxWorkspaces: 5, storageGbPerUser: 10, aiCreditsPerUser: 50, isPublic: true, features: ['module.crm', 'module.workspaces', 'module.whatsapp'], sellAsLicence: true, annualDiscountPct: 15 };
+const newPlan = await call('/platform/v1/plans', { token: owner, tenant: null, method: 'POST', body: planBody });
+const dupPlan = await call('/platform/v1/plans', { token: owner, tenant: null, method: 'POST', body: planBody });
+check('Platform Owner creates a plan (package); codes are unique', (newPlan.status === 201 || newPlan.status === 200) && newPlan.body.code === 'pro_test' && dupPlan.status === 409, [newPlan.body, dupPlan.status]);
+const abcCat = (await call('/api/v1/billing/catalog', { token: abc, tenant: 'abc' })).body;
+const proLic = abcCat.licences.find((l) => l.code === 'pro_test');
+check('a new plan can go on sale on the Billing page with its annual discount', proLic?.monthlyPaise === 129_900 && proLic.annualPaise === Math.round(129_900 * 12 * 0.85), proLic);
+const plansList = (await call('/platform/v1/plans', { token: owner, tenant: null })).body;
+check('plans list shows modules and how many organizations use each', plansList.find((x) => x.code === 'pro_test')?.features.length === 3 && typeof plansList.find((x) => x.code === 'growth')?.organizations === 'number', plansList.map((x) => [x.code, x.organizations]));
+const noModules = await call('/platform/v1/plans/pro_test', { token: owner, tenant: null, method: 'PATCH', body: { features: [] } });
+check('a plan needs at least one module', noModules.status === 400, noModules.status);
+const tooSmall = await call('/platform/v1/plans/growth', { token: owner, tenant: null, method: 'PATCH', body: { maxWorkspaces: 1 } });
+check('a workspace limit cannot go below what an organization already uses', tooSmall.status === 409 && tooSmall.body.code === 'PLAN_LIMIT_IN_USE', tooSmall.body);
+const priced = await call('/platform/v1/plans/pro_test', { token: owner, tenant: null, method: 'PATCH', body: { pricePerUserPaise: 139_900, name: 'Pro' } });
+check('plan price and name can be changed', priced.status === 200 && priced.body.pricePerUserPaise === 139_900 && priced.body.name === 'Pro', priced.body);
+const prods = (await call('/platform/v1/products', { token: owner, tenant: null })).body;
+const coreProd = prods.find((x) => x.code === 'core_crm');
+const paidBefore = (await call('/api/v1/billing/orders?status=paid', { token: abc, tenant: 'abc' })).body;
+const newPrice = await call(`/platform/v1/products/${coreProd.id}`, { token: owner, tenant: null, method: 'PATCH', body: { priceMonthlyPaise: 89_900, annualDiscountPct: 10 } });
+const abcCat2 = (await call('/api/v1/billing/catalog', { token: abc, tenant: 'abc' })).body;
+const paidAfter = (await call('/api/v1/billing/orders?status=paid', { token: abc, tenant: 'abc' })).body;
+check('changing a product price shows on the Billing page at once', newPrice.status === 200 && abcCat2.licences.find((l) => l.code === 'core_crm').monthlyPaise === 89_900 && abcCat2.licences.find((l) => l.code === 'core_crm').annualDiscountPct === 10, abcCat2.licences);
+check('orders already placed keep their old price', JSON.stringify(paidBefore.map((o) => o.totalPaise)) === JSON.stringify(paidAfter.map((o) => o.totalPaise)), [paidBefore.length, paidAfter.length]);
+const svc = await call('/platform/v1/products', { token: owner, tenant: null, method: 'POST', body: { code: 'training_day', name: 'On-site training day', kind: 'service', priceOncePaise: 1_500_000 } });
+const svcNoPrice = await call('/platform/v1/products', { token: owner, tenant: null, method: 'POST', body: { code: 'free_lunch', name: 'Free lunch', kind: 'service' } });
+const licNoPlan = await call('/platform/v1/products', { token: owner, tenant: null, method: 'POST', body: { code: 'ghost', name: 'Ghost licence', kind: 'licence', planCode: 'nope', priceMonthlyPaise: 100 } });
+check('services and licences are checked (price, real plan)', svc.status === 201 && svcNoPrice.status === 400 && licNoPlan.status === 400 && licNoPlan.body.code === 'PLAN_REQUIRED', [svc.status, svcNoPrice.body, licNoPlan.body]);
+await call(`/platform/v1/products/${svc.body.id}`, { token: owner, tenant: null, method: 'PATCH', body: { isActive: false } });
+const abcCat3 = (await call('/api/v1/billing/catalog', { token: abc, tenant: 'abc' })).body;
+check('hidden products disappear from the Billing page', !abcCat3.services.some((x) => x.code === 'training_day'), abcCat3.services.map((x) => x.code));
+const onboard = await call('/platform/v1/tenants', { token: owner, tenant: null, method: 'POST', body: {
+  name: 'Zen Studio', planCode: 'pro_test', adminName: 'Zen Admin', adminEmail: 'admin@zen.local', adminPassword: 'Zen@2026local',
+  workspaces: [{ name: 'Logo Designing', template: 'design_services' }, 'Yoga Retreats'] } });
+check('onboarding takes ready business lines and custom ones, on a new plan', onboard.status === 201 && onboard.body.workspaces.length === 2, onboard.body);
+const dupLines = await call('/platform/v1/tenants', { token: owner, tenant: null, method: 'POST', body: {
+  name: 'Dup Co', planCode: 'growth', adminName: 'Dup Admin', adminEmail: 'admin@dup.local', adminPassword: 'Dup@2026local', workspaces: ['Sales', 'sales'] } });
+const badPlan = await call('/platform/v1/tenants', { token: owner, tenant: null, method: 'POST', body: {
+  name: 'Nope Co', planCode: 'gold_ultra', adminName: 'Nope Admin', adminEmail: 'admin@nope.local', adminPassword: 'Nope@2026local', workspaces: ['Sales'] } });
+check('onboarding refuses duplicate business lines and unknown plans', dupLines.status === 409 && badPlan.status === 404, [dupLines.body, badPlan.body]);
+
 // ── Isolation ──
 const abcActions = await call('/api/v1/custom-actions?archived=true', { token: abc, tenant: 'abc' });
 check('custom actions never leak across organizations', abcActions.status === 200 && !abcActions.body.some((x) => x.id === action.id), abcActions.body.length);

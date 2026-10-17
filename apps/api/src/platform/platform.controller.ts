@@ -1,5 +1,5 @@
 import {
-  Body, CanActivate, ConflictException, Controller, ExecutionContext, Get, HttpCode, HttpException, Injectable,
+  BadRequestException, Body, CanActivate, ConflictException, Controller, ExecutionContext, Get, HttpCode, HttpException, Injectable,
   NotFoundException, Param, Patch, Post, Req, Res, UnauthorizedException, UseGuards,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
@@ -7,6 +7,8 @@ import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import { z } from 'zod';
 import { appendAudit, provisionTenant, slugify } from '@ubos/database';
+import type { Tx } from '@ubos/database';
+import { FEATURES, FeatureKey } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { ctx } from '../common/context';
 import { parse } from '../common/errors';
@@ -45,11 +47,42 @@ const CreateTenant = z.object({
   name: z.string().trim().min(2).max(100),
   slug: z.string().trim().regex(/^[a-z0-9-]{3,40}$/, 'Use 3–40 lowercase letters, numbers or dashes').optional(),
   industry: z.string().max(40).optional(),
-  planCode: z.enum(['starter', 'growth', 'business', 'enterprise']),
+  planCode: z.string().trim().regex(/^[a-z0-9_]{2,40}$/),
   adminName: z.string().trim().min(2).max(80),
   adminEmail: z.string().email(),
   adminPassword: z.string().min(10, 'At least 10 characters'),
-  workspaces: z.array(z.string().trim().min(2).max(60)).min(1).max(20),
+  // A ready business line ({ name, template }) or a custom name.
+  workspaces: z.array(z.union([z.string().trim().min(2).max(60), z.object({ name: z.string().trim().min(2).max(60), template: z.string().max(40).optional() })])).min(1).max(20),
+});
+const Features = z.array(z.enum(Object.keys(FEATURES) as [FeatureKey, ...FeatureKey[]])).max(30);
+const PlanBody = z.object({
+  name: z.string().trim().min(2).max(60),
+  pricePerUserPaise: z.number().int().min(0).max(100_000_00),
+  maxWorkspaces: z.number().int().min(1).max(1000).nullable(),
+  storageGbPerUser: z.number().int().min(0).max(1000),
+  aiCreditsPerUser: z.number().int().min(0).max(100_000),
+  isPublic: z.boolean(),
+  features: Features.min(1, 'Pick at least one module'),
+});
+const NewPlan = PlanBody.extend({
+  code: z.string().trim().regex(/^[a-z0-9_]{2,40}$/, 'Code: 2–40 lowercase letters, numbers or _'),
+  // Also put it on sale on the organizations' Billing page as a licence at the same price.
+  sellAsLicence: z.boolean().default(true),
+  annualDiscountPct: z.number().int().min(0).max(90).default(0),
+});
+const ProductBody = z.object({
+  name: z.string().trim().min(2).max(80),
+  description: z.string().trim().max(200).nullable().optional(),
+  priceMonthlyPaise: z.number().int().min(0).max(100_000_00).nullable().optional(),
+  priceOncePaise: z.number().int().min(0).max(10_000_000_00).nullable().optional(),
+  annualDiscountPct: z.number().int().min(0).max(90).optional(),
+  isActive: z.boolean().optional(),
+  position: z.number().int().min(0).max(1000).optional(),
+}).partial();
+const NewProduct = ProductBody.required({ name: true }).extend({
+  code: z.string().trim().regex(/^[a-z0-9_]{2,40}$/, 'Code: 2–40 lowercase letters, numbers or _'),
+  kind: z.enum(['licence', 'service']),
+  planCode: z.string().max(40).nullable().optional(),
 });
 const SetStatus = z.object({ status: z.enum(['active', 'suspended']) });
 
@@ -124,8 +157,13 @@ export class PlatformController {
 
   @UseGuards(PlatformGuard)
   @Get('plans')
-  plans() {
-    return this.db.platform.plan.findMany({ include: { features: true }, orderBy: { pricePerUserPaise: 'asc' } });
+  async plans() {
+    const [plans, subs] = await Promise.all([
+      this.db.platform.plan.findMany({ include: { features: true }, orderBy: { pricePerUserPaise: 'asc' } }),
+      this.db.platform.subscription.groupBy({ by: ['planId'], _count: true, where: { status: { in: ['active', 'trialing'] } } }),
+    ]);
+    const count = new Map(subs.map((x) => [x.planId, x._count]));
+    return plans.map((p) => ({ ...p, organizations: count.get(p.id) ?? 0 }));
   }
 
   /** All customer organizations with plan, status and size. Counts only — no tenant business data. */
@@ -157,6 +195,11 @@ export class PlatformController {
   async createTenant(@Body() body: unknown) {
     const input = parse(CreateTenant, body);
     const slug = input.slug ?? slugify(input.name);
+    if (!(await this.db.platform.plan.findUnique({ where: { code: input.planCode } }))) {
+      throw new NotFoundException({ code: 'PLAN_NOT_FOUND', message: 'Unknown plan' });
+    }
+    const names = input.workspaces.map((w) => (typeof w === 'string' ? w : w.name).toLowerCase());
+    if (new Set(names).size !== names.length) throw new ConflictException({ code: 'DUPLICATE_WORKSPACE', message: 'Each business line can be added once' });
     if (await this.db.platform.tenant.findUnique({ where: { slug } })) {
       throw new ConflictException({ code: 'SLUG_TAKEN', message: `Organization code "${slug}" is already in use` });
     }
@@ -165,7 +208,7 @@ export class PlatformController {
         provisionTenant(tx, {
           name: input.name, slug, industry: input.industry, planCode: input.planCode,
           admin: { name: input.adminName, email: input.adminEmail, password: input.adminPassword },
-          workspaces: input.workspaces.map((name) => ({ name })),
+          workspaces: input.workspaces.map((w) => (typeof w === 'string' ? { name: w } : w)),
           actor: { type: 'platform_user', id: ctx().platformUserId },
         }),
       );
@@ -208,6 +251,122 @@ export class PlatformController {
   @Get('products')
   products() {
     return this.db.platform.platformProduct.findMany({ orderBy: { position: 'asc' } });
+  }
+
+  // ── Plans (packages) & products. Prices are edited here; a change applies to new orders, trials and renewals.
+  // Orders already placed keep the price they were placed at (each order stores its own line prices).
+
+  @UseGuards(PlatformGuard)
+  @Post('plans')
+  createPlan(@Body() body: unknown) {
+    const input = parse(NewPlan, body);
+    return this.db.platform.$transaction(async (tx) => {
+      if (await tx.plan.findUnique({ where: { code: input.code } })) throw new ConflictException({ code: 'CODE_TAKEN', message: `Plan code "${input.code}" is already in use` });
+      if (input.sellAsLicence && (await tx.platformProduct.findUnique({ where: { code: input.code } }))) {
+        throw new ConflictException({ code: 'CODE_TAKEN', message: `A product with code "${input.code}" already exists` });
+      }
+      const plan = await tx.plan.create({
+        data: {
+          code: input.code, name: input.name, pricePerUserPaise: input.pricePerUserPaise, maxWorkspaces: input.maxWorkspaces,
+          storageGbPerUser: input.storageGbPerUser, aiCreditsPerUser: input.aiCreditsPerUser, isPublic: input.isPublic,
+          billingPeriods: ['quarterly', 'annual'], features: { create: [...new Set(input.features)].map((featureKey) => ({ featureKey })) },
+        },
+      });
+      if (input.sellAsLicence) {
+        const last = await tx.platformProduct.findFirst({ orderBy: { position: 'desc' } });
+        await tx.platformProduct.create({
+          data: { code: input.code, name: input.name, kind: 'licence', planCode: input.code, priceMonthlyPaise: input.pricePerUserPaise, annualDiscountPct: input.annualDiscountPct, position: (last?.position ?? 0) + 1 },
+        });
+      }
+      await this.platformAudit(tx, 'plan', plan.id, 'platform.plan_created', null, { code: plan.code, name: plan.name, pricePerUserPaise: plan.pricePerUserPaise, features: input.features });
+      return plan;
+    });
+  }
+
+  @UseGuards(PlatformGuard)
+  @Patch('plans/:code')
+  updatePlan(@Param('code') code: string, @Body() body: unknown) {
+    const input = parse(PlanBody.partial(), body);
+    return this.db.platform.$transaction(async (tx) => {
+      const old = await tx.plan.findUnique({ where: { code }, include: { features: true } });
+      if (!old) throw new NotFoundException({ code: 'PLAN_NOT_FOUND', message: 'Plan not found' });
+      const { features, ...data } = input;
+      if (data.maxWorkspaces !== undefined && data.maxWorkspaces !== null) {
+        const subs = await tx.subscription.findMany({ where: { planId: old.id, status: { in: ['active', 'trialing'] } }, select: { tenantId: true } });
+        for (const sub of subs) {
+          const n = await tx.workspace.count({ where: { tenantId: sub.tenantId, isArchived: false } });
+          if (n > data.maxWorkspaces) throw new ConflictException({ code: 'PLAN_LIMIT_IN_USE', message: `An organization on this plan already uses ${n} workspaces — the limit cannot go below that` });
+        }
+      }
+      const plan = await tx.plan.update({ where: { code }, data });
+      if (features) {
+        await tx.planFeature.deleteMany({ where: { planId: old.id } });
+        await tx.planFeature.createMany({ data: [...new Set(features)].map((featureKey) => ({ planId: old.id, featureKey })) });
+      }
+      await this.platformAudit(tx, 'plan', old.id, 'platform.plan_updated',
+        { name: old.name, pricePerUserPaise: old.pricePerUserPaise, maxWorkspaces: old.maxWorkspaces, isPublic: old.isPublic, features: old.features.map((f) => f.featureKey) },
+        input);
+      return plan;
+    });
+  }
+
+  @UseGuards(PlatformGuard)
+  @Post('products')
+  createProduct(@Body() body: unknown) {
+    const input = parse(NewProduct, body);
+    return this.db.platform.$transaction(async (tx) => {
+      if (await tx.platformProduct.findUnique({ where: { code: input.code } })) throw new ConflictException({ code: 'CODE_TAKEN', message: `Product code "${input.code}" is already in use` });
+      await this.checkProduct(tx, input.kind, input.planCode ?? null, input.priceMonthlyPaise ?? null, input.priceOncePaise ?? null);
+      const last = await tx.platformProduct.findFirst({ orderBy: { position: 'desc' } });
+      const product = await tx.platformProduct.create({
+        data: {
+          code: input.code, name: input.name, description: input.description ?? null, kind: input.kind,
+          planCode: input.kind === 'licence' ? input.planCode! : null,
+          priceMonthlyPaise: input.kind === 'licence' ? input.priceMonthlyPaise! : null,
+          priceOncePaise: input.kind === 'service' ? input.priceOncePaise! : null,
+          annualDiscountPct: input.kind === 'licence' ? input.annualDiscountPct ?? 0 : 0,
+          isActive: input.isActive ?? true, position: input.position ?? (last?.position ?? 0) + 1,
+        },
+      });
+      await this.platformAudit(tx, 'product', product.id, 'platform.product_created', null, product);
+      return product;
+    });
+  }
+
+  @UseGuards(PlatformGuard)
+  @Patch('products/:id')
+  updateProduct(@Param('id') id: string, @Body() body: unknown) {
+    const input = parse(ProductBody, body);
+    return this.db.platform.$transaction(async (tx) => {
+      const old = await tx.platformProduct.findUnique({ where: { id } });
+      if (!old) throw new NotFoundException({ code: 'PRODUCT_NOT_FOUND', message: 'Product not found' });
+      const monthly = input.priceMonthlyPaise !== undefined ? input.priceMonthlyPaise : old.priceMonthlyPaise;
+      const once = input.priceOncePaise !== undefined ? input.priceOncePaise : old.priceOncePaise;
+      await this.checkProduct(tx, old.kind, old.planCode, monthly, once);
+      const product = await tx.platformProduct.update({
+        where: { id },
+        data: { ...input, ...(old.kind === 'licence' ? { priceOncePaise: null } : { priceMonthlyPaise: null, annualDiscountPct: 0 }) },
+      });
+      await this.platformAudit(tx, 'product', id, 'platform.product_updated',
+        { name: old.name, priceMonthlyPaise: old.priceMonthlyPaise, priceOncePaise: old.priceOncePaise, annualDiscountPct: old.annualDiscountPct, isActive: old.isActive }, input);
+      return product;
+    });
+  }
+
+  private async checkProduct(tx: Tx, kind: string, planCode: string | null, monthly: number | null, once: number | null) {
+    if (kind === 'licence') {
+      if (!planCode || !(await tx.plan.findUnique({ where: { code: planCode } }))) throw new BadRequestException({ code: 'PLAN_REQUIRED', message: 'A licence must activate an existing plan' });
+      if (monthly === null) throw new BadRequestException({ code: 'PRICE_REQUIRED', message: 'Enter the price per user per month' });
+    } else if (once === null) {
+      throw new BadRequestException({ code: 'PRICE_REQUIRED', message: 'Enter the one-time price' });
+    }
+  }
+
+  private platformAudit(tx: Tx, entity: string, entityId: string, action: string, oldValue: unknown, newValue: unknown) {
+    return appendAudit(tx, {
+      tenantId: null, actorType: 'platform_user', actorId: ctx().platformUserId, ip: ctx().ip,
+      entity, entityId, action, oldValue: oldValue as never, newValue: newValue as never,
+    });
   }
 
   /**
