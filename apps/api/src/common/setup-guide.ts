@@ -108,9 +108,11 @@ export const GUIDES: GuideDef[] = [
     id: 'integrations', title: 'Integrations & Lead Sources', icon: '🔌', hint: 'Plug in the tools that send you leads or take payments.',
     cards: [
       { id: 'sources', title: 'Lead sources', hint: 'Wire up the channels that bring in your leads.', tone: '#d5efe9', steps: [
-        { id: 'src_facebook', title: 'Connect Facebook Lead Ads', level: 'basic', phase: '1.7' },
-        { id: 'src_sheets', title: 'Connect Google Sheets', level: 'basic', phase: '1.7' },
-        { id: 'src_portals', title: 'Connect lead portals (IndiaMART, JustDial)', level: 'basic', phase: '1.7' },
+        { id: 'src_forms', title: 'Put a web form on your website (or share its link)', level: 'basic', href: '/app/forms', done: async (c) => (await c.db.leadForm.count({ where: { tenantId: c.tenantId } })) > 0 },
+        { id: 'src_sheets', title: 'Connect Google Sheets', level: 'basic', href: '/app/integrations', done: async (c) => (await c.db.integrationConnection.count({ where: { tenantId: c.tenantId, key: { in: ['google_sheets'] }, status: 'active' } })) > 0 },
+        { id: 'src_portals', title: 'Connect lead portals (IndiaMART, JustDial)', level: 'basic', href: '/app/integrations', done: async (c) => (await c.db.integrationConnection.count({ where: { tenantId: c.tenantId, key: { in: ['indiamart','justdial'] }, status: 'active' } })) > 0 },
+        { id: 'src_website', title: 'Send website / app leads by webhook or Zapier, Make, n8n', level: 'advanced', href: '/app/integrations', done: async (c) => (await c.db.integrationConnection.count({ where: { tenantId: c.tenantId, key: { in: ['website_api','zapier','make','n8n','pabbly','wordpress'] }, status: 'active' } })) > 0 },
+        { id: 'src_facebook', title: 'Connect Facebook Lead Ads (native)', level: 'basic', phase: '2' },
       ] },
       { id: 'ecommerce', title: 'E-commerce', hint: 'Sync orders and abandoned carts as leads.', tone: '#e3d9f7', steps: [
         { id: 'shopify', title: 'Connect Shopify', level: 'basic', phase: '3' },
@@ -131,7 +133,7 @@ export const GUIDES: GuideDef[] = [
         { id: 'sequence', title: 'Build a sequence', level: 'advanced', phase: '2' },
       ] },
       { id: 'webhooks', title: 'Webhooks', hint: 'Send UBOS events to any system.', tone: '#d6e6fb', steps: [
-        { id: 'webhook_setup', title: 'Configure webhooks', level: 'advanced', phase: '1.7' },
+        { id: 'webhook_setup', title: 'Configure webhooks', level: 'advanced', href: '/app/developer', done: async (c) => (await c.db.webhookSubscription.count({ where: { tenantId: c.tenantId } })) > 0 },
       ] },
     ],
   },
@@ -170,7 +172,7 @@ export const GUIDES: GuideDef[] = [
     id: 'developer', title: 'Developer & Advanced', icon: '🛠️', hint: 'Build on top of UBOS.',
     cards: [
       { id: 'api', title: 'API access', hint: 'Programmatic access to your data.', tone: '#d5efe9', steps: [
-        { id: 'api_keys', title: 'Generate API keys', level: 'advanced', phase: '1.7' },
+        { id: 'api_keys', title: 'Generate API keys', level: 'advanced', href: '/app/developer', done: async (c) => (await c.db.apiKey.count({ where: { tenantId: c.tenantId } })) > 0 },
       ] },
       { id: 'embed', title: 'Customise the app', hint: 'Embed your own tools inside UBOS.', tone: '#d6e6fb', steps: [
         { id: 'embedded_apps', title: 'Add embedded apps & iframes', level: 'advanced', phase: '5' },

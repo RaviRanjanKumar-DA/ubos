@@ -10,6 +10,7 @@ import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { findCustomer, nextCustomerCode } from '../common/customers';
+import { emitEvent } from '../common/events';
 import { activity, applyStageChange, assignmentAvailability, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
 import { contact, customFields as visibleFields, fieldAccess, lockedFields } from '../common/field-access';
 
@@ -183,6 +184,7 @@ export class LeadsController {
         entity: 'lead', entityId: lead.id, action: 'lead.created',
         newValue: { name: input.name, source: input.source, customerCode: customer.code, existingCustomer: isExistingCustomer },
       });
+      await emitEvent(tx, tenantId(), a.workspaceId!, 'lead.created', { leadId: lead.id, customerId: customer.id, customerCode: customer.code, name: customer.name, mobile: customer.mobile, email: customer.email, source: input.source, via: 'manual', ownerId, stageId: lead.stageId, customFields });
       return { id: lead.id, customerId: customer.id, customerCode: customer.code, existingCustomer: isExistingCustomer, matchedBy: match?.matchedBy ?? null, ownerId };
     });
   }

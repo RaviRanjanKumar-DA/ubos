@@ -288,7 +288,8 @@ const rmMap = await call('/api/v1/integrations/indiamart/mapping', { token: rm, 
 const okMap = await call('/api/v1/integrations/indiamart/mapping', { token: admin, method: 'PUT', body: { sourceFields: srcs, map: base, duplicateMode: 'add_remark', defaultSource: 'indiamart' } });
 check('admins save the mapping (RMs cannot)', rmMap.status === 403 && okMap.status === 200, [rmMap.status, okMap.body]);
 const keysKept = (await call('/api/v1/integrations/indiamart/setup', { token: admin })).body;
-check('saving the mapping keeps the keys and vice versa', keysKept.values.apiKey === '••••3456' && keysKept.mapping.saved, keysKept.values);
+// (IndiaMART now pushes to the webhook URL, so its only setting is the business line.)
+check('saving the mapping keeps the settings and vice versa', keysKept.values.businessLine === VASTU && keysKept.mapping.saved && !!keysKept.webhookUrl, keysKept.values);
 const pNew = (await call('/api/v1/integrations/indiamart/mapping/preview', { token: admin, method: 'POST', body: { sample: { SENDER_NAME: 'Kunal Shah', SENDER_MOBILE: '9811122233', SENDER_CITY: 'Surat', QUERY_PRODUCT_NAME: 'Office', QUERY_MESSAGE: 'Need vastu for new office' } } })).body;
 check('preview: a new person becomes a new customer and lead with mapped fields', pNew.outcome === 'new_lead_new_customer' && pNew.lead.mobile === '+919811122233' && pNew.lead.customFields.property_type === 'Office' && pNew.lead.remark === 'Need vastu for new office' && pNew.lead.source === 'indiamart', pNew);
 const pDup = (await call('/api/v1/integrations/indiamart/mapping/preview', { token: admin, method: 'POST', body: { sample: { SENDER_NAME: 'Meera J', SENDER_MOBILE: '9876500020', QUERY_PRODUCT_NAME: 'Home' } } })).body;

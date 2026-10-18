@@ -9,6 +9,8 @@ import { parse } from '../common/errors';
 import { DbService } from '../common/db.service';
 import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
+import { IntakeService } from './integration-runtime';
+import { registerIntegrationNames } from './public.controller';
 
 type Category =
   | 'Lead sources' | 'Forms & surveys' | 'Calling' | 'Messaging' | 'Website & e-commerce' | 'Payments' | 'Accounting'
@@ -127,6 +129,10 @@ const CATALOGUE: Record<string, Entry> = {
   kylas: { name: 'Kylas', description: 'Import leads, deals and call history', category: 'Other CRMs', phase: 'Phase 5' },
 };
 export const INTEGRATION_KEYS = Object.keys(CATALOGUE);
+/** Lead sources whose live connection works now (webhook receiver or Google Sheets sync). */
+export const LIVE_NOW = new Set(['website_api', 'google_sheets', 'indiamart', 'justdial', 'google_forms', 'google_ads', 'wordpress', 'shopify', 'woocommerce', 'calendly', 'zapier', 'make', 'n8n', 'pabbly']);
+for (const k of LIVE_NOW) CATALOGUE[k].phase = 'Live';
+registerIntegrationNames(Object.fromEntries(Object.entries(CATALOGUE).map(([k, e]) => [k, e.name])));
 export const INTEGRATION_CATEGORIES: Category[] = [
   'Lead sources', 'Forms & surveys', 'Calling', 'Messaging', 'Website & e-commerce', 'Payments', 'Accounting',
   'Marketing & analytics', 'AI & automation', 'Productivity', 'Support desks', 'Other CRMs',
@@ -135,7 +141,7 @@ export const INTEGRATION_CATEGORIES: Category[] = [
 @Controller('api/v1/integrations')
 @RequireFeature('module.integrations')
 export class IntegrationsController {
-  constructor(private db: DbService) {}
+  constructor(private db: DbService, private intake: IntakeService) {}
 
   /** Full catalogue merged with this organization's switches (missing row = inactive). */
   @Get()
@@ -322,6 +328,45 @@ export class IntegrationsController {
   private config(blob: string | null | undefined): { values: Record<string, string>; webhookToken?: string; mapping?: { sourceFields: string[]; map: Record<string, string>; duplicateMode: string; defaultSource: string } } {
     if (!blob) return { values: {} };
     try { return JSON.parse(decrypt(blob)); } catch { return { values: {} }; }
+  }
+
+  /** Recent incoming records for this integration (webhook / sheet rows) with their outcome. */
+  @Get(':key/events')
+  @RequirePermission('integrations.view')
+  events(@Param('key') key: string) {
+    if (!CATALOGUE[key]) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Unknown integration' });
+    return this.db.tenant(async (tx) => {
+      const rows = await tx.webhookInbox.findMany({ where: { integrationKey: key }, orderBy: { receivedAt: 'desc' }, take: 50 });
+      const counts = await tx.webhookInbox.groupBy({ by: ['status'], where: { integrationKey: key, receivedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, _count: true });
+      return { last7Days: Object.fromEntries(counts.map((c) => [c.status, c._count])), items: rows.map((r) => ({ id: r.id, receivedAt: r.receivedAt, status: r.status, outcome: r.outcome, leadId: r.leadId, error: r.error, externalId: r.externalId, attempts: r.attempts, body: r.body.slice(0, 2000) })) };
+    });
+  }
+
+  /** Runs a stored record again (after fixing the mapping or the business line). */
+  @Post(':key/events/:id/replay')
+  @RequirePermission('integrations.manage', 'ORGANIZATION')
+  async replay(@Param('key') key: string, @Param('id') id: string) {
+    const { row, cfg } = await this.db.tenant(async (tx) => {
+      const row = await tx.webhookInbox.findFirst({ where: { id, integrationKey: key } });
+      if (!row) throw new NotFoundException({ code: 'EVENT_NOT_FOUND', message: 'Event not found' });
+      if (row.status === 'processed' || row.status === 'duplicate') throw new BadRequestException({ code: 'ALREADY_PROCESSED', message: 'This record already became a lead' });
+      const conn = await tx.integrationConnection.findFirst({ where: { key, workspaceId: null } });
+      return { row, cfg: this.config(conn?.configEncrypted) };
+    });
+    let record: Record<string, unknown>;
+    try { record = JSON.parse(row.body); } catch { throw new BadRequestException({ code: 'UNREADABLE', message: 'The stored record cannot be read' }); }
+    const out = await this.intake.viaMapping(tenantId(), key, CATALOGUE[key]?.name ?? key, cfg, record, row.externalId, undefined, row.id);
+    await this.db.tenant((tx) => this.db.audit(tx, { entity: 'integration', entityId: key, action: 'integration.event_replayed', newValue: { eventId: id, outcome: out.outcome } }));
+    return out;
+  }
+
+  /** Google Sheets: read the sheet now instead of waiting for the next automatic check. */
+  @Post('google_sheets/sync')
+  @RequirePermission('integrations.manage', 'ORGANIZATION')
+  async syncSheet() {
+    const r = await this.intake.syncSheet(tenantId());
+    await this.db.tenant((tx) => this.db.audit(tx, { entity: 'integration', entityId: 'google_sheets', action: 'integration.sheet_synced', newValue: r }));
+    return r;
   }
 
   @Post(':key/activate')

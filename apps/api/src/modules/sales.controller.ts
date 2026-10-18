@@ -9,6 +9,7 @@ import { scopeFilter } from '../common/scope';
 import { activity, applyStageChange } from '../common/lead-ops';
 import { notify } from '../common/notify';
 import { Mailer } from '../auth/mailer';
+import { emitEvent } from '../common/events';
 
 const Paise = z.number().int().min(0).max(10_000_000_000);
 const ProductBody = z.object({
@@ -311,6 +312,7 @@ export class SalesController {
         }
       }
       await this.db.audit(tx, { workspaceId: q.workspaceId, entity: 'quote', entityId: id, action: 'quote.accepted', newValue: { markWon: won } });
+      await emitEvent(tx, tenantId(), q.workspaceId, 'quote.accepted', { quoteId: id, number: q.number, leadId: q.leadId, customerId: q.customerId, totalPaise: q.totalPaise });
       const runs = await tx.processRun.findMany({ where: { leadId: q.leadId, status: 'active' }, select: { id: true } });
       return { status: 'accepted', won, processRunIds: runs.map((r) => r.id) };
     });

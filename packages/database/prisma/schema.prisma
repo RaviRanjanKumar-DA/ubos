@@ -888,15 +888,106 @@ model IntegrationConnection {
   @@index([tenantId, key])
 }
 
+// Every incoming webhook / form / API / sheet record, kept so it can be inspected and replayed.
 model WebhookInbox {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   tenantId       String?
-  integrationKey String
+  integrationKey String    // website_api, indiamart, form:<slug>, api, google_sheets …
   headers        Json
   body           String
-  status         String   @default("received") // received | processed | failed
-  attempts       Int      @default(0)
-  receivedAt     DateTime @default(now())
+  status         String    @default("received") // received | processed | failed | duplicate | skipped
+  attempts       Int       @default(0)
+  receivedAt     DateTime  @default(now())
+  externalId     String?   // sender's id (portal enquiry id, sheet row hash, Idempotency-Key) — the same one is never processed twice
+  outcome        String?   // created | linked | add_remark | update_blank | overwrite | skip | rejected
+  leadId         String?
+  error          String?
+  processedAt    DateTime?
+
+  @@index([tenantId, integrationKey, receivedAt])
+  @@index([tenantId, integrationKey, externalId])
+}
+
+// Organization API keys for the public API. Only a hash of the key is stored; it is shown once.
+model ApiKey {
+  id          String    @id @default(uuid())
+  tenantId    String
+  name        String
+  prefix      String    // first characters, shown in lists
+  keyHash     String    @unique
+  scopes      String[]  // leads:read, leads:write, customers:read, meta:read
+  workspaceId String?   // limited to one business line (null = all)
+  createdById String
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+// Outgoing webhooks: UBOS calls another system when something happens (signed with HMAC).
+model WebhookSubscription {
+  id              String    @id @default(uuid())
+  tenantId        String
+  name            String
+  url             String
+  events          String[]
+  workspaceId     String?
+  secretEncrypted String
+  isActive        Boolean   @default(true)
+  createdById     String
+  failureCount    Int       @default(0) // consecutive failures; paused after too many
+  lastDeliveryAt  DateTime?
+  lastStatus      Int?
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model WebhookDelivery {
+  id             String    @id @default(uuid())
+  tenantId       String
+  subscriptionId String
+  event          String
+  payload        Json
+  status         String    @default("pending") // pending | delivered | failed
+  attempts       Int       @default(0)
+  nextAttemptAt  DateTime  @default(now())
+  responseStatus Int?
+  responseBody   String?
+  error          String?
+  createdAt      DateTime  @default(now())
+  deliveredAt    DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([tenantId, subscriptionId, createdAt])
+}
+
+// Web-to-lead form of a business line: hosted page + embed code.
+model LeadForm {
+  id            String   @id @default(uuid())
+  tenantId      String
+  workspaceId   String
+  name          String
+  slug          String
+  title         String
+  description   String?
+  fields        Json     // [{ target: name | mobile | email | city | remark | cf:<key>, label, required, placeholder }]
+  submitLabel   String   @default("Submit")
+  thankYou      String   @default("Thank you! We will contact you soon.")
+  redirectUrl   String?
+  source        String   @default("website")
+  duplicateMode String   @default("add_remark")
+  color         String   @default("#5b3cc4")
+  isActive      Boolean  @default(true)
+  isArchived    Boolean  @default(false)
+  submissions   Int      @default(0)
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+
+  @@unique([tenantId, slug])
 }
 
 // ═════════════════════════ HRMS & Assets (organization level) ═════════════════════════

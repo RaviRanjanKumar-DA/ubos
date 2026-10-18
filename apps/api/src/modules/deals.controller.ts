@@ -11,6 +11,7 @@ import { activity, assignmentAvailability, defaultStatus, eligibleOwners, makeAs
 import { findCustomer, nextCustomerCode } from '../common/customers';
 import { notify } from '../common/notify';
 import { startProcessesOnWin } from '../common/process-engine';
+import { emitEvent } from '../common/events';
 
 const Paise = z.number().int().min(1).max(10_000_000_000);
 const Mode = z.enum(['cash', 'upi', 'card', 'bank', 'cheque', 'online']);
@@ -66,6 +67,7 @@ export class DealsController {
       });
       await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'payment', remark: `${rupees(p.amountPaise)} received (${p.kind}, ${p.mode})`, data: { paymentId: p.id, runId } }) });
       await this.db.audit(tx, { workspaceId: lead.workspaceId, entity: 'payment', entityId: p.id, action: 'payment.recorded', newValue: { leadId, amountPaise: p.amountPaise, kind: p.kind, mode: p.mode, reference: p.reference } });
+      await emitEvent(tx, tenantId(), lead.workspaceId, 'payment.received', { paymentId: p.id, leadId, customerId: p.customerId, runId, amountPaise: p.amountPaise, kind: p.kind, mode: p.mode, reference: p.reference });
       return p;
     });
   }
@@ -148,6 +150,7 @@ export class DealsController {
         await tx.leadActivity.create({ data: activity(lead, a.userId, { type: 'payment', remark: `${rupees(p.amountPaise)} received as an instalment${rule ? ` (rule: ${rule.name})` : ''}`, data: { paymentId: p.id, runId: running.id } }) });
         if (lead.ownerId) await notify(tx, [lead.ownerId], { type: 'payment', title: `Payment received: ${rupees(p.amountPaise)} from ${match.customer.name}`, link: `/app/leads/${lead.id}?tab=process` });
         await this.db.audit(tx, { workspaceId: ws, entity: 'payment', entityId: p.id, action: 'payment.recorded', newValue: { action, rule: rule?.name ?? null, amountPaise: p.amountPaise } });
+        await emitEvent(tx, tenantId(), ws, 'payment.received', { paymentId: p.id, leadId: lead.id, customerId: match.customer.id, runId: running.id, amountPaise: p.amountPaise, kind: 'instalment', mode: p.mode, reference: p.reference });
         return { action, rule: rule?.name ?? null, paymentId: p.id, leadId: lead.id, runId: running.id, fallback };
       }
 
@@ -176,6 +179,7 @@ export class DealsController {
       await tx.leadActivity.create({ data: activity(lead, a.userId, { type: 'payment', remark: `New sale from a payment of ${rupees(p.amountPaise)}${rule ? ` (rule: ${rule.name})` : ''}`, data: { paymentId: p.id } }) });
       const runs = await startProcessesOnWin(tx, lead.id, a.userId);
       if (ownerId) await notify(tx, [ownerId], { type: 'payment', title: `New sale: ${rupees(p.amountPaise)} from ${customer.name}`, link: `/app/leads/${lead.id}?tab=process` });
+      await emitEvent(tx, tenantId(), ws, 'payment.received', { paymentId: p.id, leadId: lead.id, customerId: customer.id, runId: runs[0]?.id ?? null, amountPaise: p.amountPaise, kind: 'token', mode: p.mode, reference: p.reference });
       await this.db.audit(tx, { workspaceId: ws, entity: 'payment', entityId: p.id, action: 'payment.new_sale', newValue: { rule: rule?.name ?? null, amountPaise: p.amountPaise, leadId: lead.id } });
       return { action: 'new_sale' as const, rule: rule?.name ?? null, paymentId: p.id, leadId: lead.id, runId: runs[0]?.id ?? null, fallback };
     });

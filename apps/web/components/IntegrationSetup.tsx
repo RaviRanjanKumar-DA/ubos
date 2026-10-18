@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { IntegrationEvents } from './IntegrationEvents';
 import { api, ApiError } from '@/lib/api';
 import { IntegrationIcon } from './IntegrationIcon';
 
@@ -44,7 +45,7 @@ function Info({ text }: { text: string }) {
 export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: string; canManage: boolean; onClose: () => void; onChanged: () => void }) {
   const [s, setS] = useState<Setup | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
-  const [tab, setTab] = useState<'connect' | 'map'>('connect');
+  const [tab, setTab] = useState<'connect' | 'map' | 'activity'>('connect');
   const [guide, setGuide] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
@@ -69,7 +70,7 @@ export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: st
     try { await api(`/api/v1/integrations/${id}/deactivate`, { method: 'POST', noWorkspace: true }); await load(); onChanged(); setMsg({ type: 'notice', text: 'Deactivated. Settings are kept.' }); } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
     setBusy(false);
   }
-  const live = s ? /Phase 1\b/.test(s.phase) : false;
+  const live = s ? /^Live$|Phase 1\b/.test(s.phase) : false;
 
   return (
     <div className="drawer-bg" onClick={onClose}>
@@ -113,6 +114,7 @@ export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: st
               <div className="dash-tabs" style={{ margin: '14px 0 4px' }}>
                 <button className={`dash-tab ${tab === 'connect' ? 'on' : ''}`} onClick={() => setTab('connect')}>1. Connect</button>
                 <button className={`dash-tab ${tab === 'map' ? 'on' : ''}`} onClick={() => setTab('map')}>2. Map fields</button>
+                {live && <button className={`dash-tab ${tab === 'activity' ? 'on' : ''}`} onClick={() => setTab('activity')}>3. Activity</button>}
               </div>
             )}
 
@@ -163,6 +165,7 @@ export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: st
               </>
             )}
 
+            {tab === 'activity' && <IntegrationEvents integrationKey={id} canManage={canManage} />}
             {tab === 'map' && s.mapping && <MapFields id={id} name={s.name} mapping={s.mapping} canManage={canManage} onSaved={() => { load(); setMsg({ type: 'notice', text: 'Field mapping saved.' }); }} />}
           </>
         )}

@@ -55,6 +55,8 @@ const NAV = [
   { href: '/app/roles', label: 'Roles & Permissions', icon: 'audit', perm: 'org.user.view' },
   { href: '/app/org', label: 'Org Structure', icon: 'tenants', perm: 'org.user.view' },
   { href: '/app/integrations', label: 'Integrations', icon: 'integrations', perm: 'integrations.view' },
+  { href: '/app/forms', label: 'Web forms', icon: 'menu', perm: 'crm.lead.view' },
+  { href: '/app/developer', label: 'Developer (API)', icon: 'integrations', perm: 'integrations.developer' },
   { href: '/app/audit', label: 'Audit Log', icon: 'audit', perm: 'audit.view' },
   { href: '/app/settings/security', label: 'Security Policy', icon: 'lock', perm: 'org.security.manage' },
   { href: '/app/billing', label: 'Billing & Licences', icon: 'finance', perm: 'org.billing.manage' },

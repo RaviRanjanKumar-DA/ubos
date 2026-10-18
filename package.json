@@ -29,7 +29,8 @@
     "verify:admin": "node scripts/verify-settings-admin.mjs",
     "verify:dashboards": "node scripts/verify-dashboards.mjs",
     "verify:productivity": "node scripts/verify-productivity.mjs",
-    "verify:process": "node scripts/verify-process.mjs"
+    "verify:process": "node scripts/verify-process.mjs",
+    "verify:integrations": "node scripts/verify-integrations.mjs"
   },
   "engines": {
     "node": ">=20"

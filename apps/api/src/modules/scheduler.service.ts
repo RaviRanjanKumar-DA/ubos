@@ -5,6 +5,7 @@ import { DbService } from '../common/db.service';
 import { AuthInfo, contextStore, tenantId, TenantInfo } from '../common/context';
 import { scopeFilter } from '../common/scope';
 import { Mailer } from '../auth/mailer';
+import { dueSheetSyncs, IntakeService } from './integration-runtime';
 import { localParts, loadLookups, resolveRange, runMetric } from './analytics/engine';
 
 const WEB = () => (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(',')[0];
@@ -29,7 +30,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  constructor(private db: DbService, private mailer: Mailer) {}
+  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService) {}
 
   onModuleInit() {
     if (process.env.SCHEDULER_DISABLED === 'true') return;
@@ -39,7 +40,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
 
   /** Runs every job for every active organization (or one organization). */
   async tick(onlyTenantId?: string) {
-    if (this.running) return { skipped: true };
+    // The minute timer skips while a run is going; "Run now" (one organization) waits for it and then runs.
+    if (this.running && !onlyTenantId) return { skipped: true };
+    while (this.running) await new Promise((r) => setTimeout(r, 200));
     this.running = true;
     const totals = { reminders: 0, digests: 0, dashboards: 0 };
     try {
@@ -52,6 +55,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           totals.dashboards += await this.dashboardEmails(info);
         });
       }
+      if (!onlyTenantId) await dueSheetSyncs(this.db, this.intake).catch((e) => this.log.error(e instanceof Error ? e.message : e));
     } finally {
       this.running = false;
     }

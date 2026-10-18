@@ -1,5 +1,6 @@
 import type { Prisma, Tx } from '@ubos/database';
 import { startProcessesOnWin } from './process-engine';
+import { emitEvent } from './events';
 
 /**
  * Active users who may own leads in a workspace: a valid role there (or organization-wide) that can work leads
@@ -126,6 +127,10 @@ export async function applyStageChange(tx: Tx, lead: LeadRow, stage: StageRow, u
     await tx.followUp.create({ data: { tenantId: lead.tenantId, leadId: lead.id, dueAt: due, userId: lead.ownerId ?? userId, createdById: userId, note: `Auto follow-up after moving to ${stage.name}` } });
     await syncNextFollowUp(tx, lead.id);
   }
+  const evt = { leadId: lead.id, customerId: (lead as { customerId?: string }).customerId ?? null, from: lead.stageId, to: stage.id, stageName: stage.name, lostReason: reason, by: userId };
+  await emitEvent(tx, lead.tenantId, lead.workspaceId, 'lead.stage_changed', evt);
+  if (stage.isWon) await emitEvent(tx, lead.tenantId, lead.workspaceId, 'lead.won', evt);
+  if (stage.isLost) await emitEvent(tx, lead.tenantId, lead.workspaceId, 'lead.lost', evt);
   if (stage.isWon) await startProcessesOnWin(tx, lead.id, userId);
   return null;
 }

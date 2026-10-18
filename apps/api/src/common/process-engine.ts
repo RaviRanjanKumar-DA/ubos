@@ -1,6 +1,7 @@
 import type { Tx } from '@ubos/database';
 import { activity } from './lead-ops';
 import { notify } from './notify';
+import { emitEvent } from './events';
 
 /** A form field of a process step; values live in StepRun.data under `key`. */
 export interface StepField { key: string; label: string; type: string; options?: string[]; required?: boolean }
@@ -134,6 +135,7 @@ export async function finishStep(tx: Tx, stepRunId: string, userId: string) {
   const open = await tx.stepRun.findFirst({ where: { runId: run.id, status: { not: 'done' } }, orderBy: { position: 'asc' } });
   if (!open) {
     await tx.processRun.update({ where: { id: run.id }, data: { status: 'completed', completedAt: new Date() } });
+    await emitEvent(tx, run.tenantId, run.workspaceId, 'process.completed', { runId: run.id, leadId: run.leadId, customerId: run.customerId, templateId: run.templateId });
     await tx.leadActivity.create({ data: activity(lead, userId, { type: 'process', remark: 'Process completed — record the customer’s rating', data: { runId: run.id } }) });
     return { completed: true };
   }

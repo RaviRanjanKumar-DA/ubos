@@ -28,10 +28,10 @@ click-to-filter), integrations catalogue (93 services).
 | Zoho (Blueprint), Salesforce | **Guided process** with mandatory steps and approvals | Process templates after a sale (steps, owners, payments, approvals) | 1.5d |
 | Salesforce, HubSpot, Zoho | **Products, price lists, quotes** | Products / packages per business line, quote PDF from a lead | 1.5d |
 | Salesforce | **Lead conversion to deal / customer account** | "Won" opens the process template; customer 360 keeps history | 1.5d |
-| HubSpot, Zoho | **Web-to-lead forms** | Hosted form builder per business line + embed code | 1.7 |
-| All | **Public API & webhooks** | API keys with scopes, outgoing webhooks per event | 1.7 |
-| Copper, HubSpot | **Gmail / Outlook sync** | Emails logged on the lead, send from UBOS | 1.7 |
-| HubSpot, Calendly | **Meeting scheduler** | Booking link per person → lead + meeting | 1.7 |
+| HubSpot, Zoho | **Web-to-lead forms** | Hosted form builder per business line + embed code | 1.7 (done) |
+| All | **Public API & webhooks** | API keys with scopes, outgoing webhooks per event | 1.7 (done) |
+| Copper, HubSpot | **Gmail / Outlook sync** | Emails logged on the lead, send from UBOS | Phase 2 |
+| HubSpot, Calendly | **Meeting scheduler** | Booking link per person → lead + meeting | Phase 2 |
 | TeleCRM, Close | **Power dialer & calling campaigns** | Queue of leads, auto next-call, disposition required | Phase 2 |
 | TeleCRM | **SIM calling app** with call recording sync | Android app: instant, idempotent sync with offline queue and reconciliation — design in docs/design/SIM-CALLING.md; plans choose cloud, SIM or both (built) | Phase 2 |
 | Close, HubSpot, Zoho (Cadences) | **Sequences** — multi-step email / WhatsApp / call follow-up | Sequence builder; stops when the lead replies | Phase 2 |
@@ -51,7 +51,7 @@ click-to-filter), integrations catalogue (93 services).
 |---|---|
 | Import past calls & remarks; export calls / actions; bulk edit through Excel; labels; dashboards per role (done) | 1.5c |
 | Process templates / SOP forms | 1.5d (done) |
-| Lead sources (Facebook, Google Sheets, IndiaMART / JustDial, Google Forms), webhooks, API keys, Zapier / Make / n8n / Pabbly | 1.7 |
+| Lead sources (Google Sheets, IndiaMART / JustDial, Google Forms), webhooks, API keys, Zapier / Make / n8n / Pabbly | 1.7 (done) · native Facebook Lead Ads in Phase 2 |
 | SIM calling, message templates, calling campaigns, WhatsApp chat sync & Business API, IVR providers (CallerDesk first), schedules & sequences | Phase 2 |
 | Flowcharts, API templates, Shopify / WooCommerce, Razorpay & other payments, accounting sync | Phase 3 |
 | AI call summariser, MCP connector (Claude / ChatGPT) | Phase 4 |
@@ -61,7 +61,7 @@ click-to-filter), integrations catalogue (93 services).
 
 1. **1.5c Productivity** — smart views, Kanban, tasks & meetings with calendar and reminders, daily digest + scheduled dashboard emails (Mailpit locally), goals, call scripts, @mentions, labels, field-level security, alternate emails, Excel bulk update, import of past activities, export of actions.
 2. **1.5d Process & deals** — process templates (Blueprint-style), approvals, products / price lists / quotes, lock / unlock, payment rules. **Done 18 Oct 2026.**
-3. **1.7 Integrations & API** — API keys, webhooks, web-to-lead forms, Website API, Google Sheets, Facebook Lead Ads, portals, Google Forms, automation tools, email sync, meeting scheduler.
+3. **1.7 Integrations & API** — API keys, webhooks, web-to-lead forms, Website API, Google Sheets, portals, Google Forms, automation tools. **Done 18 Oct 2026.** Facebook Lead Ads (native, needs a Meta app review), Gmail / Outlook sync and the meeting scheduler moved to Phase 2 (Facebook leads can already arrive through Zapier / Make).
 4. **Phase 2** — calling (CallerDesk, SIM app, power dialer), WhatsApp, SMS, sequences, automation rules, help desk.
 5. **Phase 3 – 5** — finance & P&L, e-commerce, AI, marketing, remaining adapters.
 

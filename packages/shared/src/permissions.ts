@@ -21,6 +21,7 @@ export const PERMISSIONS = {
   'crm.customer.merge': 'Merge duplicate customers (organization-wide)',
   'crm.product.manage': 'Products, packages, price lists and payment rules of a business line',
   'crm.quote.manage': 'Create quotes from leads and send them',
+  'crm.form.manage': 'Web forms of a business line (hosted page and embed code)',
   'process.manage': 'Design after-sale process templates (steps, owners, forms, gates)',
   'process.work': 'Work on after-sale process steps (each step can limit this by role)',
   'process.unlock': 'Unlock completed process steps (with a reason)',
@@ -36,6 +37,7 @@ export const PERMISSIONS = {
   'org.security.manage': 'Security policy: login methods, 2FA rules, IP allow-list, session timeout',
   'integrations.view': 'View integrations',
   'integrations.manage': 'Activate / deactivate integrations',
+  'integrations.developer': 'API keys and outgoing webhooks (organization-wide)',
   'audit.view': 'View audit log',
 } as const;
 export type PermissionKey = keyof typeof PERMISSIONS;
@@ -88,6 +90,8 @@ export const PERMISSION_FEATURE: Partial<Record<PermissionKey, FeatureKey>> = {
   'crm.customer.merge': 'module.crm',
   'crm.product.manage': 'module.crm',
   'crm.quote.manage': 'module.crm',
+  'crm.form.manage': 'module.crm',
+  'integrations.developer': 'module.integrations',
   'process.manage': 'module.crm',
   'process.work': 'module.crm',
   'process.unlock': 'module.crm',
@@ -122,6 +126,7 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
       { key: 'crm.customer.view', scope: 'WORKSPACE' },
       { key: 'crm.customer.update', scope: 'WORKSPACE' },
       { key: 'crm.quote.manage', scope: 'WORKSPACE' },
+      { key: 'crm.form.manage', scope: 'WORKSPACE' },
       { key: 'process.work', scope: 'WORKSPACE' },
       { key: 'process.unlock', scope: 'WORKSPACE' },
       { key: 'process.approve', scope: 'WORKSPACE' },

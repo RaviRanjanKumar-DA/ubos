@@ -81,8 +81,8 @@ const SPECIFIC: Record<string, SetupDef> = {
     fields: [workspaceField, { key: 'defaultSource', label: 'Default source', type: 'text', placeholder: 'website' }], webhook: true,
   },
   google_sheets: {
-    steps: ['Share the sheet with the UBOS service account (shown when the live connection ships) or publish it.', 'Paste the sheet URL and the tab name.', 'New rows become leads; columns are matched like a bulk upload.'],
-    fields: [{ key: 'sheetUrl', label: 'Google Sheet URL', type: 'url', required: true, placeholder: 'https://docs.google.com/spreadsheets/d/…' }, { key: 'tab', label: 'Tab name', type: 'text', placeholder: 'Sheet1' }, workspaceField],
+    steps: ['In Google Sheets: Share → “Anyone with the link can view” (or File → Share → Publish to web → CSV).', 'Paste the sheet link (and the tab name if it is not the first tab), choose the business line, save, then map the columns in step 2.', 'Switch it on: UBOS reads the sheet every few minutes and brings in new rows only — each row once, even if it is edited later. Use “Sync now” to read it at once.'],
+    fields: [{ key: 'sheetUrl', label: 'Google Sheet link', type: 'url', required: true, placeholder: 'https://docs.google.com/spreadsheets/d/…' }, { key: 'tab', label: 'Tab name', type: 'text', placeholder: 'Sheet1' }, { key: 'syncMinutes', label: 'Check for new rows every (minutes)', type: 'number', placeholder: '15' }, workspaceField],
   },
   facebook_leads: {
     steps: ['Connect your Facebook Page (Meta business login arrives with the live connection).', 'Pick the Page and its lead forms.', 'New form submissions become leads within a minute.'],
@@ -90,8 +90,8 @@ const SPECIFIC: Record<string, SetupDef> = {
     where: 'Meta Business Suite → Settings → Business assets → Pages',
   },
   indiamart: {
-    steps: ['In IndiaMART Seller Panel open Settings → CRM integration and generate the CRM key.', 'Paste it below.', 'Buyer enquiries are pulled every few minutes.'],
-    fields: [key('IndiaMART CRM key'), workspaceField],
+    steps: ['Choose the business line below and save; then map the IndiaMART fields in step 2 and switch the integration on.', 'In IndiaMART Seller Panel open Lead Manager → Settings → CRM Integration → Push API and paste the webhook URL below.', 'Every new buyer enquiry is pushed to UBOS at once; the same enquiry (UNIQUE_QUERY_ID) is never added twice.'],
+    fields: [workspaceField], webhook: true, where: 'IndiaMART Seller Panel → Lead Manager → Settings → CRM Integration',
   },
   justdial: {
     steps: ['Ask your JustDial account manager for the lead API / webhook option.', 'Give them the webhook URL below.'],
@@ -160,7 +160,7 @@ const MORE: Record<string, SetupDef> = {
     webhook: true, where: 'Google Ads → Assets → Lead forms → Lead delivery → Webhook integration',
   },
   google_forms: {
-    steps: ['Open the form → ⋮ → Script editor and paste the UBOS snippet (shown when the live connection ships), or link the form to a Google Sheet and use the Google Sheets integration.', 'Use the webhook URL below in the snippet.'],
+    steps: ['Easiest: in the form open Responses → Link to Sheets, then use the Google Sheets integration on that sheet.', "Or instant: open the form → ⋮ → Apps Script, add an “On form submit” trigger that runs: UrlFetchApp.fetch('<webhook URL>', { method: 'post', contentType: 'application/json', payload: JSON.stringify(Object.fromEntries(e.response.getItemResponses().map(r => [r.getItem().getTitle(), r.getResponse()]))) });", 'Map the question titles to lead fields in step 2.'],
     fields: [{ key: 'formUrl', label: 'Form URL', type: 'url', help: 'The link you share for the form.' }, workspaceField], webhook: true,
   },
   google_analytics: {
