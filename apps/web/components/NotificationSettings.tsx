@@ -71,3 +71,46 @@ export function MyNotificationsCard() {
     </div>
   );
 }
+
+interface Calling { plan: string | null; cloudCalling: boolean; simCalling: boolean; planRetentionDays: number; recordingMode: 'ubos' | 'provider'; recordingRetentionDays: number | null; effectiveRetentionDays: number; canManage: boolean }
+
+/** Which calling the plan includes and how call recordings are stored. */
+export function CallingCard() {
+  const [c, setC] = useState<Calling | null>(null);
+  const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  useEffect(() => { api<Calling>('/api/v1/settings/calling', { noWorkspace: true }).then(setC).catch(() => setC(null)); }, []);
+  if (!c) return null;
+  async function save() {
+    setMsg(null);
+    try {
+      await api('/api/v1/settings/calling', { method: 'PUT', noWorkspace: true, body: { recordingMode: c!.recordingMode, recordingRetentionDays: c!.recordingRetentionDays } });
+      setMsg({ type: 'notice', text: 'Recording settings saved.' });
+    } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
+  }
+  return (
+    <div className="card" style={{ marginTop: 14, maxWidth: 760 }}>
+      <h2>Calls & recordings</h2>
+      <div className="row" style={{ gap: 14, marginBottom: 10 }}>
+        <span className={`badge ${c.cloudCalling ? 'ok' : 'grey'}`}>📞 Cloud calling {c.cloudCalling ? 'included' : 'not in your plan'}</span>
+        <span className={`badge ${c.simCalling ? 'ok' : 'grey'}`}>📱 SIM calling {c.simCalling ? 'included' : 'not in your plan'}</span>
+        <span className="small muted">{c.plan} keeps recordings up to {c.planRetentionDays} days</span>
+      </div>
+      {msg && <div className={msg.type}>{msg.text}</div>}
+      {(c.cloudCalling || c.simCalling) ? (
+        <>
+          <div className="dup-modes">
+            <label className={`dup-mode ${c.recordingMode === 'ubos' ? 'on' : ''}`}><input type="radio" checked={c.recordingMode === 'ubos'} onChange={() => setC({ ...c, recordingMode: 'ubos' })} disabled={!c.canManage} /> Copy cloud-call recordings into UBOS storage (plays even if the provider deletes them; counts towards storage)</label>
+            <label className={`dup-mode ${c.recordingMode === 'provider' ? 'on' : ''}`}><input type="radio" checked={c.recordingMode === 'provider'} onChange={() => setC({ ...c, recordingMode: 'provider' })} disabled={!c.canManage} /> Keep cloud-call recordings at the provider — UBOS stores only the link</label>
+          </div>
+          <p className="small muted">SIM-call recordings are uploaded from the phone into UBOS storage (encrypted), linked to the call on the lead.</p>
+          <div className="field" style={{ maxWidth: 300 }}>
+            <label>Delete recordings after (days)</label>
+            <input className="input" type="number" min={1} max={c.planRetentionDays} placeholder={`Plan limit: ${c.planRetentionDays}`} value={c.recordingRetentionDays ?? ''} disabled={!c.canManage}
+              onChange={(e) => setC({ ...c, recordingRetentionDays: e.target.value ? Number(e.target.value) : null })} />
+          </div>
+          {c.canManage && <div className="row end"><button type="button" className="btn" onClick={save}>Save</button></div>}
+        </>
+      ) : <p className="small muted">Your plan has no calling. Upgrade on Billing & Licences to add cloud calling, SIM calling or both.</p>}
+    </div>
+  );
+}

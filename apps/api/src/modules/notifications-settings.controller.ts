@@ -9,6 +9,7 @@ import { SchedulerService } from './scheduler.service';
 
 const OrgSettings = z.object({ digestHour: z.number().int().min(0).max(23), reminderMinutes: z.number().int().min(0).max(1440) });
 const MySettings = z.object({ digestEnabled: z.boolean() });
+const Recording = z.object({ recordingMode: z.enum(['ubos', 'provider']), recordingRetentionDays: z.number().int().min(1).max(3650).nullable() });
 const Subscription = z.object({ frequency: z.enum(['daily', 'weekly']).default('daily'), hour: z.number().int().min(0).max(23).default(9) });
 
 /** Reminder & daily-summary settings, "email me this dashboard", and running the scheduler on demand. */
@@ -40,6 +41,39 @@ export class NotificationsSettingsController {
   }
 
   /** Each person can switch their own daily summary off or on. */
+  /** Calling on the organization's plan (cloud / SIM) and how call recordings are stored. */
+  @Get('settings/calling')
+  @RequirePermission('dashboard.view')
+  calling() {
+    return this.db.tenant(async (tx) => {
+      const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, include: { plan: { include: { features: true } } }, orderBy: { currentPeriodEnd: 'desc' } });
+      const org = await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() }, select: { recordingMode: true, recordingRetentionDays: true } });
+      const features = sub?.plan.features.map((f) => f.featureKey) ?? [];
+      const planDays = sub?.plan.recordingRetentionDays ?? 0;
+      return {
+        plan: sub?.plan.name ?? null, cloudCalling: features.includes('module.telephony'), simCalling: features.includes('module.sim_calling'),
+        planRetentionDays: planDays, recordingMode: org?.recordingMode ?? 'ubos', recordingRetentionDays: org?.recordingRetentionDays ?? null,
+        effectiveRetentionDays: Math.min(planDays, org?.recordingRetentionDays ?? planDays), canManage: auth().permissions['org.security.manage'] === 'ORGANIZATION',
+      };
+    });
+  }
+
+  @Put('settings/calling')
+  @RequirePermission('org.security.manage', 'ORGANIZATION')
+  saveCalling(@Body() body: unknown) {
+    const input = parse(Recording, body);
+    return this.db.tenant(async (tx) => {
+      const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, include: { plan: true }, orderBy: { currentPeriodEnd: 'desc' } });
+      const max = sub?.plan.recordingRetentionDays ?? 0;
+      if (input.recordingRetentionDays !== null && input.recordingRetentionDays > max) {
+        throw new BadRequestException({ code: 'OVER_PLAN', message: `Your plan keeps recordings for up to ${max} days` });
+      }
+      await tx.organizationSetting.upsert({ where: { tenantId: tenantId() }, create: { tenantId: tenantId(), ...input }, update: input });
+      await this.db.audit(tx, { entity: 'settings', entityId: 'calling', action: 'settings.recordings_changed', newValue: input });
+      return input;
+    });
+  }
+
   @Put('me/notifications')
   saveMine(@Body() body: unknown) {
     const { digestEnabled } = parse(MySettings, body);

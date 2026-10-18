@@ -61,6 +61,7 @@ const PlanBody = z.object({
   maxWorkspaces: z.number().int().min(1).max(1000).nullable(),
   storageGbPerUser: z.number().int().min(0).max(1000),
   aiCreditsPerUser: z.number().int().min(0).max(100_000),
+  recordingRetentionDays: z.number().int().min(0).max(3650).default(90),
   isPublic: z.boolean(),
   features: Features.min(1, 'Pick at least one module'),
 });
@@ -268,7 +269,7 @@ export class PlatformController {
       const plan = await tx.plan.create({
         data: {
           code: input.code, name: input.name, pricePerUserPaise: input.pricePerUserPaise, maxWorkspaces: input.maxWorkspaces,
-          storageGbPerUser: input.storageGbPerUser, aiCreditsPerUser: input.aiCreditsPerUser, isPublic: input.isPublic,
+          storageGbPerUser: input.storageGbPerUser, aiCreditsPerUser: input.aiCreditsPerUser, recordingRetentionDays: input.recordingRetentionDays, isPublic: input.isPublic,
           billingPeriods: ['quarterly', 'annual'], features: { create: [...new Set(input.features)].map((featureKey) => ({ featureKey })) },
         },
       });

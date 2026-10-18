@@ -33,7 +33,7 @@ click-to-filter), integrations catalogue (93 services).
 | Copper, HubSpot | **Gmail / Outlook sync** | Emails logged on the lead, send from UBOS | 1.7 |
 | HubSpot, Calendly | **Meeting scheduler** | Booking link per person → lead + meeting | 1.7 |
 | TeleCRM, Close | **Power dialer & calling campaigns** | Queue of leads, auto next-call, disposition required | Phase 2 |
-| TeleCRM | **SIM calling app** with call recording sync | Android app logs calls & recordings | Phase 2 |
+| TeleCRM | **SIM calling app** with call recording sync | Android app: instant, idempotent sync with offline queue and reconciliation — design in docs/design/SIM-CALLING.md; plans choose cloud, SIM or both (built) | Phase 2 |
 | Close, HubSpot, Zoho (Cadences) | **Sequences** — multi-step email / WhatsApp / call follow-up | Sequence builder; stops when the lead replies | Phase 2 |
 | monday, Zoho, HubSpot | **Automation recipes** — "when X, if Y, then Z" | Workflow rules engine, then a visual flow builder (Phase 3) | Phase 2 |
 | TeleCRM, Interakt | **WhatsApp inbox, templates, broadcast** | WhatsApp Cloud API + BSP adapters | Phase 2 |

@@ -356,6 +356,21 @@ const badPlan = await call('/platform/v1/tenants', { token: owner, tenant: null,
   name: 'Nope Co', planCode: 'gold_ultra', adminName: 'Nope Admin', adminEmail: 'admin@nope.local', adminPassword: 'Nope@2026local', workspaces: ['Sales'] } });
 check('onboarding refuses duplicate business lines and unknown plans', dupLines.status === 409 && badPlan.status === 404, [dupLines.body, badPlan.body]);
 
+// ── Calling packages & recordings ──
+const simPlan = await call('/platform/v1/plans', { token: owner, tenant: null, method: 'POST', body: { code: 'sim_only', name: 'SIM Calling', pricePerUserPaise: 59_900, maxWorkspaces: 2, storageGbPerUser: 5, aiCreditsPerUser: 0, recordingRetentionDays: 60, isPublic: true, features: ['module.crm', 'module.sim_calling'], sellAsLicence: true } });
+check('a plan can include SIM calling only, with its recording retention', simPlan.status === 201 && simPlan.body.recordingRetentionDays === 60, simPlan.body);
+const catCalls = (await call('/api/v1/billing/catalog', { token: abc, tenant: 'abc' })).body.licences;
+const simLic = catCalls.find((l) => l.code === 'sim_only');
+const coreLic = catCalls.find((l) => l.code === 'core_crm');
+check('Billing shows which calling each licence includes', simLic.features.includes('module.sim_calling') && !simLic.features.includes('module.telephony') && coreLic.features.includes('module.telephony') && coreLic.features.includes('module.sim_calling'), [simLic.features, coreLic.features]);
+const myCalling = (await call('/api/v1/settings/calling', { token: admin })).body;
+check('organization sees its calling options and plan retention', myCalling.cloudCalling && myCalling.simCalling && myCalling.planRetentionDays === 365 && myCalling.recordingMode === 'ubos', myCalling);
+const overPlan = await call('/api/v1/settings/calling', { token: admin, method: 'PUT', body: { recordingMode: 'provider', recordingRetentionDays: 400 } });
+const okRec = await call('/api/v1/settings/calling', { token: admin, method: 'PUT', body: { recordingMode: 'provider', recordingRetentionDays: 120 } });
+const rmRec = await call('/api/v1/settings/calling', { token: manager, workspace: VASTU, method: 'PUT', body: { recordingMode: 'ubos', recordingRetentionDays: 30 } });
+const afterRec = (await call('/api/v1/settings/calling', { token: admin })).body;
+check('recording storage and a shorter retention can be chosen (not beyond the plan, admins only)', overPlan.status === 400 && okRec.status === 200 && rmRec.status === 403 && afterRec.recordingMode === 'provider' && afterRec.effectiveRetentionDays === 120, [overPlan.status, okRec.status, rmRec.status, afterRec]);
+
 // ── Isolation ──
 const abcActions = await call('/api/v1/custom-actions?archived=true', { token: abc, tenant: 'abc' });
 check('custom actions never leak across organizations', abcActions.status === 200 && !abcActions.body.some((x) => x.id === action.id), abcActions.body.length);

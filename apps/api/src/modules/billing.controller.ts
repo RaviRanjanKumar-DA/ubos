@@ -39,6 +39,7 @@ export class BillingController {
   catalog() {
     return this.db.tenant(async (tx) => {
       const products = await tx.platformProduct.findMany({ where: { isActive: true }, orderBy: { position: 'asc' } });
+      const plans = new Map((await tx.plan.findMany({ include: { features: true } })).map((p) => [p.code, p]));
       const sub = await tx.subscription.findFirst({ include: { plan: true }, orderBy: { currentPeriodEnd: 'desc' } });
       const used = await tx.user.count({ where: { isActive: true } });
       return {
@@ -47,6 +48,8 @@ export class BillingController {
         licences: products.filter((p) => p.kind === 'licence').map((p) => ({
           code: p.code, name: p.name, description: p.description, planCode: p.planCode, monthlyPaise: p.priceMonthlyPaise,
           quarterlyPaise: licenceUnitPaise(p, 'quarterly'), annualPaise: licenceUnitPaise(p, 'annual'), annualDiscountPct: p.annualDiscountPct,
+          features: plans.get(p.planCode ?? '')?.features.map((f) => f.featureKey) ?? [],
+          recordingRetentionDays: plans.get(p.planCode ?? '')?.recordingRetentionDays ?? 0,
         })),
         services: products.filter((p) => p.kind === 'service').map((p) => ({ code: p.code, name: p.name, description: p.description, pricePaise: p.priceOncePaise })),
       };

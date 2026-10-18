@@ -13,12 +13,12 @@ const DEV_PASSWORD = 'Ubos@2026dev';
 const prisma = new PrismaClient(); // owner connection (DATABASE_URL), bypasses RLS
 
 const PLANS = [
-  { code: 'starter', name: 'Starter', price: 49_900, maxWorkspaces: 1, storage: 5, ai: 0,
-    features: ['module.crm', 'module.integrations'] },
-  { code: 'growth', name: 'Growth', price: 99_900, maxWorkspaces: 3, storage: 10, ai: 50,
-    features: ['module.crm', 'module.integrations', 'module.workspaces', 'module.telephony', 'module.whatsapp', 'module.workflows', 'module.support'] },
-  { code: 'business', name: 'Business', price: 149_900, maxWorkspaces: 10, storage: 20, ai: 100,
-    features: ['module.crm', 'module.integrations', 'module.workspaces', 'module.telephony', 'module.whatsapp', 'module.workflows', 'module.support', 'module.hrms', 'module.finance', 'module.audit_explorer'] },
+  { code: 'starter', name: 'Starter', price: 49_900, maxWorkspaces: 1, storage: 5, ai: 0, recordings: 30,
+    features: ['module.crm', 'module.integrations', 'module.sim_calling'] },
+  { code: 'growth', name: 'Growth', price: 99_900, maxWorkspaces: 3, storage: 10, ai: 50, recordings: 90,
+    features: ['module.crm', 'module.integrations', 'module.workspaces', 'module.telephony', 'module.sim_calling', 'module.whatsapp', 'module.workflows', 'module.support'] },
+  { code: 'business', name: 'Business', price: 149_900, maxWorkspaces: 10, storage: 20, ai: 100, recordings: 180,
+    features: ['module.crm', 'module.integrations', 'module.workspaces', 'module.telephony', 'module.sim_calling', 'module.whatsapp', 'module.workflows', 'module.support', 'module.hrms', 'module.finance', 'module.audit_explorer'] },
   { code: 'enterprise', name: 'Enterprise', price: 0, maxWorkspaces: null, storage: 50, ai: 500,
     features: Object.keys(FEATURES) },
 ];
@@ -41,7 +41,7 @@ async function main() {
     await prisma.plan.create({
       data: {
         code: p.code, name: p.name, pricePerUserPaise: p.price, billingPeriods: ['monthly', 'annual'],
-        maxWorkspaces: p.maxWorkspaces, storageGbPerUser: p.storage, aiCreditsPerUser: p.ai,
+        maxWorkspaces: p.maxWorkspaces, storageGbPerUser: p.storage, aiCreditsPerUser: p.ai, recordingRetentionDays: (p as { recordings?: number }).recordings ?? 365,
         isPublic: p.code !== 'enterprise',
         features: { create: p.features.map((featureKey) => ({ featureKey })) },
       },

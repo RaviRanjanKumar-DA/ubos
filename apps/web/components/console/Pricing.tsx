@@ -6,7 +6,7 @@ import { ApiError, platformApi, rupees } from '@/lib/api';
 
 export interface PlanRow {
   id: string; code: string; name: string; pricePerUserPaise: number; maxWorkspaces: number | null; storageGbPerUser: number;
-  aiCreditsPerUser: number; isPublic: boolean; features: { featureKey: string }[]; organizations: number;
+  aiCreditsPerUser: number; recordingRetentionDays: number; isPublic: boolean; features: { featureKey: string }[]; organizations: number;
 }
 interface Product {
   id: string; code: string; name: string; description: string | null; kind: 'licence' | 'service'; planCode: string | null;
@@ -62,6 +62,11 @@ export function Pricing({ onChanged }: { onChanged: () => void }) {
             <div><span style={{ fontSize: 22, fontWeight: 700 }}>{p.pricePerUserPaise ? rupees(p.pricePerUserPaise) : 'Custom'}</span>{p.pricePerUserPaise ? <span className="small muted"> / user / month</span> : null}</div>
             <div className="small muted">
               {p.maxWorkspaces ? `Up to ${p.maxWorkspaces} business lines` : 'Unlimited business lines'} · {p.storageGbPerUser} GB / user{p.aiCreditsPerUser ? ` · ${p.aiCreditsPerUser} AI credits` : ''}
+            </div>
+            <div className="small">
+              {p.features.some((f) => f.featureKey === 'module.telephony') ? '📞 Cloud calling ' : ''}{p.features.some((f) => f.featureKey === 'module.sim_calling') ? '📱 SIM calling' : ''}
+              {!p.features.some((f) => ['module.telephony', 'module.sim_calling'].includes(f.featureKey)) && <span className="muted">No calling</span>}
+              {p.recordingRetentionDays > 0 && <span className="muted"> · recordings {p.recordingRetentionDays} days</span>}
             </div>
             <div className="small">{p.features.length} of {Object.keys(FEATURES).length} modules</div>
             <div className="small muted">{p.organizations} organization(s) on this plan</div>
@@ -124,7 +129,7 @@ export function Pricing({ onChanged }: { onChanged: () => void }) {
 function PlanDialog({ plan, onClose, onSave }: { plan: PlanRow | null; onClose: () => void; onSave: (b: unknown) => void }) {
   const [f, setF] = useState({
     code: '', name: plan?.name ?? '', price: toRupees(plan?.pricePerUserPaise ?? 0), maxWorkspaces: plan?.maxWorkspaces ? String(plan.maxWorkspaces) : '',
-    storage: String(plan?.storageGbPerUser ?? 5), ai: String(plan?.aiCreditsPerUser ?? 0), isPublic: plan?.isPublic ?? true,
+    storage: String(plan?.storageGbPerUser ?? 5), ai: String(plan?.aiCreditsPerUser ?? 0), rec: String(plan?.recordingRetentionDays ?? 90), isPublic: plan?.isPublic ?? true,
     features: plan?.features.map((x) => x.featureKey) ?? ['module.crm', 'module.workspaces'], sell: true, discount: '0',
   });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
@@ -137,7 +142,7 @@ function PlanDialog({ plan, onClose, onSave }: { plan: PlanRow | null; onClose: 
           onSave({
             ...(plan ? {} : { code: f.code, sellAsLicence: f.sell, annualDiscountPct: Number(f.discount || 0) }),
             name: f.name, pricePerUserPaise: toPaise(f.price), maxWorkspaces: f.maxWorkspaces ? Number(f.maxWorkspaces) : null,
-            storageGbPerUser: Number(f.storage || 0), aiCreditsPerUser: Number(f.ai || 0), isPublic: f.isPublic, features: f.features,
+            storageGbPerUser: Number(f.storage || 0), aiCreditsPerUser: Number(f.ai || 0), recordingRetentionDays: Number(f.rec || 0), isPublic: f.isPublic, features: f.features,
           });
         }}>
         <h2>{plan ? `Edit plan · ${plan.name}` : 'New plan (package)'}</h2>
@@ -150,6 +155,15 @@ function PlanDialog({ plan, onClose, onSave }: { plan: PlanRow | null; onClose: 
           <div className="field"><label>Business lines allowed</label><input className="input" type="number" min={1} value={f.maxWorkspaces} onChange={set('maxWorkspaces')} placeholder="Unlimited" /></div>
           <div className="field"><label>Storage per user (GB)</label><input className="input" type="number" min={0} value={f.storage} onChange={set('storage')} /></div>
           <div className="field"><label>AI credits per user / month</label><input className="input" type="number" min={0} value={f.ai} onChange={set('ai')} /></div>
+        </div>
+        <div className="small" style={{ fontWeight: 600, margin: '4px 0 6px' }}>Calling</div>
+        <div className="row" style={{ marginBottom: 10 }}>
+          {([['', 'No calling', []], ['cloud', '📞 Cloud calling', ['module.telephony']], ['sim', '📱 SIM calling', ['module.sim_calling']], ['both', 'Both', ['module.telephony', 'module.sim_calling']]] as const).map(([k, l, keys]) => {
+            const has = (x: string) => f.features.includes(x);
+            const on = keys.length === 0 ? !has('module.telephony') && !has('module.sim_calling') : keys.every(has) && (k === 'both' || !has(k === 'cloud' ? 'module.sim_calling' : 'module.telephony'));
+            return <button type="button" key={k} className={`chip ${on ? 'on' : ''}`} onClick={() => setF({ ...f, features: [...f.features.filter((x) => x !== 'module.telephony' && x !== 'module.sim_calling'), ...keys] })}>{l}</button>;
+          })}
+          <label className="row small" style={{ marginLeft: 'auto' }}>Keep recordings <input className="input" style={{ width: 80 }} type="number" min={0} max={3650} value={f.rec} onChange={set('rec')} /> days</label>
         </div>
         <div className="small" style={{ fontWeight: 600, margin: '4px 0 6px' }}>Modules included</div>
         <div className="grid cols-2" style={{ gap: 6, marginBottom: 10 }}>

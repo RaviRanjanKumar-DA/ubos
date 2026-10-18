@@ -1,6 +1,6 @@
 'use client';
 
-import { RemindersCard } from '@/components/NotificationSettings';
+import { CallingCard, RemindersCard } from '@/components/NotificationSettings';
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
@@ -122,6 +122,7 @@ export default function SecurityPolicyPage() {
       </div>
     </form>
     <RemindersCard />
+    <CallingCard />
     </>
   );
 }

@@ -5,7 +5,7 @@ import { api, ApiError, rupees } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 
 type Cycle = 'quarterly' | 'annual';
-interface LicenceProduct { code: string; name: string; description: string | null; planCode: string; monthlyPaise: number; quarterlyPaise: number; annualPaise: number; annualDiscountPct: number }
+interface LicenceProduct { code: string; name: string; description: string | null; planCode: string; monthlyPaise: number; quarterlyPaise: number; annualPaise: number; annualDiscountPct: number; features: string[]; recordingRetentionDays: number }
 interface Service { code: string; name: string; description: string | null; pricePaise: number }
 interface Catalog {
   gstPct: number; licences: LicenceProduct[]; services: Service[];
@@ -108,6 +108,11 @@ function Buy({ catalog, onOrdered }: { catalog: Catalog; onOrdered: (number: str
                     <input type="radio" name="plan" checked={plan === l.code} onChange={() => setPlan(l.code)} />
                   </div>
                   {l.description && <div className="small muted" style={{ margin: '4px 0' }}>{l.description}</div>}
+                  <div className="small" style={{ margin: '4px 0' }}>
+                    <span style={{ opacity: l.features.includes('module.telephony') ? 1 : 0.4 }}>{l.features.includes('module.telephony') ? '✓' : '✕'} 📞 Cloud calling</span>{'  '}
+                    <span style={{ opacity: l.features.includes('module.sim_calling') ? 1 : 0.4 }}>{l.features.includes('module.sim_calling') ? '✓' : '✕'} 📱 SIM calling</span>
+                    {l.recordingRetentionDays > 0 && <div className="muted">Call recordings kept {l.recordingRetentionDays} days</div>}
+                  </div>
                   <div style={{ fontSize: 22, fontWeight: 700, marginTop: 6 }}>{rupees(Math.round(price / months))}<span className="small muted" style={{ fontWeight: 500 }}> / user / month</span></div>
                   <div className="small muted">{rupees(price)} per user every {cycle === 'annual' ? 'year' : 'quarter'}{cycle === 'annual' && l.annualDiscountPct ? <> · <span style={{ color: 'var(--ok)' }}>save {l.annualDiscountPct}%</span></> : ''}</div>
                 </label>

@@ -25,6 +25,7 @@ model Plan {
   maxWorkspaces    Int?           // null = unlimited
   storageGbPerUser Int
   aiCreditsPerUser Int            @default(0)
+  recordingRetentionDays Int      @default(90) // how long call recordings are kept on this plan (0 = none)
   isPublic         Boolean        @default(true)
   features         PlanFeature[]
   subscriptions    Subscription[]
@@ -161,6 +162,8 @@ model OrganizationSetting {
   setupSkipped       String[] @default([]) // Setup Guide steps the admins chose to skip
   digestHour         Int      @default(9)  // local hour of the daily summary email
   reminderMinutes    Int      @default(15) // remind this many minutes before a task / follow-up
+  recordingMode      String   @default("ubos") // cloud-call recordings: ubos (copied to UBOS storage) | provider (link only)
+  recordingRetentionDays Int?  // shorter than the plan limit if the organization wants
   updatedAt          DateTime @updatedAt
 }
 
