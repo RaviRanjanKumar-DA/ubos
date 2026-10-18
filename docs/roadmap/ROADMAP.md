@@ -23,7 +23,7 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 | Campaigns | Calling / WhatsApp / email campaigns with lists, results and cost per lead | Phase 2 |
 | Workshops & Events | Event pages, registrations as leads, reminders, attendance, follow-up after the event | Phase 4 |
 | Marketing | UTM / source ROI, ad spend, AI content studio (copy, creatives, short videos) | Phase 4 |
-| Integrations with other CRMs & platforms | Catalogue now lists 36 integrations (portals, telephony, WhatsApp, Shopify / WooCommerce / WordPress, Zoho / HubSpot / Salesforce / LeadSquared / TeleCRM / Pipedrive / Freshsales, Zapier); adapters ship per phase | Catalogue: Phase 1.5 · adapters: Phases 1–5 |
+| Integrations with other CRMs & platforms | Catalogue now lists 93 integrations in 12 categories with brand icons (lead portals incl. LinkedIn / YouTube / Google Business / education & property portals, forms, 11 telephony providers, WhatsApp BSPs, Instagram / Messenger / Telegram, websites & e-commerce, 8 payment gateways, Tally / Zoho Books / QuickBooks, marketing & analytics, AI keys and automation tools, productivity, support desks, 10 other CRMs); adapters ship per phase | Catalogue: Phase 1.5 · adapters: Phases 1–5 |
 
 ## Setup Guide & onboarding checklist (requested 17 Oct 2026)
 

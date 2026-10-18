@@ -3,18 +3,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
+import { IntegrationIcon } from '@/components/IntegrationIcon';
 
 interface Integration {
   key: string; name: string; description: string; category: string; phase: string;
   status: 'active' | 'inactive' | 'paused'; activatedAt: string | null;
 }
-const ORDER = ['Lead sources', 'Calling', 'Messaging', 'Website & e-commerce', 'Payments', 'Productivity', 'Other CRMs'];
+const ORDER = [
+  'Lead sources', 'Forms & surveys', 'Calling', 'Messaging', 'Website & e-commerce', 'Payments', 'Accounting',
+  'Marketing & analytics', 'AI & automation', 'Productivity', 'Support desks', 'Other CRMs',
+];
 
 export default function IntegrationsPage() {
   const { me, version } = useShell();
   const [list, setList] = useState<Integration[] | null>(null);
   const [q, setQ] = useState('');
   const [cat, setCat] = useState('');
+  const [onlyActive, setOnlyActive] = useState(false);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const canManage = me.permissions['integrations.manage'] === 'ORGANIZATION';
@@ -35,7 +40,9 @@ export default function IntegrationsPage() {
     }
   }
 
-  const shown = useMemo(() => (list ?? []).filter((i) => (!cat || i.category === cat) && (!q || `${i.name} ${i.description}`.toLowerCase().includes(q.toLowerCase()))), [list, q, cat]);
+  const shown = useMemo(() => (list ?? []).filter((i) =>
+    (!cat || i.category === cat) && (!onlyActive || i.status === 'active')
+    && (!q || `${i.name} ${i.description} ${i.category}`.toLowerCase().includes(q.toLowerCase()))), [list, q, cat, onlyActive]);
   const active = (list ?? []).filter((i) => i.status === 'active');
 
   return (
@@ -45,9 +52,12 @@ export default function IntegrationsPage() {
           <h1>Integrations</h1>
           <div className="muted small">{active.length} active of {list?.length ?? 0} · switch each service on or off for {me.tenant.name}. Connection settings arrive with each integration in the phase shown.</div>
         </div>
-        <input className="input" style={{ width: 220 }} placeholder="Search integrations" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="row">
+          <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} /> Active only</label>
+          <input className="input" style={{ width: 230 }} placeholder="Search 90+ integrations" value={q} onChange={(e) => setQ(e.target.value)} />
+        </div>
       </div>
-      <div className="chips" style={{ marginBottom: 14 }}>
+      <div className="chips" style={{ marginBottom: 16 }}>
         <button className={`chip ${!cat ? 'on' : ''}`} onClick={() => setCat('')}>All <span className="count">{list?.length ?? 0}</span></button>
         {ORDER.map((c) => (
           <button key={c} className={`chip ${cat === c ? 'on' : ''}`} onClick={() => setCat(cat === c ? '' : c)}>
@@ -58,35 +68,36 @@ export default function IntegrationsPage() {
       {error && <div className="error">{error}</div>}
       {!list && <div className="muted">Loading…</div>}
       {ORDER.filter((c) => shown.some((i) => i.category === c)).map((c) => (
-        <div key={c} style={{ marginBottom: 18 }}>
-          <h2>{c}</h2>
-          <div className="card" style={{ padding: 0 }}>
-            <div className="table-wrap">
-              <table className="table" style={{ minWidth: 560 }}>
-                <tbody>
-                  {shown.filter((i) => i.category === c).map((i) => (
-                    <tr key={i.key}>
-                      <td style={{ width: '55%' }}><b>{i.name}</b><div className="small muted">{i.description}</div></td>
-                      <td>
-                        {i.status === 'active' ? <span className="badge ok"><span className="dot" />Active</span> : <span className="badge grey">Inactive</span>}
-                        <span className="badge" style={{ marginLeft: 6, fontWeight: 500 }} title="When the live connection ships">{i.phase}</span>
-                      </td>
-                      <td style={{ textAlign: 'right' }}>
-                        {canManage && (
-                          <button className={`btn sm ${i.status === 'active' ? 'danger' : 'outline'}`} disabled={busy === i.key} onClick={() => toggle(i)}>
-                            {i.status === 'active' ? 'Deactivate' : 'Activate now'}
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <section key={c} style={{ marginBottom: 22 }}>
+          <h2 style={{ marginBottom: 10 }}>{c} <span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>({shown.filter((i) => i.category === c).length})</span></h2>
+          <div className="int-grid">
+            {shown.filter((i) => i.category === c).map((i) => (
+              <div key={i.key} className={`card int-card ${i.status === 'active' ? 'on' : ''}`}>
+                <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 12 }}>
+                  <IntegrationIcon id={i.key} name={i.name} />
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <b className="int-name">{i.name}</b>
+                    <div className="small muted int-desc">{i.description}</div>
+                  </div>
+                </div>
+                <div className="row" style={{ justifyContent: 'space-between', marginTop: 'auto', paddingTop: 10 }}>
+                  <span className="row" style={{ gap: 6 }}>
+                    {i.status === 'active' ? <span className="badge ok"><span className="dot" />Active</span> : <span className="badge grey">Inactive</span>}
+                    <span className="badge" style={{ fontWeight: 500 }} title="When the live connection ships">{i.phase}</span>
+                  </span>
+                  {canManage && (
+                    <button className={`btn sm ${i.status === 'active' ? 'ghost' : 'outline'}`} disabled={busy === i.key} onClick={() => toggle(i)}
+                      style={i.status === 'active' ? { color: 'var(--bad)' } : undefined}>
+                      {i.status === 'active' ? 'Deactivate' : 'Activate'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        </section>
       ))}
-      {list && !shown.length && <div className="card empty">No integration matches “{q}”.</div>}
+      {list && !shown.length && <div className="card empty">No integration matches{q ? ` “${q}”` : ' these filters'}.</div>}
     </>
   );
 }
