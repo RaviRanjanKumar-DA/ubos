@@ -188,6 +188,8 @@ const rmNotif = await call('/api/v1/settings/notifications', { token: rm, worksp
 const orgNotif = await call('/api/v1/settings/notifications', { token: admin, method: 'PUT', body: { digestHour: 0, reminderMinutes: 30 } });
 check('only security admins change reminder / summary settings', rmNotif.status === 403 && orgNotif.status === 200, [rmNotif.status, orgNotif.status]);
 await call('/api/v1/me/notifications', { token: rm2, workspace: COURSE, method: 'PUT', body: { digestEnabled: false } });
+// The API scheduler also runs every minute and may have sent her summary before she switched it off; count only later ones.
+const switchedOffAt = Date.now() - 1_000;
 const sub = await call('/api/v1/dashboards/tpl:my_day/subscription', { token: rm, workspace: VASTU, method: 'PUT', body: { frequency: 'daily', hour: 0 } });
 const privateDash = await call('/api/v1/dashboards', { token: admin, method: 'POST', body: { name: 'Admin only', widgets: [{ id: 'k', type: 'kpi', title: 'Leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] } });
 const subPrivate = await call(`/api/v1/dashboards/${privateDash.body.id}/subscription`, { token: rm, workspace: VASTU, method: 'PUT', body: { hour: 0 } });
@@ -199,7 +201,7 @@ await new Promise((r) => setTimeout(r, 800));
 check('reminder email and in-app reminder for the meeting', (await mailTo('rm@mycompany.local', /Reminder — Meeting: Site visit with family/)).length === 1
   && (await call('/api/v1/notifications', { token: rm, workspace: VASTU })).body.items.some((n) => n.type === 'reminder'), (await mails()).map((m) => m.Subject));
 check('daily summary email per person', (await mailTo('rm@mycompany.local', /Your day at My Company/)).length === 1 && (await mailTo('manager@mycompany.local', /Your day at My Company/)).length === 1, (await mails()).map((m) => [m.To[0]?.Address, m.Subject]));
-check('people who switched the summary off get none', (await mailTo('rm2@mycompany.local', /Your day/)).length === 0);
+check('people who switched the summary off get none', (await mailTo('rm2@mycompany.local', /Your day/)).filter((m) => new Date(m.Created).getTime() >= switchedOffAt).length === 0);
 const dashMail = await mailTo('rm@mycompany.local', /^My day — Yesterday/);
 check('subscribed dashboard arrives by email', dashMail.length === 1, (await mails()).map((m) => m.Subject));
 const run2 = await call('/api/v1/automation/run-now', { token: admin, method: 'POST' });

@@ -10,7 +10,7 @@ import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { findCustomer, nextCustomerCode } from '../common/customers';
-import { activity, applyStageChange, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
+import { activity, applyStageChange, assignmentAvailability, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
 import { contact, customFields as visibleFields, fieldAccess, lockedFields } from '../common/field-access';
 
 const csvList = z.string().max(4000).optional().transform((v) => (v ? v.split(',').map((x) => x.trim()).filter(Boolean) : []));
@@ -150,7 +150,7 @@ export class LeadsController {
         const ws = await tx.workspace.findUniqueOrThrow({ where: { id: a.workspaceId! } });
         const eligible = (await eligibleOwners(tx, ws.id)).map((u) => u.id);
         if (input.ownerId === 'rules') {
-          const assigner = makeAssigner(ws, eligible, a.userId);
+          const assigner = makeAssigner(ws, eligible, a.userId, await assignmentAvailability(tx));
           ownerId = assigner.pick(customer.primaryRmId);
           await tx.workspace.update({ where: { id: ws.id }, data: { assignmentCursor: assigner.state.cursor } });
         } else {

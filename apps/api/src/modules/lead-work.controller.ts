@@ -93,7 +93,7 @@ export class LeadWorkController {
         mobile: contact(fa, 'mobile', full.customer.mobile), alternateMobiles: contacts(fa, 'mobile', full.customer.alternateMobiles),
         email: contact(fa, 'email', full.customer.email), alternateEmails: contacts(fa, 'email', full.customer.alternateEmails), city: full.customer.city,
         workspace: full.workspace, pipeline: { id: full.pipeline.id, name: full.pipeline.name, stages: full.pipeline.stages.map((s) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost })) },
-        stageId: full.stageId, status: full.status, lostReason: full.lostReason, source: full.source,
+        stageId: full.stageId, status: full.status, lostReason: full.lostReason, source: full.source, rating: full.rating,
         customFields: visibleFields(fa, full.customFields as Record<string, unknown>), labelIds: full.labelIds,
         fieldAccess: Object.fromEntries([...['mobile', 'email'], ...fields.map((f) => `cf:${f.key}`)].map((k) => [k, fa.of(k)])),
         owner: full.ownerId ? { id: full.ownerId, name: users.get(full.ownerId) ?? '?' } : null,

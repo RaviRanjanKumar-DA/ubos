@@ -10,13 +10,14 @@ import { useShell } from '@/components/AppShell';
 import { TaskDialog, TaskRow } from '@/components/TaskDialog';
 import { Field, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 import type { CustomAction } from '@/components/CustomActions';
+import { DealsPanel } from '@/components/deals/DealsPanel';
 
 interface Activity { mentions?: string[]; id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
 interface FollowUp { id: string; dueAt: string; note: string | null; doneAt: string | null; outcome: string | null; user: string | null }
 interface LeadDetail {
   id: string; customerId: string; customerCode: string; name: string; mobile: string | null; alternateMobiles: string[]; email: string | null; city: string | null;
   workspace: { id: string; name: string }; pipeline: { id: string; name: string; stages: { id: string; name: string; isWon: boolean; isLost: boolean }[] };
-  stageId: string; status: string | null; lostReason: string | null; source: string; customFields: Record<string, unknown>;
+  stageId: string; status: string | null; lostReason: string | null; source: string; customFields: Record<string, unknown>; rating: number | null;
   owner: { id: string; name: string } | null; createdAt: string; assignedAt: string | null; firstResponseAt: string | null;
   lastActivityAt: string | null; lastDisposition: string | null; nextFollowUpAt: string | null; score: number; stageChangedAt: string; canUpdate: boolean; canAssign: boolean;
   activities: Activity[]; followUps: FollowUp[]; labelIds: string[]; alternateEmails: string[]; fieldAccess: Record<string, 'editable' | 'read' | 'masked' | 'hidden'>;
@@ -25,7 +26,7 @@ interface LabelRow { id: string; name: string; color: string }
 interface Script { id: string; stageId: string | null; title: string; body: string }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷' };
+const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥' };
 const at = (h: number, addDays: number) => { const d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
@@ -37,7 +38,9 @@ const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_0
 
 function LeadPage() {
   const { id } = useParams<{ id: string }>();
-  const wsParam = useSearchParams().get('ws');
+  const params = useSearchParams();
+  const wsParam = params.get('ws');
+  const tabParam = params.get('tab');
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [ws, setWs] = useState<WorkspaceSettings | null>(null);
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
@@ -100,6 +103,10 @@ function LeadPage() {
       case 'action': return `${String(d.name ?? 'Custom action')}${d.score ? ` · ${Number(d.score) > 0 ? '+' : ''}${d.score} score` : ''}`;
       case 'task': return `Planned ${d.kind === 'meeting' ? 'meeting' : d.kind === 'call' ? 'call' : 'task'}: ${String(d.title ?? '')} — ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
       case 'labels': return 'Labels changed';
+      case 'quote': return 'Quote';
+      case 'payment': return 'Payment';
+      case 'process': return 'Process';
+      case 'team': return 'Lead team';
       default: return a.type;
     }
   }
@@ -110,7 +117,8 @@ function LeadPage() {
         <div>
           <div className="small muted"><Link href="/app/leads">Leads</Link> / {lead.workspace.name} · {lead.pipeline.name}</div>
           <h1>{lead.name} {lead.status && <span className={`badge ${STATUS_TONE[lead.status] ?? ''}`} style={{ verticalAlign: 'middle' }}>{label('statuses', lead.status)}</span>}
-            {' '}<span className={`badge ${lead.score >= 30 ? 'ok' : 'grey'}`} style={{ verticalAlign: 'middle' }} title="Lead score from custom actions">Score {lead.score}</span></h1>
+            {' '}<span className={`badge ${lead.score >= 30 ? 'ok' : 'grey'}`} style={{ verticalAlign: 'middle' }} title="Lead score from custom actions">Score {lead.score}</span>
+            {lead.rating ? <span className="stars" style={{ marginLeft: 8, fontSize: 16, verticalAlign: 'middle' }} title="Customer rating">{'★'.repeat(lead.rating)}</span> : null}</h1>
           <div className="small muted">
             {lead.mobile && (lead.mobile.includes('•') ? <span title="Masked for your role">{lead.mobile}</span> : <a href={`tel:${lead.mobile}`}>{lead.mobile}</a>)}{lead.email ? ` · ${lead.email}` : ''}{lead.alternateEmails?.length ? ` (+${lead.alternateEmails.length} email)` : ''}{lead.city ? ` · ${lead.city}` : ''}
             {' · '}<Link href={`/app/customers/${lead.customerId}`}>Customer {lead.customerCode} (360°)</Link>
@@ -168,6 +176,7 @@ function LeadPage() {
         </div>
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}
+      <DealsPanel lead={{ id: lead.id, name: lead.name, workspace: lead.workspace, canUpdate: lead.canUpdate, ownerId: lead.owner?.id ?? null }} people={people} initialTab={tabParam} onChange={load} />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }} className="lead-grid">
         <div style={{ display: 'grid', gap: 14 }}>

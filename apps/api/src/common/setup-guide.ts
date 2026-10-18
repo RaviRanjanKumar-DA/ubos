@@ -11,7 +11,7 @@ interface Ctx { db: Db; tenantId: string; workspaceId: string | null; audit: (pr
 const WS = (tab: string) => (c: { workspaceId: string | null }) => (c.workspaceId ? `/app/workspaces/${c.workspaceId}?tab=${tab}` : '/app/workspaces');
 const hrefs: Record<string, (c: { workspaceId: string | null }) => string> = {
   lead_fields: WS('fields'), lead_stages: WS('stages'), call_feedback: WS('feedback'), custom_actions: WS('actions'),
-  sop_forms: WS('stages'), assignment_rules: WS('assignment'), lead_reports: WS('fields'),
+  sop_forms: WS('stages'), assignment_rules: WS('assignment'), lead_reports: WS('fields'), labels: WS('labels'),
 };
 
 /**
@@ -45,8 +45,9 @@ export const GUIDES: GuideDef[] = [
           { id: 'call_feedback', title: 'Configure call feedback and lead statuses', level: 'basic', done: async (c) => (await c.audit('workspace.call_disposition')) || (await c.audit('workspace.lead_status')) },
           { id: 'custom_actions', title: 'Configure custom actions', level: 'basic', done: async (c) => (await c.db.customAction.count({ where: { tenantId: c.tenantId } })) > 0 },
           { id: 'sop_forms', title: 'Add stage rules (required details before a stage)', level: 'advanced', done: async (c) => (await c.db.leadStage.count({ where: { tenantId: c.tenantId, requiredFieldKeys: { isEmpty: false } } })) > 0 },
-          { id: 'labels', title: 'Configure labels (tags)', level: 'advanced', phase: '1.5c' },
-          { id: 'process_templates', title: 'Process templates after a sale (steps, owners, payments)', level: 'advanced', phase: '1.5d' },
+          { id: 'labels', title: 'Configure labels (tags)', level: 'advanced', done: async (c) => (await c.db.label.count({ where: { tenantId: c.tenantId } })) > 0 },
+          { id: 'products', title: 'Add your products, packages and price lists', level: 'basic', href: '/app/products', done: async (c) => (await c.db.package.count({ where: { tenantId: c.tenantId } })) > 0 },
+          { id: 'process_templates', title: 'Process templates after a sale (steps, owners, payments)', level: 'advanced', href: '/app/processes', done: async (c) => (await c.db.processTemplate.count({ where: { tenantId: c.tenantId } })) > 0 },
         ],
       },
       {

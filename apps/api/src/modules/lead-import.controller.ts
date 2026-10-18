@@ -8,7 +8,7 @@ import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { findCustomer, nextCustomerCode } from '../common/customers';
-import { activity, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
+import { activity, assignmentAvailability, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
 
 const MAX_ROWS = 5000;
 const ImportBody = z.object({
@@ -65,7 +65,7 @@ export class LeadImportController {
         input.assign.mode === 'users'
           ? { assignmentMode: 'round_robin', assignmentUserIds: input.assign.userIds, assignmentCursor: 0, stickyOwner: false }
           : ws,
-        eligible, a.userId,
+        eligible, a.userId, await assignmentAvailability(tx),
       );
       const imp = await tx.leadImport.create({
         data: { tenantId: tenantId(), workspaceId: ws.id, fileName: input.fileName, total: rows.length, created: 0, linked: 0, skipped: 0, failed: 0, errors: [], createdById: a.userId },

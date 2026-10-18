@@ -33,6 +33,9 @@ import { SchedulerService } from './modules/scheduler.service';
 import { DataToolsController } from './modules/data-tools.controller';
 import { CustomActionsController } from './modules/custom-actions.controller';
 import { BillingController } from './modules/billing.controller';
+import { SalesController } from './modules/sales.controller';
+import { ProcessController } from './modules/process.controller';
+import { DealsController } from './modules/deals.controller';
 
 @Controller('health')
 class HealthController {
@@ -51,7 +54,7 @@ class HealthController {
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
     WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, AnalyticsController, LabelsScriptsController, ViewsTasksController, NotificationsSettingsController, DataToolsController, LeadWorkController,
-    CustomActionsController, BillingController,
+    CustomActionsController, BillingController, SalesController, ProcessController, DealsController,
   ],
   providers: [
     DbService,

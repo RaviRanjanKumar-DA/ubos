@@ -50,7 +50,7 @@ click-to-filter), integrations catalogue (93 services).
 | Setup Guide item | Slice |
 |---|---|
 | Import past calls & remarks; export calls / actions; bulk edit through Excel; labels; dashboards per role (done) | 1.5c |
-| Process templates / SOP forms | 1.5d |
+| Process templates / SOP forms | 1.5d (done) |
 | Lead sources (Facebook, Google Sheets, IndiaMART / JustDial, Google Forms), webhooks, API keys, Zapier / Make / n8n / Pabbly | 1.7 |
 | SIM calling, message templates, calling campaigns, WhatsApp chat sync & Business API, IVR providers (CallerDesk first), schedules & sequences | Phase 2 |
 | Flowcharts, API templates, Shopify / WooCommerce, Razorpay & other payments, accounting sync | Phase 3 |
@@ -60,7 +60,7 @@ click-to-filter), integrations catalogue (93 services).
 ## Order of work
 
 1. **1.5c Productivity** — smart views, Kanban, tasks & meetings with calendar and reminders, daily digest + scheduled dashboard emails (Mailpit locally), goals, call scripts, @mentions, labels, field-level security, alternate emails, Excel bulk update, import of past activities, export of actions.
-2. **1.5d Process & deals** — process templates (Blueprint-style), approvals, products / price lists / quotes, lock / unlock, payment rules.
+2. **1.5d Process & deals** — process templates (Blueprint-style), approvals, products / price lists / quotes, lock / unlock, payment rules. **Done 18 Oct 2026.**
 3. **1.7 Integrations & API** — API keys, webhooks, web-to-lead forms, Website API, Google Sheets, Facebook Lead Ads, portals, Google Forms, automation tools, email sync, meeting scheduler.
 4. **Phase 2** — calling (CallerDesk, SIM app, power dialer), WhatsApp, SMS, sequences, automation rules, help desk.
 5. **Phase 3 – 5** — finance & P&L, e-commerce, AI, marketing, remaining adapters.

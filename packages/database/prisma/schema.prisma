@@ -198,6 +198,8 @@ model Workspace {
   displayH1         String   @default("name")        // what lists and headers show as the title of a lead
   displayH2         String   @default("mobile")      // …and as the second line (name / mobile / email / city / cf:<key>)
   valueFieldKey     String?  // a number / amount lead field holding the deal value (for pipeline value and forecasts)
+  quoteMaxDiscountPct Int    @default(10)              // a quote with more discount than this needs approval
+  quoteTerms        String?  // default terms printed on quotes
   pipelines Pipeline[]
   leads     Lead[]
   packages  Package[]
@@ -333,6 +335,7 @@ model User {
   mustChangePassword Boolean @default(false)
   isActive      Boolean    @default(true)
   digestEnabled Boolean    @default(true)   // daily summary email
+  acceptingLeads Boolean   @default(true)   // off = skipped by automatic assignment (manual transfer still possible)
   lastDigestAt  DateTime?
   roles         UserRole[]
   employee      Employee?
@@ -514,6 +517,7 @@ model Lead {
   stageChangedAt  DateTime   @default(now()) // for stage SLA ("in this stage for 4 days")
   score           Int        @default(0)     // lead score, e.g. from custom-action scores
   labelIds        String[]   @default([])    // Label ids
+  teamMembers     LeadTeamMember[]
   importId        String?
   followUps       FollowUp[]
   activities      LeadActivity[]
@@ -579,15 +583,277 @@ model LeadImport {
   @@index([tenantId, workspaceId, createdAt])
 }
 
+// Products, services and packages sold by a business line.
 model Package {
   id          String            @id @default(uuid())
   tenantId    String
   workspaceId String
   workspace   Workspace         @relation(fields: [workspaceId], references: [id])
   name        String            // Elite, BSP, NME, VPM, Logo Basic, Vastu Audit...
+  code        String?           // SKU / short code
+  description String?
+  category    String?
+  unit        String            @default("unit")
   mrpPaise    Int
   gstRate     Decimal
+  isArchived  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @default(now()) @updatedAt
   sales       CustomerPackage[]
+  priceItems  PriceListItem[]
+}
+
+// A price list of a business line (e.g. "Standard", "Festive offer"); prices fall back to the product MRP.
+model PriceList {
+  id          String          @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  isDefault   Boolean         @default(false)
+  validFrom   DateTime?
+  validTo     DateTime?
+  isArchived  Boolean         @default(false)
+  createdAt   DateTime        @default(now())
+  items       PriceListItem[]
+
+  @@index([tenantId, workspaceId])
+}
+
+model PriceListItem {
+  id            String    @id @default(uuid())
+  tenantId      String
+  priceListId   String
+  priceList     PriceList @relation(fields: [priceListId], references: [id])
+  packageId     String
+  package       Package   @relation(fields: [packageId], references: [id])
+  pricePaise    Int
+  minPricePaise Int?      // lowest price a rep may offer without approval
+
+  @@unique([priceListId, packageId])
+}
+
+// Quote / proposal made from a lead.
+model Quote {
+  id            String      @id @default(uuid())
+  tenantId      String
+  workspaceId   String
+  leadId        String
+  customerId    String
+  number        String      // Q-2026-0001
+  status        String      @default("draft") // draft | pending_approval | approved | sent | accepted | rejected
+  priceListId   String?
+  validUntil    DateTime?
+  subtotalPaise Int         @default(0) // list value before discount
+  discountPaise Int         @default(0)
+  taxPaise      Int         @default(0)
+  totalPaise    Int         @default(0)
+  notes         String?
+  terms         String?
+  needsApproval Boolean     @default(false)
+  approvalId    String?
+  createdById   String
+  sentAt        DateTime?
+  decidedAt     DateTime?   // accepted / rejected by the customer
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  items         QuoteItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, leadId])
+}
+
+model QuoteItem {
+  id             String  @id @default(uuid())
+  tenantId       String
+  quoteId        String
+  quote          Quote   @relation(fields: [quoteId], references: [id])
+  packageId      String?
+  name           String
+  qty            Int     @default(1)
+  listPricePaise Int     // price-list / MRP unit price
+  pricePaise     Int     // offered unit price
+  gstRate        Float   @default(0)
+  position       Int     @default(0)
+}
+
+// Anything waiting for a manager's yes / no: quote discounts, process steps that need sign-off.
+model ApprovalRequest {
+  id            String    @id @default(uuid())
+  tenantId      String
+  workspaceId   String
+  leadId        String?
+  kind          String    // quote_discount | process_step
+  entityId      String    // quote id / step-run id
+  title         String
+  details       Json?
+  status        String    @default("pending") // pending | approved | rejected | cancelled
+  requestedById String
+  decidedById   String?
+  decidedAt     DateTime?
+  decisionNote  String?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, status])
+  @@index([tenantId, entityId])
+}
+
+// What happens after a sale: ordered steps with owners, forms, payment gates and approvals (per business line).
+model ProcessTemplate {
+  id          String        @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  description String?
+  trigger     String        @default("won") // won (starts when a lead is won) | manual
+  packageIds  String[]      @default([])    // only for these products (empty = any sale)
+  isArchived  Boolean       @default(false)
+  createdById String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @default(now()) @updatedAt
+  steps       ProcessStep[]
+
+  @@index([tenantId, workspaceId])
+}
+
+model ProcessStep {
+  id               String          @id @default(uuid())
+  tenantId         String
+  templateId       String
+  template         ProcessTemplate @relation(fields: [templateId], references: [id])
+  position         Int
+  name             String
+  instructions     String?
+  assignTo         String          @default("lead_owner") // lead_owner | user | role
+  assigneeUserId   String?
+  ownerRoleId      String?         // responsible role (assignTo = role: first available person with it)
+  dueDays          Int?            // due this many days after the step starts
+  fields           Json            @default("[]") // [{ key, label, type, options, required }]
+  minPaymentPct    Int?            // step can only be completed once this % of the deal value is received
+  requiresApproval Boolean         @default(false)
+  access           Json            @default("{}") // roleId → edit | view | none (roles not listed: view)
+  isArchived       Boolean         @default(false)
+}
+
+// One customer's journey through a process template.
+model ProcessRun {
+  id              String    @id @default(uuid())
+  tenantId        String
+  workspaceId     String
+  templateId      String
+  leadId          String
+  customerId      String
+  quoteId         String?
+  status          String    @default("active") // active | completed | cancelled
+  dealValuePaise  Int       @default(0)
+  startedAt       DateTime  @default(now())
+  completedAt     DateTime?
+  cancelledReason String?
+  rating          Int?      // customer rating 1-5 recorded at completion
+  ratingNote      String?
+  createdById     String
+  steps           StepRun[]
+
+  @@index([tenantId, leadId])
+  @@index([tenantId, workspaceId, status])
+}
+
+model StepRun {
+  id            String     @id @default(uuid())
+  tenantId      String
+  runId         String
+  run           ProcessRun @relation(fields: [runId], references: [id])
+  stepId        String
+  position      Int
+  status        String     @default("pending") // pending | active | awaiting_approval | done
+  assigneeId    String?
+  dueAt         DateTime?
+  data          Json       @default("{}")
+  startedAt     DateTime?
+  completedAt   DateTime?
+  completedById String?
+  locked        Boolean    @default(false) // done steps are locked; unlocking needs process.unlock and a reason
+  approvalId    String?
+  sentBackCount Int        @default(0)
+  updatedAt     DateTime   @default(now()) @updatedAt
+
+  @@index([runId])
+  @@index([tenantId, assigneeId, status])
+}
+
+// Money received from a customer: token, instalments, balance. Never deleted — a wrong entry is voided.
+model Payment {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  customerId  String
+  leadId      String?
+  runId       String?
+  packageId   String?
+  amountPaise Int
+  kind        String    @default("instalment") // token | instalment | balance | full
+  mode        String    @default("upi")        // cash | upi | card | bank | cheque | online
+  reference   String?
+  receivedAt  DateTime  @default(now())
+  note        String?
+  source      String    @default("manual")     // manual | rule (payment rules) | gateway (1.7)
+  isVoided    Boolean   @default(false)
+  voidReason  String?
+  voidedById  String?
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, runId])
+  @@index([tenantId, customerId])
+}
+
+// Decides what an incoming payment is: a new sale (opens a won lead + process) or an instalment of a running one.
+model PaymentRule {
+  id             String   @id @default(uuid())
+  tenantId       String
+  workspaceId    String
+  name           String
+  position       Int      @default(0)
+  minAmountPaise Int?
+  maxAmountPaise Int?
+  packageIds     String[] @default([])
+  action         String   // new_sale | instalment
+  isArchived     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId, workspaceId])
+}
+
+// Extra people working on a lead (designer, consultant, accounts) with a role label; they can see the lead.
+model LeadTeamMember {
+  id        String    @id @default(uuid())
+  tenantId  String
+  leadId    String
+  lead      Lead      @relation(fields: [leadId], references: [id])
+  userId    String
+  roleLabel String
+  addedById String
+  createdAt DateTime  @default(now())
+  removedAt DateTime?
+
+  @@index([tenantId, userId])
+  @@index([leadId])
+}
+
+// Temporary cover while someone is away: their new leads go to the cover person, who also sees their leads.
+model UserCover {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  coverUserId String
+  startsAt    DateTime
+  endsAt      DateTime
+  note        String?
+  createdById String
+  cancelledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, userId])
+  @@index([tenantId, coverUserId])
 }
 
 model CustomerPackage {

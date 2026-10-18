@@ -1,4 +1,5 @@
 import type { Prisma, Tx } from '@ubos/database';
+import { startProcessesOnWin } from './process-engine';
 
 /**
  * Active users who may own leads in a workspace: a valid role there (or organization-wide) that can work leads
@@ -34,22 +35,45 @@ export function makeAssigner(
   ws: { assignmentMode: string; assignmentUserIds: string[]; assignmentCursor: number; stickyOwner: boolean },
   eligible: string[],
   creatorId: string,
+  avail: Availability = { paused: new Set(), cover: new Map() },
 ) {
   const eligibleSet = new Set(eligible);
   const pool = ws.assignmentUserIds.filter((id) => eligibleSet.has(id));
   const rr = pool.length ? pool : eligible;
   const state = { cursor: ws.assignmentCursor };
+  // Someone away hands new leads to their cover person (when that person works in this business line).
+  const covered = (id: string) => { const c = avail.cover.get(id); return c && eligibleSet.has(c) ? c : id; };
+  const free = (id: string) => !avail.paused.has(id) && !avail.cover.has(id);
   return {
     state,
     pick(customerPrimaryRmId?: string | null): string {
-      if (ws.stickyOwner && customerPrimaryRmId && eligibleSet.has(customerPrimaryRmId)) return customerPrimaryRmId;
+      if (ws.stickyOwner && customerPrimaryRmId && eligibleSet.has(customerPrimaryRmId)) {
+        if (avail.cover.has(customerPrimaryRmId)) return covered(customerPrimaryRmId);
+        if (!avail.paused.has(customerPrimaryRmId)) return customerPrimaryRmId;
+      }
       if (ws.assignmentMode === 'creator' || !rr.length) return creatorId;
-      if (ws.assignmentMode === 'fixed') return pool[0] ?? creatorId;
-      const owner = rr[state.cursor % rr.length];
-      state.cursor = (state.cursor + 1) % 1_000_000;
-      return owner;
+      if (ws.assignmentMode === 'fixed') return pool[0] ? covered(pool[0]) : creatorId;
+      // Round-robin skips people who stopped accepting new leads or are away.
+      for (let i = 0; i < rr.length; i++) {
+        const owner = rr[state.cursor % rr.length];
+        state.cursor = (state.cursor + 1) % 1_000_000;
+        if (free(owner)) return owner;
+      }
+      return covered(rr[state.cursor % rr.length]);
     },
   };
+}
+
+export interface Availability { paused: Set<string>; cover: Map<string, string> }
+
+/** Who is not taking new leads right now: the accepting-new-leads switch is off, or they are away with a cover. */
+export async function assignmentAvailability(tx: Tx): Promise<Availability> {
+  const now = new Date();
+  const [paused, covers] = await Promise.all([
+    tx.user.findMany({ where: { acceptingLeads: false }, select: { id: true } }),
+    tx.userCover.findMany({ where: { cancelledAt: null, startsAt: { lte: now }, endsAt: { gt: now } }, orderBy: { createdAt: 'asc' } }),
+  ]);
+  return { paused: new Set(paused.map((u) => u.id)), cover: new Map(covers.map((c) => [c.userId, c.coverUserId])) };
 }
 
 /** Keeps Lead.nextFollowUpAt equal to the earliest open follow-up. */
@@ -66,7 +90,7 @@ export function activity(
   return { tenantId: lead.tenantId, workspaceId: lead.workspaceId, leadId: lead.id, userId, ...a };
 }
 
-type StageRow = { id: string; name: string; pipelineId: string; isLost: boolean; requiredFieldKeys: string[]; setStatus: string | null; followUpDays: number | null };
+type StageRow = { id: string; name: string; pipelineId: string; isLost: boolean; isWon?: boolean; requiredFieldKeys: string[]; setStatus: string | null; followUpDays: number | null };
 type LeadRow = { id: string; tenantId: string; workspaceId: string; pipelineId: string; stageId: string; status: string | null; lostReason: string | null; ownerId: string | null; customFields: unknown };
 
 /**
@@ -102,6 +126,7 @@ export async function applyStageChange(tx: Tx, lead: LeadRow, stage: StageRow, u
     await tx.followUp.create({ data: { tenantId: lead.tenantId, leadId: lead.id, dueAt: due, userId: lead.ownerId ?? userId, createdById: userId, note: `Auto follow-up after moving to ${stage.name}` } });
     await syncNextFollowUp(tx, lead.id);
   }
+  if (stage.isWon) await startProcessesOnWin(tx, lead.id, userId);
   return null;
 }
 

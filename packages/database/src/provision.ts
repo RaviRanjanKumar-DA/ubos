@@ -35,6 +35,8 @@ export interface ProvisionInput {
  * tenant's built-in admin role receives them organization-wide. Runs at API startup (platform connection).
  */
 export async function syncPermissionCatalog(client: PrismaClient) {
+  const known = new Set((await client.permission.findMany({ select: { key: true } })).map((p) => p.key));
+  const fresh = PERMISSION_KEYS.filter((k) => !known.has(k));
   await client.permission.createMany({ data: PERMISSION_KEYS.map((key) => ({ key })), skipDuplicates: true });
   const perms = await client.permission.findMany({ where: { key: { in: PERMISSION_KEYS } } });
   const adminRoles = await client.role.findMany({ where: { name: ADMIN_ROLE }, select: { id: true } });
@@ -43,6 +45,20 @@ export async function syncPermissionCatalog(client: PrismaClient) {
     data: adminRoles.flatMap((role) => perms.map((p) => ({ roleId: role.id, permissionId: p.id, scope: 'ORGANIZATION' as const }))),
     skipDuplicates: true,
   });
+  // Permissions that are new in this release also go to the built-in Manager / Team Leader / RM / Auditor roles
+  // as their templates say — only once, so an admin who later removes one keeps it removed.
+  if (fresh.length && known.size) {
+    const byKey = new Map(perms.map((p) => [p.key, p.id]));
+    for (const t of ROLE_TEMPLATES.filter((x) => x.name !== ADMIN_ROLE)) {
+      const grants = t.grants.filter((g) => fresh.includes(g.key));
+      if (!grants.length) continue;
+      const roles = await client.role.findMany({ where: { name: t.name, isTemplate: true }, select: { id: true } });
+      await client.rolePermission.createMany({
+        data: roles.flatMap((role) => grants.map((g) => ({ roleId: role.id, permissionId: byKey.get(g.key)!, scope: g.scope, isDeny: !!g.isDeny }))),
+        skipDuplicates: true,
+      });
+    }
+  }
   return r.count;
 }
 
