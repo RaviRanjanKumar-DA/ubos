@@ -15,6 +15,7 @@ interface LeaderRow {
 const pc = (v: number | null) => (v === null ? '—' : `${v}%`);
 const warn = (bad: boolean) => (bad ? { color: 'var(--bad)', fontWeight: 600 } : undefined);
 interface FollowRow { id: string; leadId: string; name: string; mobile: string | null; dueAt: string; note: string | null; owner: string | null; overdue: boolean }
+interface GoalRow { id: string; name: string; who: string; periodLabel: string; value: number; target: number; percent: number; onTrack: boolean; format: string }
 interface ForecastData { wonSoFar: number; runRateWins: number; pipelineWins: number; wonValueSoFar: number; runRateValue: number; weightedPipelineValue: number; openLeads: number; daysLeft: number }
 
 /** Leads-list link for a clicked bar / slice, when the metric maps to lead filters. */
@@ -97,6 +98,22 @@ export function WidgetBody({ w, data, onDrill, onCross, active }: {
           <Link key={f.id} href={`/app/leads/${f.leadId}`} className="fu-row">
             <span style={{ minWidth: 0 }}><b>{f.name}</b><span className="small muted"> · {f.note ?? 'Follow-up'}{f.owner ? ` · ${f.owner}` : ''}</span></span>
             <span className={`badge ${f.overdue ? 'bad' : 'warn'}`}>{relTime(f.dueAt)}</span>
+          </Link>
+        ))}
+      </div>
+    );
+  }
+  if (w.type === 'goals') {
+    const rows = (data as { rows: GoalRow[] }).rows;
+    if (!rows.length) return <div className="empty" style={{ padding: 14 }}>No goals yet. <Link href="/app/goals">Set goals</Link></div>;
+    return (
+      <div className="goal-strip">
+        {rows.map((g) => (
+          <Link key={g.id} href="/app/goals" className="goal-mini">
+            <span className="small muted">{g.who} · {g.periodLabel}</span>
+            <b>{g.name}</b>
+            <span className="goal-bar"><span style={{ width: `${Math.min(100, g.percent)}%`, background: g.percent >= 100 ? 'var(--ok)' : g.onTrack ? 'var(--brand)' : '#e08a1e' }} /></span>
+            <span className="small">{fmt(g.value, g.format)} / {fmt(g.target, g.format)} · {g.percent}%{g.percent < 100 && !g.onTrack ? ' · behind' : ''}</span>
           </Link>
         ))}
       </div>

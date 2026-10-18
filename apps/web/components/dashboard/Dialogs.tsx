@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 const TYPE_HINT: Record<WidgetType, string> = {
   kpi: 'One number with the change vs the previous period', line: 'How a number moves day by day, week or month', bar: 'Compare people, stages, sources…',
   pie: 'Share of a total', funnel: 'How far new leads get', table: 'Exact numbers per group', leaderboard: 'People ranked by wins, calls and more',
-  heatmap: 'Best weekday and hour', gauge: 'Progress towards a target', followups: 'Follow-ups due today and overdue', forecast: 'Where this month will land',
+  heatmap: 'Best weekday and hour', gauge: 'Progress towards a target', followups: 'Follow-ups due today and overdue', forecast: 'Where this month will land', goals: 'Progress towards the goals you can see',
 };
 /** Groupings that make sense for each chart type. */
 const TYPE_GROUPS: Partial<Record<WidgetType, GroupBy[]>> = {

@@ -4,13 +4,13 @@ import { useState } from 'react';
 import type { WorkspaceSettings } from '@/lib/workspace';
 
 export interface Adv {
-  stageIds: string[]; statuses: string[]; sources: string[]; owners: string[]; dispositions: string[]; lostReasons: string[];
+  stageIds: string[]; statuses: string[]; sources: string[]; owners: string[]; dispositions: string[]; lostReasons: string[]; labelIds: string[];
   createdFrom: string; createdTo: string; assignedFrom: string; assignedTo: string; activityFrom: string; activityTo: string;
   followUpFrom: string; followUpTo: string; contacted: '' | 'yes' | 'no'; stuck: '' | 'yes'; scoreMin: string; scoreMax: string;
   cf: Record<string, string>;
 }
 export const EMPTY_ADV: Adv = {
-  stageIds: [], statuses: [], sources: [], owners: [], dispositions: [], lostReasons: [],
+  stageIds: [], statuses: [], sources: [], owners: [], dispositions: [], lostReasons: [], labelIds: [],
   createdFrom: '', createdTo: '', assignedFrom: '', assignedTo: '', activityFrom: '', activityTo: '', followUpFrom: '', followUpTo: '',
   contacted: '', stuck: '', scoreMin: '', scoreMax: '', cf: {},
 };
@@ -18,7 +18,7 @@ export const EMPTY_ADV: Adv = {
 /** Query-string parameters for the leads API. */
 export function advParams(a: Adv): [string, string][] {
   const out: [string, string][] = [];
-  for (const k of ['stageIds', 'statuses', 'sources', 'owners', 'dispositions', 'lostReasons'] as const) if (a[k].length) out.push([k, a[k].join(',')]);
+  for (const k of ['stageIds', 'statuses', 'sources', 'owners', 'dispositions', 'lostReasons', 'labelIds'] as const) if (a[k]?.length) out.push([k, a[k].join(',')]);
   for (const k of ['createdFrom', 'createdTo', 'assignedFrom', 'assignedTo', 'activityFrom', 'activityTo', 'followUpFrom', 'followUpTo', 'contacted', 'stuck', 'scoreMin', 'scoreMax'] as const) if (a[k]) out.push([k, a[k]]);
   for (const [k, v] of Object.entries(a.cf)) if (v) out.push([`cf_${k}`, v]);
   return out;
@@ -28,7 +28,7 @@ export const advCount = (a: Adv) => advParams(a).length;
 /** Reads filters from a query string (links from dashboards: ?stageIds=…&createdFrom=…). */
 export function advFromQuery(q: URLSearchParams): Adv {
   const a: Adv = { ...EMPTY_ADV, cf: {} };
-  for (const k of ['stageIds', 'statuses', 'sources', 'owners', 'dispositions', 'lostReasons'] as const) { const v = q.get(k); if (v) a[k] = v.split(',').filter(Boolean); }
+  for (const k of ['stageIds', 'statuses', 'sources', 'owners', 'dispositions', 'lostReasons', 'labelIds'] as const) { const v = q.get(k); if (v) a[k] = v.split(',').filter(Boolean); }
   for (const k of ['createdFrom', 'createdTo', 'assignedFrom', 'assignedTo', 'activityFrom', 'activityTo', 'followUpFrom', 'followUpTo', 'scoreMin', 'scoreMax'] as const) { const v = q.get(k); if (v) a[k] = v; }
   if (q.get('contacted') === 'yes' || q.get('contacted') === 'no') a.contacted = q.get('contacted') as 'yes' | 'no';
   if (q.get('stuck') === 'yes') a.stuck = 'yes';
@@ -40,13 +40,13 @@ export function advFromQuery(q: URLSearchParams): Adv {
  * Flexible filters to follow leads end to end: by stage, status, source, owner, last call outcome, lost reason,
  * dates (created / assigned / last activity / follow-up), contact, SLA breach, score and any custom field.
  */
-export function LeadFilters({ ws, people, value, onApply, onClose }: {
-  ws: WorkspaceSettings; people: { id: string; name: string }[]; value: Adv; onApply: (a: Adv) => void; onClose: () => void;
+export function LeadFilters({ ws, people, labels = [], value, onApply, onClose }: {
+  ws: WorkspaceSettings; people: { id: string; name: string }[]; labels?: { id: string; name: string; color: string }[]; value: Adv; onApply: (a: Adv) => void; onClose: () => void;
 }) {
   const [a, setA] = useState<Adv>(value);
-  const toggle = (k: 'stageIds' | 'statuses' | 'sources' | 'owners' | 'dispositions' | 'lostReasons', v: string) =>
+  const toggle = (k: 'stageIds' | 'statuses' | 'sources' | 'owners' | 'dispositions' | 'lostReasons' | 'labelIds', v: string) =>
     setA({ ...a, [k]: a[k].includes(v) ? a[k].filter((x) => x !== v) : [...a[k], v] });
-  const Chips = ({ k, items }: { k: 'stageIds' | 'statuses' | 'sources' | 'owners' | 'dispositions' | 'lostReasons'; items: [string, string][] }) => (
+  const Chips = ({ k, items }: { k: 'stageIds' | 'statuses' | 'sources' | 'owners' | 'dispositions' | 'lostReasons' | 'labelIds'; items: [string, string][] }) => (
     <div className="chips">{items.map(([v, l]) => <button type="button" key={v} className={`chip ${a[k].includes(v) ? 'on' : ''}`} onClick={() => toggle(k, v)}>{l}</button>)}</div>
   );
   const Range = ({ label, from, to }: { label: string; from: keyof Adv; to: keyof Adv }) => (
@@ -85,6 +85,8 @@ export function LeadFilters({ ws, people, value, onApply, onClose }: {
         <div className="row" style={{ marginTop: 8 }}>
           <label className="row small"><input type="checkbox" checked={a.stuck === 'yes'} onChange={(e) => setA({ ...a, stuck: e.target.checked ? 'yes' : '' })} /> Stuck longer than the stage SLA</label>
         </div>
+
+        {labels.length > 0 && <>{section('Labels')}<Chips k="labelIds" items={labels.map((l) => [l.id, l.name])} /></>}
 
         {section('People & source')}
         <div className="small" style={{ marginBottom: 4 }}>Owner</div>

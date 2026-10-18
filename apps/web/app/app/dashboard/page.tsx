@@ -239,6 +239,7 @@ export default function DashboardPage() {
                 ? <button className="btn outline" onClick={() => setDraft({ name: dash.name, widgets: dash.widgets })}>Edit</button>
                 : <button className="btn outline" onClick={() => setDraft({ name: `${dash.name} (my copy)`, widgets: dash.widgets })} title="Change widgets and save it as your own dashboard">Customise</button>)}
               {dash?.canShare && !dash.isTemplate && list?.canShare && <button className="btn outline" onClick={() => setSharing(true)}>Share</button>}
+              {dash && <EmailMe dashboardId={dash.id} />}
               <button className="btn" onClick={() => saveCopy('My dashboard', [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }]).then((id) => { if (id) setDraft({ name: 'My dashboard', widgets: [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] }); })}>+ New</button>
             </>
           )}
@@ -389,5 +390,35 @@ export default function DashboardPage() {
           onSave={(s) => run(() => api(`/api/v1/dashboards/${dash.id}/sharing`, { method: 'PUT', body: s }), 'Sharing saved.').then((ok) => { if (ok) { setSharing(false); setDash({ ...dash, sharing: s, isLocked: s.isLocked }); loadList(); } })} />
       )}
     </>
+  );
+}
+
+/** "Email me this dashboard" — daily or weekly, with the person's own numbers. */
+function EmailMe({ dashboardId }: { dashboardId: string }) {
+  const [sub, setSub] = useState<{ frequency: string; hour: number } | null>(null);
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ frequency: 'daily', hour: 9 });
+  useEffect(() => {
+    api<{ frequency: string; hour: number } | null>(`/api/v1/dashboards/${encodeURIComponent(dashboardId)}/subscription`)
+      .then((r) => { setSub(r); if (r) setF({ frequency: r.frequency, hour: r.hour }); }).catch(() => setSub(null));
+  }, [dashboardId]);
+  return (
+    <span style={{ position: 'relative' }}>
+      <button className={`btn ${sub ? '' : 'outline'}`} onClick={() => setOpen(!open)} title="Get this dashboard by email">✉ {sub ? (sub.frequency === 'weekly' ? 'Weekly email' : 'Daily email') : 'Email me'}</button>
+      {open && (
+        <div className="card fbar-more" style={{ width: 280 }}>
+          <div className="field"><label>Send</label>
+            <select className="input" value={f.frequency} onChange={(e) => setF({ ...f, frequency: e.target.value })}><option value="daily">Every day (yesterday’s numbers)</option><option value="weekly">Every Monday (last 7 days)</option></select>
+          </div>
+          <div className="field"><label>At</label>
+            <select className="input" value={f.hour} onChange={(e) => setF({ ...f, hour: Number(e.target.value) })}>{Array.from({ length: 24 }, (_, h) => <option key={h} value={h}>{`${((h + 11) % 12) + 1}:00 ${h < 12 ? 'am' : 'pm'}`}</option>)}</select>
+          </div>
+          <div className="row end">
+            {sub && <button className="btn sm ghost" onClick={() => api(`/api/v1/dashboards/${encodeURIComponent(dashboardId)}/subscription`, { method: 'DELETE' }).then(() => { setSub(null); setOpen(false); })}>Stop emails</button>}
+            <button className="btn sm" onClick={() => api<{ frequency: string; hour: number }>(`/api/v1/dashboards/${encodeURIComponent(dashboardId)}/subscription`, { method: 'PUT', body: f }).then((r) => { setSub(r); setOpen(false); })}>Save</button>
+          </div>
+        </div>
+      )}
+    </span>
   );
 }

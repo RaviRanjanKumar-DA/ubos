@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { z } from 'zod';
 import { normalizeMobile, toCsv, validateCustomFields } from '@ubos/shared';
@@ -11,13 +11,14 @@ import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { findCustomer, nextCustomerCode } from '../common/customers';
 import { activity, applyStageChange, defaultStatus, eligibleOwners, makeAssigner } from '../common/lead-ops';
+import { contact, customFields as visibleFields, fieldAccess, lockedFields } from '../common/field-access';
 
 const csvList = z.string().max(4000).optional().transform((v) => (v ? v.split(',').map((x) => x.trim()).filter(Boolean) : []));
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional();
 /** Flexible filters — every one is optional and they combine with AND; lists inside one filter combine with OR. */
 const ListQuery = z.object({
   pipelineId: z.string().uuid().optional(),
-  stageIds: csvList, statuses: csvList, sources: csvList, owners: csvList, dispositions: csvList, lostReasons: csvList,
+  stageIds: csvList, statuses: csvList, sources: csvList, owners: csvList, dispositions: csvList, lostReasons: csvList, labelIds: csvList,
   // single-value forms kept for simple links
   stageId: z.string().uuid().optional(), status: z.string().max(60).optional(), owner: z.string().max(60).optional(), source: z.string().max(60).optional(),
   createdFrom: day, createdTo: day, assignedFrom: day, assignedTo: day, activityFrom: day, activityTo: day, followUpFrom: day, followUpTo: day,
@@ -84,16 +85,17 @@ export class LeadsController {
       ]);
       const stage = new Map(stages.map((s) => [s.id, s]));
       const ownerName = new Map(owners.map((o) => [o.id, o.name]));
+      const fa = await fieldAccess(tx);
       const rows = leads.map((l) => {
         const s = stage.get(l.stageId);
         const inStageDays = Math.max(0, Math.floor((Date.now() - l.stageChangedAt.getTime()) / 86_400_000));
         return {
-          id: l.id, name: l.customer.name, mobile: l.customer.mobile, email: l.customer.email, city: l.customer.city,
+          id: l.id, name: l.customer.name, mobile: contact(fa, 'mobile', l.customer.mobile), email: contact(fa, 'email', l.customer.email), city: l.customer.city,
           customerId: l.customerId, customerCode: l.customer.code, source: l.source,
           workspaceId: l.workspaceId, workspace: l.workspace.name, pipelineId: l.pipelineId, pipeline: l.pipeline.name,
           stageId: l.stageId, stage: s?.name, stageColor: s?.color ?? null, lostReason: l.lostReason, status: l.status,
           inStageDays, slaBreached: !!s?.slaDays && !s.isWon && !s.isLost && inStageDays >= s.slaDays,
-          customFields: l.customFields ?? {}, score: l.score,
+          customFields: visibleFields(fa, l.customFields as Record<string, unknown>), score: l.score, labelIds: l.labelIds,
           ownerId: l.ownerId, owner: l.ownerId ? ownerName.get(l.ownerId) : null,
           nextFollowUpAt: l.nextFollowUpAt, lastActivityAt: l.lastActivityAt, lastDisposition: l.lastDisposition, createdAt: l.createdAt,
         };
@@ -221,6 +223,8 @@ export class LeadsController {
       const scope = await scopeFilter(tx, 'crm.lead.update');
       const lead = await tx.lead.findFirst({ where: { AND: [scope, { id }] } });
       if (!lead) throw new NotFoundException({ code: 'LEAD_NOT_FOUND', message: 'Lead not found' });
+      const locked = lockedFields(await fieldAccess(tx), Object.keys(customFields).map((k) => `cf:${k}`));
+      if (locked.length) throw new ForbiddenException({ code: 'FIELD_LOCKED', message: 'Your role cannot change some of these fields', details: locked });
       const changes = await this.checkFields(tx, lead.workspaceId, customFields, true);
       const before = (lead.customFields ?? {}) as Record<string, unknown>;
       const merged = { ...before, ...changes } as Prisma.InputJsonObject;
@@ -244,14 +248,15 @@ export class LeadsController {
       const stages = new Map((await tx.leadStage.findMany({ where: { id: { in: [...new Set(leads.map((l) => l.stageId))] } } })).map((s) => [s.id, s.name]));
       const owners = new Map((await tx.user.findMany({ where: { id: { in: leads.map((l) => l.ownerId).filter(Boolean) as string[] } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
       const ws = auth().workspaceId;
-      const fields = ws ? await tx.leadField.findMany({ where: { workspaceId: ws, isArchived: false }, orderBy: { position: 'asc' } }) : [];
+      const fa = await fieldAccess(tx);
+      const fields = (ws ? await tx.leadField.findMany({ where: { workspaceId: ws, isArchived: false }, orderBy: { position: 'asc' } }) : []).filter((f) => fa.of(`cf:${f.key}`) !== 'hidden');
       await this.db.audit(tx, { entity: 'lead', entityId: 'export', action: 'lead.exported', newValue: { rows: leads.length, filters: Object.keys(query as object) } });
       return [
         ['Customer ID', 'Name', 'Mobile', 'Email', 'Business line', 'Pipeline', 'Stage', 'Status', 'Lost reason', 'Source', 'Owner', 'Score', 'Last call', 'Next follow-up', 'Created', ...fields.map((f) => f.label)],
         ...leads.map((l) => {
-          const cf = (l.customFields ?? {}) as Record<string, unknown>;
+          const cf = visibleFields(fa, l.customFields as Record<string, unknown>);
           return [
-            l.customer.code, l.customer.name, l.customer.mobile ?? '', l.customer.email ?? '', l.workspace.name, l.pipeline.name,
+            l.customer.code, l.customer.name, contact(fa, 'mobile', l.customer.mobile) ?? '', contact(fa, 'email', l.customer.email) ?? '', l.workspace.name, l.pipeline.name,
             stages.get(l.stageId) ?? '', l.status ?? '', l.lostReason ?? '', l.source, l.ownerId ? owners.get(l.ownerId) ?? '' : '', l.score,
             l.lastDisposition ?? '', l.nextFollowUpAt?.toISOString() ?? '', l.createdAt.toISOString(),
             ...fields.map((f) => (Array.isArray(cf[f.key]) ? (cf[f.key] as string[]).join('; ') : String(cf[f.key] ?? ''))),
@@ -286,6 +291,7 @@ export class LeadsController {
     }
     if (q.dispositions.length) and.push({ lastDisposition: { in: q.dispositions } });
     if (q.lostReasons.length) and.push({ lostReason: { in: q.lostReasons } });
+    if (q.labelIds.length) and.push({ labelIds: { hasSome: q.labelIds } });
     const created = range(q.createdFrom, q.createdTo); if (created) and.push({ createdAt: created });
     const assigned = range(q.assignedFrom, q.assignedTo); if (assigned) and.push({ assignedAt: assigned });
     const act = range(q.activityFrom, q.activityTo); if (act) and.push({ lastActivityAt: act });

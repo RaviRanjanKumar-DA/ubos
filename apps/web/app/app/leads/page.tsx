@@ -15,11 +15,13 @@ interface Lead {
   workspaceId: string; workspace: string; pipelineId: string; pipeline: string; stageId: string; stage: string; stageColor: string | null;
   lostReason: string | null; status: string | null; inStageDays: number; slaBreached: boolean; score: number;
   customFields: Record<string, unknown>; ownerId: string | null; owner: string | null;
-  nextFollowUpAt: string | null; lastActivityAt: string | null; lastDisposition: string | null; createdAt: string;
+  nextFollowUpAt: string | null; lastActivityAt: string | null; lastDisposition: string | null; createdAt: string; labelIds: string[];
 }
 interface Person { id: string; name: string }
+export interface LabelRow { id: string; name: string; color: string; workspaceId: string | null }
+interface SavedView { id: string; name: string; isMine: boolean; owner: string | null; workspaceId: string | null; layout: 'list' | 'board'; sharedRoleIds: string[]; query: { quick?: Quick; adv?: Partial<Adv>; sort?: string } }
 type Quick = { followUp: string; owner: string; q: string };
-type BulkAction = 'assign' | 'stage' | 'status' | 'remark' | 'follow_up';
+type BulkAction = 'assign' | 'stage' | 'status' | 'remark' | 'follow_up' | 'labels';
 const SORTS: [string, string][] = [
   ['created_desc', 'Newest first'], ['created_asc', 'Oldest first'], ['activity_desc', 'Recently worked'],
   ['followup_asc', 'Next follow-up'], ['score_desc', 'Highest score'], ['stage_age_desc', 'Longest in stage'],
@@ -51,6 +53,13 @@ function LeadsPage() {
   const [adding, setAdding] = useState(false);
   const [losing, setLosing] = useState<{ lead: Lead; stageId: string } | null>(null);
   const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  const [labels, setLabels] = useState<LabelRow[]>([]);
+  const [views, setViews] = useState<SavedView[]>([]);
+  const [activeView, setActiveView] = useState<string>('');
+  const [layout, setLayout] = useState<'list' | 'board'>('list');
+  const [boardPipe, setBoardPipe] = useState('');
+  const [dragLead, setDragLead] = useState<Lead | null>(null);
+  const [shareView, setShareView] = useState<SavedView | null>(null);
 
   /** One query string for the list and the export, so an export is exactly what is on screen. */
   const query = useCallback(() => {
@@ -83,12 +92,37 @@ function LeadsPage() {
     if (seenVersion.current === null) setAdv(advFromQuery(new URLSearchParams(params.toString())));
     else if (seenVersion.current !== version) setAdv(EMPTY_ADV);
     seenVersion.current = version;
+    setActiveView('');
+    loadViews();
+    api<LabelRow[]>('/api/v1/labels').then(setLabels).catch(() => setLabels([]));
     if (me.currentWorkspaceId && can('org.workspace.view')) {
       api<WorkspaceSettings>(`/api/v1/workspaces/${me.currentWorkspaceId}/settings`).then(setWs).catch(() => setWs(null));
       api<Person[]>(`/api/v1/workspaces/${me.currentWorkspaceId}/assignees`).then(setPeople).catch(() => setPeople([]));
     } else { setWs(null); setPeople([]); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
+
+  function loadViews() { api<SavedView[]>('/api/v1/views').then(setViews).catch(() => setViews([])); }
+  function applyView(v: SavedView | null) {
+    setActiveView(v?.id ?? '');
+    setQuick({ ...EMPTY_Q, ...(v?.query.quick ?? {}) });
+    setAdv({ ...EMPTY_ADV, ...(v?.query.adv ?? {}), cf: { ...(v?.query.adv?.cf ?? {}) } });
+    setSort(v?.query.sort ?? 'created_desc');
+    setLayout(v?.layout ?? 'list');
+  }
+  async function saveView(existing?: SavedView) {
+    const name = existing ? existing.name : prompt('Name this view, e.g. "Hot leads this week"');
+    if (!name) return;
+    const body = { name, workspaceId: me.currentWorkspaceId, query: { quick, adv, sort }, layout };
+    try {
+      const v = await api<SavedView>(existing ? `/api/v1/views/${existing.id}` : '/api/v1/views', { method: existing ? 'PATCH' : 'POST', body });
+      loadViews();
+      setActiveView(v.id);
+      setMsg({ type: 'notice', text: existing ? 'View updated.' : `Saved “${name}”.` });
+    } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
+  }
+  const labelOf = (id: string) => labels.find((x) => x.id === id);
+  const view = views.find((v) => v.id === activeView);
 
   const stagesFor = (l: Lead) => ws?.pipelines.find((p) => p.id === l.pipelineId)?.stages ?? [];
   // Without a selected business line there are no option labels: show the stored value readably.
@@ -132,6 +166,7 @@ function LeadsPage() {
       ['owners', 'Owner', (v) => (v === 'me' ? 'Me' : v === 'unassigned' ? 'Unassigned' : people.find((p) => p.id === v)?.name ?? 'Someone')],
       ['dispositions', 'Last call', (v) => label('dispositions', v)],
       ['lostReasons', 'Lost reason', (v) => ws.lostReasons.find((r) => r.value === v)?.label ?? v],
+      ['labelIds', 'Label', (v) => labelOf(v)?.name ?? 'Label'],
     ];
     for (const [k, title, name] of multi) {
       const vals = adv[k] as string[];
@@ -166,8 +201,23 @@ function LeadsPage() {
           </form>
           {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv} title="Exports the leads matching the current filters">Export</button>}
           {can('crm.lead.import') && me.currentWorkspaceId && <Link className="btn outline" href="/app/leads/import">Bulk upload</Link>}
+          {can('crm.lead.import') && me.currentWorkspaceId && <Link className="btn outline" href="/app/leads/update">Bulk update</Link>}
           {can('crm.lead.create') && ws && <button className="btn" onClick={() => setAdding(true)}>+ Add lead</button>}
         </div>
+      </div>
+
+      <div className="view-bar">
+        <button className={`view-tab ${!activeView ? 'on' : ''}`} onClick={() => applyView(null)}>All leads</button>
+        {views.map((v) => (
+          <button key={v.id} className={`view-tab ${activeView === v.id ? 'on' : ''}`} onClick={() => applyView(v)} title={v.isMine ? 'My view' : `Shared by ${v.owner}`}>
+            {v.isMine ? '' : '↗ '}{v.name}{v.layout === 'board' ? ' ▦' : ''}
+          </button>
+        ))}
+        <span style={{ flex: 1 }} />
+        {view?.isMine && <button className="btn sm ghost" onClick={() => saveView(view)}>Update view</button>}
+        {view?.isMine && can('crm.view.share') && <button className="btn sm ghost" onClick={() => setShareView(view)}>Share</button>}
+        {view?.isMine && <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={() => { if (confirm(`Remove the view “${view.name}”?`)) api(`/api/v1/views/${view.id}`, { method: 'DELETE' }).then(() => { applyView(null); loadViews(); }); }}>Remove</button>}
+        <button className="btn sm outline" onClick={() => saveView()}>☆ Save as view</button>
       </div>
 
       <div className="card" style={{ padding: 12, marginBottom: 12 }}>
@@ -183,6 +233,12 @@ function LeadsPage() {
           <select className="input" style={{ width: 'auto', height: 32 }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
+          {ws && (
+            <span className="row" style={{ gap: 0, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
+              <button className={`btn sm ${layout === 'list' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('list')} title="List">☰ List</button>
+              <button className={`btn sm ${layout === 'board' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('board')} title="Board by stage">▦ Board</button>
+            </span>
+          )}
           {ws && <button className={`btn sm ${nAdv ? '' : 'outline'}`} onClick={() => setShowFilters(true)}>⚲ Filters{nAdv ? ` (${nAdv})` : ''}</button>}
         </div>
         {ws && ws.pipelines.length > 0 && (
@@ -206,7 +262,52 @@ function LeadsPage() {
       {!me.currentWorkspaceId && can('crm.lead.create') && <div className="notice">Select a workspace (business line) at the top to add, upload, filter in detail or bulk-edit leads.</div>}
       {msg && <div className={msg.type}>{msg.text}</div>}
 
-      <div className="card" style={{ padding: 0 }}>
+      {layout === 'board' && ws && (() => {
+        const pipe = ws.pipelines.find((p) => p.id === boardPipe) ?? ws.pipelines[0];
+        const inPipe = (leads ?? []).filter((l) => l.pipelineId === pipe?.id);
+        return (
+          <>
+            {ws.pipelines.length > 1 && (
+              <div className="chips" style={{ marginBottom: 8 }}>
+                {ws.pipelines.map((p) => <button key={p.id} className={`chip ${pipe?.id === p.id ? 'on' : ''}`} onClick={() => setBoardPipe(p.id)}>{p.name}</button>)}
+              </div>
+            )}
+            <div className="board">
+              {pipe?.stages.map((s) => {
+                const cards = inPipe.filter((l) => l.stageId === s.id);
+                return (
+                  <div key={s.id} className={`board-col ${dragLead && dragLead.stageId !== s.id ? 'droppable' : ''}`}
+                    onDragOver={(e) => { if (dragLead && can('crm.lead.update')) e.preventDefault(); }}
+                    onDrop={() => { if (dragLead && dragLead.stageId !== s.id) moveStage(dragLead, s.id!); setDragLead(null); }}>
+                    <div className="board-head" style={{ borderTopColor: s.color ?? '#e4e2ec' }}>
+                      <b>{s.name}</b><span className="count">{cards.length}</span>
+                    </div>
+                    <div className="board-cards">
+                      {cards.map((l) => (
+                        <div key={l.id} className={`board-card ${l.slaBreached ? 'stuck' : ''}`} draggable={can('crm.lead.update')}
+                          onDragStart={() => setDragLead(l)} onDragEnd={() => setDragLead(null)} onClick={() => router.push(`/app/leads/${l.id}`)}>
+                          <b>{h1(l)}</b>
+                          <div className="small muted">{h2(l)}</div>
+                          {l.labelIds.length > 0 && <div className="lbls">{l.labelIds.map((id) => labelOf(id)).filter(Boolean).map((x) => <span key={x!.id} className="lbl" style={{ background: x!.color }}>{x!.name}</span>)}</div>}
+                          <div className="row small" style={{ justifyContent: 'space-between', marginTop: 4 }}>
+                            <span>{l.status ? <span className={`badge ${STATUS_TONE[l.status] ?? ''}`}>{label('statuses', l.status)}</span> : null}</span>
+                            <span className="muted">{l.slaBreached ? <span className="badge bad">Stuck {l.inStageDays}d</span> : l.owner ?? 'Unassigned'}</span>
+                          </div>
+                          {l.nextFollowUpAt && <div className="small" style={{ color: new Date(l.nextFollowUpAt) < new Date() ? 'var(--bad)' : 'var(--muted)' }}>⏰ {relTime(l.nextFollowUpAt)}</div>}
+                        </div>
+                      ))}
+                      {!cards.length && <div className="small muted" style={{ padding: 8, textAlign: 'center' }}>{dragLead ? 'Drop here' : 'No leads'}</div>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="small muted" style={{ marginTop: 6 }}>Drag a card to another stage — stage rules (required fields, lost reason) still apply. The board shows up to 500 leads; filter to narrow it.</div>
+          </>
+        );
+      })()}
+
+      {(layout === 'list' || !ws) && <div className="card" style={{ padding: 0 }}>
         <div className="table-wrap">
           <table className="table" style={{ minWidth: 960 }}>
             <thead>
@@ -226,6 +327,7 @@ function LeadsPage() {
                     <td>
                       <b>{h1(l)}</b>
                       <div className="small muted">{[h2(l), label('sources', l.source)].filter(Boolean).join(' · ')}</div>
+                      {l.labelIds.length > 0 && <div className="lbls">{l.labelIds.map((id) => labelOf(id)).filter(Boolean).map((x) => <span key={x!.id} className="lbl" style={{ background: x!.color }}>{x!.name}</span>)}</div>}
                     </td>
                     {!me.currentWorkspaceId && <td><span className="badge">{l.workspace}</span></td>}
                     {firstField && <td className="small">{showValue(firstField, l.customFields?.[firstField.key]) || <span className="muted">—</span>}</td>}
@@ -258,7 +360,7 @@ function LeadsPage() {
           {leads && !leads.length && <div className="empty">No leads match these filters.</div>}
           {!leads && <div className="empty">Loading…</div>}
         </div>
-      </div>
+      </div>}
 
       {selected.size > 0 && (
         <div className="bulkbar">
@@ -269,14 +371,15 @@ function LeadsPage() {
           {can('crm.lead.update') && ws && <button className="btn sm" onClick={() => setBulk('status')}>Change status</button>}
           {can('crm.lead.update') && <button className="btn sm" onClick={() => setBulk('remark')}>Add remark</button>}
           {can('crm.lead.update') && <button className="btn sm" onClick={() => setBulk('follow_up')}>Schedule follow-up</button>}
+          {can('crm.lead.update') && labels.length > 0 && <button className="btn sm" onClick={() => setBulk('labels')}>Labels</button>}
           <button className="btn sm" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}
 
-      {showFilters && ws && <LeadFilters ws={ws} people={people} value={adv} onClose={() => setShowFilters(false)} onApply={(a) => { setAdv(a); setShowFilters(false); }} />}
+      {showFilters && ws && <LeadFilters ws={ws} people={people} labels={labels} value={adv} onClose={() => setShowFilters(false)} onApply={(a) => { setAdv(a); setShowFilters(false); }} />}
       {bulk && (
         <BulkDialog
-          action={bulk} ids={[...selected]} ws={ws} people={people}
+          action={bulk} ids={[...selected]} ws={ws} people={people} labels={labels}
           onClose={() => setBulk(null)}
           onDone={(text) => { setBulk(null); setMsg({ type: 'notice', text }); load(); }}
         />
@@ -285,6 +388,7 @@ function LeadsPage() {
         <AddLead ws={ws} people={people} canAssign={can('crm.lead.assign')} meId={me.user.id} onClose={() => setAdding(false)}
           onSaved={(id) => { setAdding(false); router.push(`/app/leads/${id}`); }} />
       )}
+      {shareView && <ShareViewDialog view={shareView} onClose={() => setShareView(null)} onDone={() => { setShareView(null); loadViews(); setMsg({ type: 'notice', text: 'Sharing saved.' }); }} />}
       {losing && ws && (
         <LostDialog ws={ws} name={losing.lead.name} onClose={() => setLosing(null)} onPick={(r) => moveStage(losing.lead, losing.stageId, r)} />
       )}
@@ -292,9 +396,11 @@ function LeadsPage() {
   );
 }
 
-function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
-  action: BulkAction; ids: string[]; ws: WorkspaceSettings | null; people: Person[]; onClose: () => void; onDone: (text: string) => void;
+function BulkDialog({ action, ids, ws, people, labels = [], onClose, onDone }: {
+  action: BulkAction; ids: string[]; ws: WorkspaceSettings | null; people: Person[]; labels?: LabelRow[]; onClose: () => void; onDone: (text: string) => void;
 }) {
+  const [addL, setAddL] = useState<string[]>([]);
+  const [removeL, setRemoveL] = useState<string[]>([]);
   const [owners, setOwners] = useState<string[]>([]);
   const [stageId, setStageId] = useState('');
   const [lostReason, setLostReason] = useState('');
@@ -305,7 +411,7 @@ function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
   const [busy, setBusy] = useState(false);
   const stage = ws?.pipelines.flatMap((p) => p.stages).find((s) => s.id === stageId);
   const titles: Record<BulkAction, string> = {
-    assign: 'Assign leads', stage: 'Change stage', status: 'Change status', remark: 'Add remark', follow_up: 'Schedule follow-up',
+    assign: 'Assign leads', stage: 'Change stage', status: 'Change status', remark: 'Add remark', follow_up: 'Schedule follow-up', labels: 'Add or remove labels',
   };
 
   async function submit(e: React.FormEvent) {
@@ -322,6 +428,7 @@ function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
           ...(action === 'status' ? { status: status || undefined } : {}),
           ...(action === 'remark' || action === 'follow_up' ? { remark: remark || undefined } : {}),
           ...(action === 'follow_up' ? { followUpAt: new Date(date).toISOString() } : {}),
+          ...(action === 'labels' ? { addLabelIds: addL, removeLabelIds: removeL } : {}),
         },
       });
       const reasons = [...new Set(r.skipped.map((s) => s.reason))];
@@ -374,6 +481,18 @@ function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
             {ws.statuses.map((s) => <button type="button" key={s.value} className={`chip ${status === s.value ? 'on' : ''}`} onClick={() => setStatus(s.value ?? '')}>{s.label}</button>)}
           </div>
         )}
+        {action === 'labels' && (
+          <>
+            <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>Add</div>
+            <div className="chips" style={{ marginBottom: 10 }}>
+              {labels.map((l) => <button type="button" key={l.id} className={`chip ${addL.includes(l.id) ? 'on' : ''}`} onClick={() => { setAddL(addL.includes(l.id) ? addL.filter((x) => x !== l.id) : [...addL, l.id]); setRemoveL(removeL.filter((x) => x !== l.id)); }}><span className="lbl-dot" style={{ background: l.color }} />{l.name}</button>)}
+            </div>
+            <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>Remove</div>
+            <div className="chips" style={{ marginBottom: 12 }}>
+              {labels.map((l) => <button type="button" key={l.id} className={`chip ${removeL.includes(l.id) ? 'on' : ''}`} onClick={() => { setRemoveL(removeL.includes(l.id) ? removeL.filter((x) => x !== l.id) : [...removeL, l.id]); setAddL(addL.filter((x) => x !== l.id)); }}><span className="lbl-dot" style={{ background: l.color }} />{l.name}</button>)}
+            </div>
+          </>
+        )}
         {action === 'follow_up' && (
           <div className="field"><label>Follow-up on</label><input className="input" type="datetime-local" value={date} onChange={(e) => setDate(e.target.value)} required /></div>
         )}
@@ -385,7 +504,7 @@ function BulkDialog({ action, ids, ws, people, onClose, onDone }: {
         )}
         <div className="row end">
           <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
-          <button className="btn" disabled={busy || (action === 'assign' && !owners.length) || (action === 'status' && !status)}>{busy ? 'Applying…' : 'Apply'}</button>
+          <button className="btn" disabled={busy || (action === 'assign' && !owners.length) || (action === 'status' && !status) || (action === 'labels' && !addL.length && !removeL.length)}>{busy ? 'Applying…' : 'Apply'}</button>
         </div>
       </form>
     </div>
@@ -508,6 +627,29 @@ function AddLead({ ws, people, canAssign, meId, onClose, onSaved }: {
           <button type="button" className="btn ghost" onClick={onClose}>Cancel</button>
           <button className="btn" disabled={busy}>{busy ? 'Saving…' : 'Save lead'}</button>
         </div>
+      </form>
+    </div>
+  );
+}
+
+function ShareViewDialog({ view, onClose, onDone }: { view: SavedView; onClose: () => void; onDone: () => void }) {
+  const [roles, setRoles] = useState<{ id: string; name: string }[]>([]);
+  const [picked, setPicked] = useState<string[]>(view.sharedRoleIds);
+  const [error, setError] = useState('');
+  useEffect(() => { api<{ id: string; name: string }[]>('/api/v1/roles', { noWorkspace: true }).then(setRoles).catch(() => setRoles([])); }, []);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <form className="modal" onClick={(e) => e.stopPropagation()} onSubmit={async (e) => {
+        e.preventDefault();
+        try { await api(`/api/v1/views/${view.id}/sharing`, { method: 'PATCH', body: { sharedRoleIds: picked } }); onDone(); } catch (err) { setError(err instanceof ApiError ? err.message : 'Failed'); }
+      }}>
+        <h2>Share “{view.name}”</h2>
+        <p className="small muted" style={{ marginTop: -4 }}>People with these roles get this view in their list. Each still sees only the leads their own access allows.</p>
+        {error && <div className="error">{error}</div>}
+        <div className="chips" style={{ marginBottom: 12 }}>
+          {roles.map((r) => <button type="button" key={r.id} className={`chip ${picked.includes(r.id) ? 'on' : ''}`} onClick={() => setPicked(picked.includes(r.id) ? picked.filter((x) => x !== r.id) : [...picked, r.id])}>{r.name}</button>)}
+        </div>
+        <div className="row end"><button type="button" className="btn ghost" onClick={onClose}>Cancel</button><button className="btn">Save sharing</button></div>
       </form>
     </div>
   );

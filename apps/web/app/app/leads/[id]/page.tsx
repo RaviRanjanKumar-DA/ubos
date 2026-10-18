@@ -6,10 +6,12 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { api, ApiError, session } from '@/lib/api';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
+import { useShell } from '@/components/AppShell';
+import { TaskDialog, TaskRow } from '@/components/TaskDialog';
 import { Field, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 import type { CustomAction } from '@/components/CustomActions';
 
-interface Activity { id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
+interface Activity { mentions?: string[]; id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
 interface FollowUp { id: string; dueAt: string; note: string | null; doneAt: string | null; outcome: string | null; user: string | null }
 interface LeadDetail {
   id: string; customerId: string; customerCode: string; name: string; mobile: string | null; alternateMobiles: string[]; email: string | null; city: string | null;
@@ -17,11 +19,13 @@ interface LeadDetail {
   stageId: string; status: string | null; lostReason: string | null; source: string; customFields: Record<string, unknown>;
   owner: { id: string; name: string } | null; createdAt: string; assignedAt: string | null; firstResponseAt: string | null;
   lastActivityAt: string | null; lastDisposition: string | null; nextFollowUpAt: string | null; score: number; stageChangedAt: string; canUpdate: boolean; canAssign: boolean;
-  activities: Activity[]; followUps: FollowUp[];
+  activities: Activity[]; followUps: FollowUp[]; labelIds: string[]; alternateEmails: string[]; fieldAccess: Record<string, 'editable' | 'read' | 'masked' | 'hidden'>;
 }
+interface LabelRow { id: string; name: string; color: string }
+interface Script { id: string; stageId: string | null; title: string; body: string }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔' };
+const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷' };
 const at = (h: number, addDays: number) => { const d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
@@ -37,6 +41,8 @@ function LeadPage() {
   const [lead, setLead] = useState<LeadDetail | null>(null);
   const [ws, setWs] = useState<WorkspaceSettings | null>(null);
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+  const [labels, setLabels] = useState<LabelRow[]>([]);
+  const [labelEdit, setLabelEdit] = useState(false);
   const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
   const [losing, setLosing] = useState<string | null>(null);
   const workspace = wsParam ?? session.get()?.workspaceId ?? null;
@@ -47,7 +53,8 @@ function LeadPage() {
       setLead(l);
       setWs((cur) => cur ?? null);
       api<WorkspaceSettings>(`/api/v1/workspaces/${l.workspace.id}/settings`, { workspace: l.workspace.id }).then(setWs).catch(() => {});
-      if (l.canAssign) api<{ id: string; name: string }[]>(`/api/v1/workspaces/${l.workspace.id}/assignees`, { workspace: l.workspace.id }).then(setPeople).catch(() => {});
+      api<LabelRow[]>(`/api/v1/labels?workspaceId=${l.workspace.id}`, { workspace: l.workspace.id }).then(setLabels).catch(() => setLabels([]));
+      api<{ id: string; name: string }[]>(`/api/v1/workspaces/${l.workspace.id}/assignees`, { workspace: l.workspace.id }).then(setPeople).catch(() => {});
     } catch (e) {
       setMsg({ type: 'error', text: e instanceof Error ? e.message : 'Failed' });
     }
@@ -91,6 +98,8 @@ function LeadPage() {
       case 'follow_up': return `Follow-up planned for ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
       case 'import': return `Imported from ${String(d.file ?? 'file')}`;
       case 'action': return `${String(d.name ?? 'Custom action')}${d.score ? ` · ${Number(d.score) > 0 ? '+' : ''}${d.score} score` : ''}`;
+      case 'task': return `Planned ${d.kind === 'meeting' ? 'meeting' : d.kind === 'call' ? 'call' : 'task'}: ${String(d.title ?? '')} — ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
+      case 'labels': return 'Labels changed';
       default: return a.type;
     }
   }
@@ -103,8 +112,24 @@ function LeadPage() {
           <h1>{lead.name} {lead.status && <span className={`badge ${STATUS_TONE[lead.status] ?? ''}`} style={{ verticalAlign: 'middle' }}>{label('statuses', lead.status)}</span>}
             {' '}<span className={`badge ${lead.score >= 30 ? 'ok' : 'grey'}`} style={{ verticalAlign: 'middle' }} title="Lead score from custom actions">Score {lead.score}</span></h1>
           <div className="small muted">
-            {lead.mobile && <a href={`tel:${lead.mobile}`}>{lead.mobile}</a>}{lead.email ? ` · ${lead.email}` : ''}{lead.city ? ` · ${lead.city}` : ''}
+            {lead.mobile && (lead.mobile.includes('•') ? <span title="Masked for your role">{lead.mobile}</span> : <a href={`tel:${lead.mobile}`}>{lead.mobile}</a>)}{lead.email ? ` · ${lead.email}` : ''}{lead.alternateEmails?.length ? ` (+${lead.alternateEmails.length} email)` : ''}{lead.city ? ` · ${lead.city}` : ''}
             {' · '}<Link href={`/app/customers/${lead.customerId}`}>Customer {lead.customerCode} (360°)</Link>
+          </div>
+          <div className="lead-labels">
+          {lead.labelIds.map((lid) => labels.find((x) => x.id === lid)).filter(Boolean).map((x) => <span key={x!.id} className="lbl" style={{ background: x!.color }}>{x!.name}</span>)}
+          {lead.canUpdate && labels.length > 0 && <button className="btn sm ghost" onClick={() => setLabelEdit(!labelEdit)}>🏷 {lead.labelIds.length ? 'Edit labels' : 'Add label'}</button>}
+          {labelEdit && (
+            <div className="card label-pop">
+              {labels.map((x) => {
+                const on = lead.labelIds.includes(x.id);
+                return (
+                  <button key={x.id} className={`chip ${on ? 'on' : ''}`} onClick={() => act(() => call(`/api/v1/leads/${id}/labels`, 'PUT', { labelIds: on ? lead.labelIds.filter((y) => y !== x.id) : [...lead.labelIds, x.id] }), 'Labels saved.')}>
+                    <span className="lbl-dot" style={{ background: x.color }} />{x.name}
+                  </button>
+                );
+              })}
+            </div>
+          )}
           </div>
         </div>
         <div className="row">
@@ -146,7 +171,8 @@ function LeadPage() {
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }} className="lead-grid">
         <div style={{ display: 'grid', gap: 14 }}>
-          {lead.canUpdate && ws && <ActionPanel ws={ws} lead={lead} act={act} call={call} />}
+          {lead.canUpdate && ws && <ActionPanel ws={ws} lead={lead} act={act} call={call} people={people} />}
+          <TasksCard lead={lead} people={people} onChange={load} />
           {lead.canUpdate && ws && ws.statuses.length > 0 && (
             <div className="card">
               <h2>Lead status</h2>
@@ -187,6 +213,7 @@ function LeadPage() {
                   <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{relTime(a.at)}</span>
                 </div>
                 {a.remark && <div style={{ fontSize: 13.5, margin: '2px 0' }}>{a.remark}</div>}
+                {!!a.mentions?.length && <div className="small" style={{ color: 'var(--brand)' }}>{a.mentions.map((m) => `@${m}`).join(' ')}</div>}
                 {a.type === 'action' && a.data?.answers ? <Answers answers={a.data.answers as Record<string, unknown>} labels={a.data.labels as Record<string, string> | undefined} /> : null}
                 <div className="small muted">{a.user ?? 'System'} · {new Date(a.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
               </div>
@@ -205,17 +232,23 @@ function LeadPage() {
   );
 }
 
-function ActionPanel({ ws, lead, act, call }: {
-  ws: WorkspaceSettings; lead: LeadDetail;
+function ActionPanel({ ws, lead, act, call, people }: {
+  ws: WorkspaceSettings; lead: LeadDetail; people: { id: string; name: string }[];
   act: (fn: () => Promise<unknown>, text: string) => Promise<boolean>; call: (p: string, m: string, b?: unknown) => Promise<unknown>;
 }) {
+  const [mentions, setMentions] = useState<string[]>([]);
+  const [showMention, setShowMention] = useState(false);
+  const [scripts, setScripts] = useState<Script[]>([]);
+  const [showScript, setShowScript] = useState(true);
+  useEffect(() => { api<Script[]>(`/api/v1/call-scripts?workspaceId=${lead.workspace.id}`, { workspace: lead.workspace.id }).then(setScripts).catch(() => setScripts([])); }, [lead.workspace.id]);
+  const script = scripts.find((x) => x.stageId === lead.stageId) ?? scripts.find((x) => !x.stageId);
   const [tab, setTab] = useState<Tab>('call');
   const defaultDisposition = ws.dispositions.find((d) => d.isDefault)?.value ?? '';
   const [disposition, setDisposition] = useState(defaultDisposition);
   const [minutes, setMinutes] = useState('');
   const [remark, setRemark] = useState('');
   const [next, setNext] = useState('');
-  const reset = () => { setDisposition(defaultDisposition); setMinutes(''); setRemark(''); setNext(''); };
+  const reset = () => { setDisposition(defaultDisposition); setMinutes(''); setRemark(''); setNext(''); setMentions([]); setShowMention(false); };
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -223,10 +256,10 @@ function ActionPanel({ ws, lead, act, call }: {
     let ok = false;
     if (tab === 'call') {
       ok = await act(() => call(`/api/v1/leads/${lead.id}/activities`, 'POST', {
-        type: 'call', disposition, durationSec: minutes ? Math.round(Number(minutes) * 60) : undefined, remark: remark || undefined, followUpAt,
+        type: 'call', disposition, durationSec: minutes ? Math.round(Number(minutes) * 60) : undefined, remark: remark || undefined, followUpAt, mentionIds: mentions,
       }), 'Call logged.');
     } else if (tab === 'remark') {
-      ok = await act(() => call(`/api/v1/leads/${lead.id}/activities`, 'POST', { type: 'remark', remark, followUpAt }), 'Remark added.');
+      ok = await act(() => call(`/api/v1/leads/${lead.id}/activities`, 'POST', { type: 'remark', remark, followUpAt, mentionIds: mentions }), 'Remark added.');
     } else {
       ok = await act(() => call(`/api/v1/leads/${lead.id}/follow-ups`, 'POST', { dueAt: followUpAt, note: remark || undefined }), 'Follow-up planned.');
     }
@@ -241,6 +274,12 @@ function ActionPanel({ ws, lead, act, call }: {
             style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}>{l}</button>
         ))}
       </div>
+      {tab === 'call' && script && (
+        <div className="script-box">
+          <button type="button" className="link-btn small" onClick={() => setShowScript(!showScript)}>📋 Call script: {script.title} {showScript ? '▾' : '▸'}</button>
+          {showScript && <div className="script-body">{script.body}</div>}
+        </div>
+      )}
       {tab === 'call' && (
         <>
           <div className="small" style={{ fontWeight: 600, marginBottom: 6 }}>What happened on the call?</div>
@@ -256,6 +295,16 @@ function ActionPanel({ ws, lead, act, call }: {
       <div className="field">
         <label>{tab === 'follow_up' ? 'Note (optional)' : tab === 'call' ? 'Remark (optional)' : 'Remark'}</label>
         <textarea className="input" style={{ height: 70, paddingTop: 8 }} value={remark} onChange={(e) => setRemark(e.target.value)} required={tab === 'remark'} placeholder={tab === 'call' ? 'What did the customer say?' : ''} />
+        {tab !== 'follow_up' && people.length > 1 && (
+          <div style={{ marginTop: 6 }}>
+            <button type="button" className="btn sm ghost" onClick={() => setShowMention(!showMention)}>@ Mention{mentions.length ? ` (${mentions.length})` : ''}</button>
+            {showMention && (
+              <div className="chips" style={{ marginTop: 4 }}>
+                {people.map((p) => <button type="button" key={p.id} className={`chip ${mentions.includes(p.id) ? 'on' : ''}`} onClick={() => setMentions(mentions.includes(p.id) ? mentions.filter((x) => x !== p.id) : [...mentions, p.id])}>@{p.name}</button>)}
+              </div>
+            )}
+          </div>
+        )}
       </div>
       <div className="field">
         <label>{tab === 'follow_up' ? 'Follow-up on' : 'Next follow-up (optional)'}</label>
@@ -275,7 +324,8 @@ function DetailsCard({ ws, lead, act, call }: {
   ws: WorkspaceSettings; lead: LeadDetail;
   act: (fn: () => Promise<unknown>, text: string) => Promise<boolean>; call: (p: string, m: string, b?: unknown) => Promise<unknown>;
 }) {
-  const fields = ws.fields.filter((f) => !f.isArchived);
+  const access = (k: string) => lead.fieldAccess?.[`cf:${k}`] ?? 'editable';
+  const fields = ws.fields.filter((f) => !f.isArchived && access(f.key) !== 'hidden');
   const [editing, setEditing] = useState(false);
   const [values, setValues] = useState<Record<string, unknown>>(lead.customFields);
   useEffect(() => { setValues(lead.customFields); }, [lead]);
@@ -290,18 +340,21 @@ function DetailsCard({ ws, lead, act, call }: {
         <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', margin: '10px 0 0' }}>
           {fields.map((f) => [
             <dt key={`${f.key}-l`} className="muted small">{f.label}</dt>,
-            <dd key={`${f.key}-v`} style={{ margin: 0 }}>{showValue(f, lead.customFields[f.key]) || '—'}</dd>,
+            <dd key={`${f.key}-v`} style={{ margin: 0 }}>{access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '—') : showValue(f, lead.customFields[f.key]) || '—'}{access(f.key) !== 'editable' && <span className="small muted" title="Your role cannot change this field"> 🔒</span>}</dd>,
           ])}
         </dl>
       ) : (
         <form style={{ marginTop: 10 }} onSubmit={async (e) => {
           e.preventDefault();
-          if (await act(() => call(`/api/v1/leads/${lead.id}/fields`, 'PATCH', { customFields: values }), 'Details saved.')) setEditing(false);
+          const editable = Object.fromEntries(Object.entries(values).filter(([k]) => access(k) === 'editable'));
+          if (await act(() => call(`/api/v1/leads/${lead.id}/fields`, 'PATCH', { customFields: editable }), 'Details saved.')) setEditing(false);
         }}>
           {fields.map((f) => (
             <div key={f.key} className="field">
               <label htmlFor={`f_${f.key}`}>{f.label}{f.required && ' *'}</label>
-              <FieldInput field={f} value={values[f.key]} onChange={(v) => setValues({ ...values, [f.key]: v })} />
+              {access(f.key) === 'editable'
+                ? <FieldInput field={f} value={values[f.key]} onChange={(v) => setValues({ ...values, [f.key]: v })} />
+                : <input className="input" value={`${access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '') : showValue(f, lead.customFields[f.key])} 🔒`} disabled />}
             </div>
           ))}
           <div className="row end">
@@ -379,6 +432,39 @@ function RunAction({ action, onClose, onSubmit }: { action: CustomAction; onClos
           <button className="btn">Save · {action.score > 0 ? `+${action.score}` : action.score} score</button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/** Tasks, meetings and planned calls on this lead. */
+function TasksCard({ lead, people, onChange }: { lead: LeadDetail; people: { id: string; name: string }[]; onChange: () => void }) {
+  const { me, can } = useShell();
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [dialog, setDialog] = useState<TaskRow | 'new' | null>(null);
+  const load = useCallback(() => api<TaskRow[]>(`/api/v1/tasks?leadId=${lead.id}&status=all`, { workspace: lead.workspace.id }).then(setTasks).catch(() => setTasks([])), [lead.id, lead.workspace.id]);
+  useEffect(() => { load(); }, [load]);
+  const open = tasks.filter((t) => !t.doneAt);
+  const done = tasks.filter((t) => t.doneAt).slice(0, 3);
+  return (
+    <div className="card">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>Tasks & meetings</h2>
+        <button className="btn sm outline" onClick={() => setDialog('new')}>+ Plan</button>
+      </div>
+      {!tasks.length && <p className="small muted">Nothing planned. Plan a meeting, site visit or task — reminders arrive before it.</p>}
+      {[...open, ...done].map((t) => (
+        <div key={t.id} className="task-row">
+          <input type="checkbox" checked={!!t.doneAt} aria-label={`Done: ${t.title}`} onChange={() => api(`/api/v1/tasks/${t.id}`, { method: 'PATCH', body: { done: !t.doneAt }, workspace: lead.workspace.id }).then(() => { load(); onChange(); })} />
+          <div style={{ minWidth: 0, flex: 1, opacity: t.doneAt ? 0.55 : 1 }}>
+            <button className="link-btn" onClick={() => setDialog(t)} style={{ textDecoration: t.doneAt ? 'line-through' : undefined }}>{t.type === 'meeting' ? '👥' : t.type === 'call' ? '📞' : '✔'} {t.title}</button>
+            <div className="small muted"><span style={{ color: t.overdue ? 'var(--bad)' : undefined }}>{new Date(t.dueAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>{t.location ? ` · ${t.location}` : ''}{t.assigneeId !== me.user.id ? ` · ${t.assignee}` : ''}</div>
+          </div>
+        </div>
+      ))}
+      {dialog && (
+        <TaskDialog task={dialog === 'new' ? null : dialog} leadId={lead.id} leadName={lead.name} people={people} canAssign={can('crm.lead.assign')} meId={me.user.id}
+          onClose={() => setDialog(null)} onSaved={() => { setDialog(null); load(); onChange(); }} />
+      )}
     </div>
   );
 }

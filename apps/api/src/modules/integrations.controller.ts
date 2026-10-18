@@ -1,4 +1,11 @@
-import { Controller, Get, NotFoundException, Param, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Post, Put } from '@nestjs/common';
+import { z } from 'zod';
+import { bringsLeads, DUPLICATE_MODES, DuplicateMode, FieldDef, guessTarget, MAP_TARGETS, normalizeMobile, setupFor, sourceFieldsFor, validateCustomFields } from '@ubos/shared';
+import type { Tx } from '@ubos/database';
+import { findCustomer } from '../common/customers';
+import { decrypt, encrypt, randomToken } from '../auth/crypto';
+import { ctx } from '../common/context';
+import { parse } from '../common/errors';
 import { DbService } from '../common/db.service';
 import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
@@ -139,6 +146,182 @@ export class IntegrationsController {
     return Object.entries(CATALOGUE).map(([key, e]) => ({
       key, ...e, status: byKey.get(key)?.status ?? 'inactive', activatedAt: byKey.get(key)?.activatedAt ?? null,
     }));
+  }
+
+  /** Setup panel: steps, fields (secrets shown masked), webhook URL and status. */
+  @Get(':key/setup')
+  @RequirePermission('integrations.view')
+  setup(@Param('key') key: string) {
+    const entry = CATALOGUE[key];
+    if (!entry) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Unknown integration' });
+    const def = setupFor(key, entry.category);
+    return this.db.tenant(async (tx) => {
+      const conn = await tx.integrationConnection.findFirst({ where: { key, workspaceId: null } });
+      const cfg = this.config(conn?.configEncrypted);
+      const workspaces = await tx.workspace.findMany({ where: { isArchived: false }, select: { id: true, name: true }, orderBy: { name: 'asc' } });
+      const values = Object.fromEntries(def.fields.map((f) => {
+        const v = cfg.values[f.key];
+        if (v === undefined || v === '') return [f.key, ''];
+        return [f.key, f.type === 'secret' ? `••••${String(v).slice(-4)}` : v];
+      }));
+      return {
+        key, ...entry, status: conn?.status ?? 'inactive', activatedAt: conn?.activatedAt ?? null, lastEventAt: conn?.lastEventAt ?? null,
+        steps: def.steps, where: def.where ?? null,
+        fields: def.fields.map((f) => (f.key === 'businessLine' ? { ...f, options: workspaces.map((w) => w.id), optionLabels: workspaces.map((w) => w.name) } : f)),
+        values, configured: Object.keys(cfg.values).length > 0,
+        mapping: bringsLeads(def) ? await this.mappingView(tx, key, cfg) : null,
+        webhookUrl: def.webhook && cfg.webhookToken ? `${(process.env.API_PUBLIC_URL ?? 'http://localhost:4000').replace(/\/$/, '')}/hooks/${ctx().tenant!.slug}/${key}/${cfg.webhookToken}` : null,
+        needsWebhook: !!def.webhook,
+      };
+    });
+  }
+
+  /** Saves the settings (secrets encrypted; unchanged masked secrets are kept) and optionally activates. */
+  @Put(':key/setup')
+  @RequirePermission('integrations.manage', 'ORGANIZATION')
+  saveSetup(@Param('key') key: string, @Body() body: unknown) {
+    const entry = CATALOGUE[key];
+    if (!entry) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Unknown integration' });
+    const input = parse(z.object({ values: z.record(z.string().max(2000)), activate: z.boolean().default(false) }), body);
+    const def = setupFor(key, entry.category);
+    return this.db.tenant(async (tx) => {
+      const conn = await tx.integrationConnection.findFirst({ where: { key, workspaceId: null } });
+      const old = this.config(conn?.configEncrypted);
+      const values: Record<string, string> = {};
+      for (const f of def.fields) {
+        let v = (input.values[f.key] ?? '').trim();
+        if (f.type === 'secret' && (v.startsWith('••••') || v === '')) v = old.values[f.key] ?? '';
+        if (f.required && !v) throw new BadRequestException({ code: 'FIELD_REQUIRED', message: `${f.label} is required` });
+        if (v && f.type === 'url' && !/^https?:\/\/\S+$/.test(v)) throw new BadRequestException({ code: 'INVALID_URL', message: `${f.label} must start with https://` });
+        if (v && f.type === 'number' && Number.isNaN(Number(v))) throw new BadRequestException({ code: 'INVALID_NUMBER', message: `${f.label} must be a number` });
+        if (v && f.type === 'select' && f.key !== 'businessLine' && f.options && !f.options.includes(v)) throw new BadRequestException({ code: 'INVALID_OPTION', message: `Choose a valid ${f.label}` });
+        if (v && f.key === 'businessLine' && !(await tx.workspace.findFirst({ where: { id: v } }))) throw new BadRequestException({ code: 'INVALID_OPTION', message: 'Unknown business line' });
+        if (v) values[f.key] = v;
+      }
+      const cfg = { ...old, values, webhookToken: old.webhookToken ?? (def.webhook ? randomToken(18).replace(/[^A-Za-z0-9]/g, '').slice(0, 24) : undefined) };
+      const status = input.activate ? 'active' : conn?.status ?? 'inactive';
+      const data = { configEncrypted: encrypt(JSON.stringify(cfg)), status, ...(input.activate && conn?.status !== 'active' ? { activatedAt: new Date(), activatedById: auth().userId } : {}) };
+      if (conn) await tx.integrationConnection.update({ where: { id: conn.id }, data });
+      else await tx.integrationConnection.create({ data: { tenantId: tenantId(), key, ...data } });
+      await this.db.audit(tx, {
+        entity: 'integration', entityId: key, action: 'integration.configured',
+        // secrets never go into the audit log
+        newValue: { fields: Object.keys(values).map((k) => (def.fields.find((f) => f.key === k)?.type === 'secret' ? `${k}:••••` : k)), activated: input.activate },
+      });
+      return { ok: true, status };
+    });
+  }
+
+  /** Step 2 — how incoming data becomes a lead: field mapping and what to do with existing leads. */
+  @Put(':key/mapping')
+  @RequirePermission('integrations.manage', 'ORGANIZATION')
+  saveMapping(@Param('key') key: string, @Body() body: unknown) {
+    const entry = CATALOGUE[key];
+    if (!entry) throw new NotFoundException({ code: 'INTEGRATION_NOT_FOUND', message: 'Unknown integration' });
+    if (!bringsLeads(setupFor(key, entry.category))) throw new BadRequestException({ code: 'NO_MAPPING', message: 'This integration does not bring leads' });
+    const input = parse(z.object({
+      sourceFields: z.array(z.string().trim().min(1).max(80)).min(1).max(80),
+      map: z.record(z.string().max(80)),
+      duplicateMode: z.enum(Object.keys(DUPLICATE_MODES) as [DuplicateMode, ...DuplicateMode[]]),
+      defaultSource: z.string().trim().max(40).optional(),
+    }), body);
+    return this.db.tenant(async (tx) => {
+      const conn = await tx.integrationConnection.findFirst({ where: { key, workspaceId: null } });
+      const cfg = this.config(conn?.configEncrypted);
+      const ws = cfg.values.businessLine;
+      if (!ws) throw new BadRequestException({ code: 'BUSINESS_LINE_REQUIRED', message: 'Choose the business line in step 1 and save first' });
+      const targets = await this.targets(tx, ws);
+      const map = Object.fromEntries(input.sourceFields.map((f) => [f, input.map[f] ?? 'ignore']));
+      const bad = Object.values(map).filter((t) => !targets.some((x) => x.value === t));
+      if (bad.length) throw new BadRequestException({ code: 'UNKNOWN_TARGET', message: `Unknown lead field "${bad[0]}"` });
+      const used = Object.values(map).filter((t) => t !== 'ignore' && t !== 'remark');
+      if (new Set(used).size !== used.length) throw new BadRequestException({ code: 'DUPLICATE_TARGET', message: 'Each lead field can receive only one incoming field' });
+      const byEmail = (await tx.organizationSetting.findFirst())?.leadIdentifier === 'email';
+      if (!used.includes('name')) throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'Map one incoming field to Name' });
+      if (!used.includes(byEmail ? 'email' : 'mobile')) throw new BadRequestException({ code: 'LEAD_ID_REQUIRED', message: `Map one incoming field to ${byEmail ? 'Email' : 'Mobile'} — it is your Lead ID` });
+      const mapping = { sourceFields: input.sourceFields, map, duplicateMode: input.duplicateMode, defaultSource: input.defaultSource || key };
+      const data = { configEncrypted: encrypt(JSON.stringify({ ...cfg, mapping })) };
+      if (conn) await tx.integrationConnection.update({ where: { id: conn.id }, data });
+      else await tx.integrationConnection.create({ data: { tenantId: tenantId(), key, status: 'inactive', ...data } });
+      await this.db.audit(tx, { entity: 'integration', entityId: key, action: 'integration.mapping_saved', newValue: mapping });
+      return { ok: true, mapping };
+    });
+  }
+
+  /** Shows what a sample record would become, without saving anything. */
+  @Post(':key/mapping/preview')
+  @RequirePermission('integrations.view')
+  previewMapping(@Param('key') key: string, @Body() body: unknown) {
+    const { sample } = parse(z.object({ sample: z.record(z.unknown()) }), body);
+    return this.db.tenant(async (tx) => {
+      const conn = await tx.integrationConnection.findFirst({ where: { key, workspaceId: null } });
+      const cfg = this.config(conn?.configEncrypted);
+      if (!cfg.mapping || !cfg.values.businessLine) throw new BadRequestException({ code: 'MAPPING_REQUIRED', message: 'Save the field mapping first' });
+      const ws = cfg.values.businessLine;
+      const get = (path: string) => path.split('.').reduce<unknown>((o, k) => (o && typeof o === 'object' ? (o as Record<string, unknown>)[k] : undefined), sample);
+      const lead: Record<string, string> = {};
+      const remarks: string[] = [];
+      const custom: Record<string, unknown> = {};
+      for (const [src, target] of Object.entries(cfg.mapping.map)) {
+        const raw = get(src);
+        if (raw === undefined || raw === null || raw === '') continue;
+        const v = Array.isArray(raw) ? raw.join(', ') : typeof raw === 'object' ? JSON.stringify(raw) : String(raw);
+        if (target === 'ignore') continue;
+        if (target === 'remark') remarks.push(v);
+        else if (target === 'name') lead.name = lead.name ? `${lead.name} ${v}` : v;
+        else if (target.startsWith('cf:')) custom[target.slice(3)] = v;
+        else lead[target] = v;
+      }
+      const errors: string[] = [];
+      const byEmail = (await tx.organizationSetting.findFirst())?.leadIdentifier === 'email';
+      if (!lead.name) errors.push('Name is missing');
+      const mobile = lead.mobile ? normalizeMobile(lead.mobile) : null;
+      if (lead.mobile && !mobile) errors.push(`"${lead.mobile}" is not a valid mobile number`);
+      if (!byEmail && !mobile) errors.push('Mobile is missing (it is your Lead ID)');
+      if (byEmail && !lead.email) errors.push('Email is missing (it is your Lead ID)');
+      const fields = (await tx.leadField.findMany({ where: { workspaceId: ws, isArchived: false } })) as unknown as FieldDef[];
+      const { values, errors: fieldErrors } = validateCustomFields(fields, custom);
+      errors.push(...Object.values(fieldErrors));
+      const match = await findCustomer(tx, { mobile, email: lead.email || null, preferEmail: byEmail });
+      let existing = null;
+      if (match) {
+        const leads = await tx.lead.findMany({ where: { customerId: match.customer.id, workspaceId: ws }, orderBy: { createdAt: 'desc' } });
+        const stages = await tx.leadStage.findMany({ where: { id: { in: leads.map((l) => l.stageId) } } });
+        const open = leads.find((l) => { const st = stages.find((x) => x.id === l.stageId); return st && !st.isWon && !st.isLost; });
+        existing = { customerCode: match.customer.code, customerName: match.customer.name, openLeadId: open?.id ?? null };
+      }
+      const mode = cfg.mapping.duplicateMode as DuplicateMode;
+      const outcome = errors.length ? 'rejected'
+        : !existing?.openLeadId ? (existing ? 'new_lead_existing_customer' : 'new_lead_new_customer')
+        : mode === 'new_lead' ? 'new_lead_existing_customer' : mode;
+      return { lead: { ...lead, mobile: mobile ?? lead.mobile ?? null, remark: remarks.join('\n') || null, customFields: values, source: cfg.mapping.defaultSource }, errors, existing, outcome };
+    });
+  }
+
+  private async targets(tx: Tx, workspaceId: string) {
+    const fields = await tx.leadField.findMany({ where: { workspaceId, isArchived: false }, orderBy: { position: 'asc' } });
+    return [
+      ...Object.entries(MAP_TARGETS).map(([value, label]) => ({ value, label, required: false })),
+      ...fields.map((f) => ({ value: `cf:${f.key}`, label: f.label, required: f.required })),
+    ];
+  }
+
+  private async mappingView(tx: Tx, key: string, cfg: ReturnType<IntegrationsController['config']>) {
+    const ws = cfg.values.businessLine;
+    const targets = ws ? await this.targets(tx, ws) : Object.entries(MAP_TARGETS).map(([value, label]) => ({ value, label, required: false }));
+    const sourceFields = cfg.mapping?.sourceFields ?? sourceFieldsFor(key);
+    const map = cfg.mapping?.map ?? Object.fromEntries(sourceFields.map((f) => [f, guessTarget(f)]));
+    const byEmail = (await tx.organizationSetting.findFirst())?.leadIdentifier === 'email';
+    return {
+      saved: !!cfg.mapping, businessLineSet: !!ws, sourceFields, map, duplicateMode: cfg.mapping?.duplicateMode ?? 'add_remark',
+      defaultSource: cfg.mapping?.defaultSource ?? key, targets, leadIdentifier: byEmail ? 'email' : 'mobile',
+      duplicateModes: Object.entries(DUPLICATE_MODES).map(([value, label]) => ({ value, label })),
+    };
+  }
+
+  private config(blob: string | null | undefined): { values: Record<string, string>; webhookToken?: string; mapping?: { sourceFields: string[]; map: Record<string, string>; duplicateMode: string; defaultSource: string } } {
+    if (!blob) return { values: {} };
+    try { return JSON.parse(decrypt(blob)); } catch { return { values: {} }; }
   }
 
   @Post(':key/activate')

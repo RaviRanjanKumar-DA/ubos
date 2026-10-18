@@ -27,7 +27,8 @@
     "verify:customers": "node scripts/verify-customers.mjs",
     "verify:leadwork": "node scripts/verify-leadwork.mjs",
     "verify:admin": "node scripts/verify-settings-admin.mjs",
-    "verify:dashboards": "node scripts/verify-dashboards.mjs"
+    "verify:dashboards": "node scripts/verify-dashboards.mjs",
+    "verify:productivity": "node scripts/verify-productivity.mjs"
   },
   "engines": {
     "node": ">=20"

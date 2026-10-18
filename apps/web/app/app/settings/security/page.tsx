@@ -1,5 +1,6 @@
 'use client';
 
+import { RemindersCard } from '@/components/NotificationSettings';
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
@@ -59,6 +60,7 @@ export default function SecurityPolicyPage() {
   }
 
   return (
+    <>
     <form onSubmit={save}>
       <div className="page-head">
         <div>
@@ -119,5 +121,7 @@ export default function SecurityPolicyPage() {
         </div>
       </div>
     </form>
+    <RemindersCard />
+    </>
   );
 }

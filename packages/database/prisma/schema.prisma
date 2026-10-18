@@ -159,6 +159,8 @@ model OrganizationSetting {
   maxFailedLogins    Int      @default(5)
   lockMinutes        Int      @default(15)
   setupSkipped       String[] @default([]) // Setup Guide steps the admins chose to skip
+  digestHour         Int      @default(9)  // local hour of the daily summary email
+  reminderMinutes    Int      @default(15) // remind this many minutes before a task / follow-up
   updatedAt          DateTime @updatedAt
 }
 
@@ -327,6 +329,8 @@ model User {
   passwordChangedAt DateTime?
   mustChangePassword Boolean @default(false)
   isActive      Boolean    @default(true)
+  digestEnabled Boolean    @default(true)   // daily summary email
+  lastDigestAt  DateTime?
   roles         UserRole[]
   employee      Employee?
   createdAt     DateTime   @default(now())
@@ -428,6 +432,7 @@ model Customer {
   mobile       String?           // E.164; unique per organization among active (unmerged) customers
   alternateMobiles String[]      @default([])
   email        String?
+  alternateEmails String[]       @default([])
   city         String?
   panEncrypted String?
   panLast4     String?
@@ -505,6 +510,7 @@ model Lead {
   nextFollowUpAt  DateTime?  // earliest open follow-up, kept in sync for fast "due today" lists
   stageChangedAt  DateTime   @default(now()) // for stage SLA ("in this stage for 4 days")
   score           Int        @default(0)     // lead score, e.g. from custom-action scores
+  labelIds        String[]   @default([])    // Label ids
   importId        String?
   followUps       FollowUp[]
   activities      LeadActivity[]
@@ -525,6 +531,7 @@ model FollowUp {
   outcome     String?
   userId      String
   createdById String?
+  remindedAt  DateTime?
   createdAt   DateTime  @default(now())
 
   @@index([tenantId, userId, doneAt, dueAt])
@@ -744,6 +751,124 @@ model PlatformProduct {
   annualDiscountPct Int      @default(0)
   isActive          Boolean  @default(true)
   position          Int      @default(0)
+}
+
+// ── Slice 1.5c: productivity & views ──
+
+/** Coloured label (tag) for leads; per business line or organization-wide (workspaceId = null). */
+model Label {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String?
+  name        String
+  color       String   @default("#5b3cc4")
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, workspaceId])
+}
+
+/** Smart view: saved lead filters, columns and layout; personal or shared with roles. */
+model SavedView {
+  id            String   @id @default(uuid())
+  tenantId      String
+  ownerId       String
+  workspaceId   String?
+  name          String
+  query         Json     // filters + sort as on the leads page
+  columns       String[] @default([])
+  layout        String   @default("list") // list | board
+  sharedRoleIds String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, ownerId])
+}
+
+/** Task, meeting or planned call — on a lead or on its own. */
+model Task {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String?
+  leadId      String?
+  type        String    @default("task") // task | meeting | call
+  title       String
+  notes       String?
+  dueAt       DateTime
+  durationMin Int?
+  location    String?   // address or meeting link
+  assigneeId  String
+  createdById String
+  mentionIds  String[]  @default([])
+  doneAt      DateTime?
+  remindedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([tenantId, assigneeId, doneAt, dueAt])
+  @@index([leadId])
+}
+
+/** In-app notification (mentions, reminders, assignments). */
+model Notification {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  type      String    // mention | reminder | assignment | digest
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, userId, readAt])
+}
+
+/** Target for a metric per period, for a person, a team or the whole business line / organization. */
+model Goal {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String?
+  name        String
+  metric      String   // analytics metric key, e.g. won, calls, won_value
+  period      String   @default("month") // week | month | quarter
+  target      Int      // in the metric's unit (paise for amounts)
+  userId      String?
+  teamId      String?
+  createdById String
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, userId])
+}
+
+/** Call script shown in the Log-call panel, for a stage or the whole business line. */
+model CallScript {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  stageId     String?
+  title       String
+  body        String
+  isArchived  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, workspaceId])
+}
+
+/** "Email me this dashboard": each person subscribes for themselves, so numbers follow their own access. */
+model DashboardSubscription {
+  id          String    @id @default(uuid())
+  tenantId    String
+  userId      String
+  dashboardId String    // a saved dashboard id or "tpl:<key>"
+  frequency   String    @default("daily") // daily | weekly (Mondays)
+  hour        Int       @default(9)
+  lastSentAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([userId, dashboardId])
 }
 
 // A saved dashboard: widgets with their metric, chart and size. Personal, or shared with roles / teams / business lines / people.

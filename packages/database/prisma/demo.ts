@@ -179,6 +179,46 @@ async function main() {
   await prisma.tenantOrder.create({ data: { tenantId: abc.id, number: 'UB-202610-DEMO1', cycle: 'annual', items: [{ productCode: 'core_crm', name: 'Core CRM', kind: 'licence', planCode: 'growth', quantity: 5, unitPaise: 958_800, amountPaise: 4_794_000 }], subtotalPaise: 4_794_000, gstPaise: 862_920, totalPaise: 5_656_920, createdById: (await prisma.user.findFirstOrThrow({ where: { tenantId: abc.id } })).id, createdAt: daysAgo(1) } });
 
   const [a, b] = await Promise.all([prisma.lead.count({ where: { tenantId: own.id } }), prisma.lead.count({ where: { tenantId: abc.id } })]);
+  // ── 1.5c: labels, tasks & meetings, goals, call scripts ──
+  const wsAll = await prisma.workspace.findMany({ where: { tenantId: own.id } });
+  const byName = (n: string) => wsAll.find((w) => w.name.startsWith(n))!;
+  const mkLabel = (workspaceId: string | null, name: string, color: string) => prisma.label.create({ data: { tenantId: own.id, workspaceId, name, color } });
+  const labelSet = [
+    await mkLabel(null, 'VIP', '#d6455d'), await mkLabel(null, 'Referral partner', '#14a3a3'),
+    await mkLabel(byName('Vastu').id, 'Site visit due', '#1f9d55'), await mkLabel(byName('Course').id, 'Scholarship', '#e08a1e'),
+    await mkLabel(byName('Logo').id, 'Brand refresh', '#8a5cf6'),
+  ];
+  for (const l of await prisma.lead.findMany({ where: { tenantId: own.id } })) {
+    const options = labelSet.filter((x) => !x.workspaceId || x.workspaceId === l.workspaceId);
+    if (chance(0.25)) await prisma.lead.update({ where: { id: l.id }, data: { labelIds: [pick(options).id] } });
+  }
+  const openLeads = await prisma.lead.findMany({ where: { tenantId: own.id, ownerId: { not: null } }, include: { customer: true }, take: 40, orderBy: { createdAt: 'desc' } });
+  for (const [i, l] of openLeads.slice(0, 18).entries()) {
+    const type = (['meeting', 'task', 'call'] as const)[i % 3];
+    const due = new Date(Date.now() + (i - 4) * 9 * 3_600_000);
+    due.setMinutes(0, 0, 0);
+    const title = type === 'meeting' ? `Site visit / demo with ${l.customer.name}` : type === 'call' ? `Call back ${l.customer.name}` : `Send proposal to ${l.customer.name}`;
+    await prisma.task.create({ data: {
+      tenantId: own.id, workspaceId: l.workspaceId, leadId: l.id, type, title, dueAt: due, durationMin: type === 'task' ? null : 30 + (i % 3) * 15,
+      location: type === 'meeting' ? pick(['Client office', 'https://meet.google.com/abc-defg-hij', 'Our office']) : null,
+      assigneeId: l.ownerId!, createdById: l.ownerId!, doneAt: due < new Date() && chance(0.5) ? new Date() : null,
+    } });
+  }
+  const rms = await prisma.user.findMany({ where: { tenantId: own.id, name: { contains: 'RM' } } });
+  for (const u of rms) {
+    await prisma.goal.create({ data: { tenantId: own.id, name: 'Wins this month', metric: 'won', period: 'month', target: 6, userId: u.id, createdById: admin.id } });
+    await prisma.goal.create({ data: { tenantId: own.id, name: 'Calls this week', metric: 'calls', period: 'week', target: 40, userId: u.id, createdById: admin.id } });
+  }
+  const vastuTeam = await prisma.team.findFirst({ where: { tenantId: own.id } });
+  if (vastuTeam) await prisma.goal.create({ data: { tenantId: own.id, name: 'Team revenue', metric: 'won_value', period: 'month', target: 50_000_000, teamId: vastuTeam.id, workspaceId: byName('Vastu').id, createdById: admin.id } });
+  const vastuPipe = await prisma.pipeline.findFirstOrThrow({ where: { workspaceId: byName('Vastu').id }, orderBy: { position: 'asc' }, include: { stages: true } });
+  const st = (n: string) => vastuPipe.stages.find((x) => x.name === n)?.id ?? null;
+  await prisma.callScript.createMany({ data: [
+    { tenantId: own.id, workspaceId: byName('Vastu').id, stageId: null, title: 'First call', body: '1. Greet and confirm the name.\n2. Ask what kind of property (home, office, shop, plot) and the city.\n3. Ask what made them look for Vastu now.\n4. Offer a free 10-minute consultation and book a slot.' },
+    { tenantId: own.id, workspaceId: byName('Vastu').id, stageId: st('Interested'), title: 'Book the site visit', body: '1. Recap their concern.\n2. Offer two visit slots this week.\n3. Share the audit fee and what the report includes.\n4. If “too costly”: explain the remedies save rebuild costs; offer the online consultation instead.' },
+    { tenantId: own.id, workspaceId: byName('Course').id, stageId: null, title: 'Course enquiry', body: '1. Which course and why now?\n2. Weekday, weekend or online batch?\n3. Share fees, EMI option and the next batch date.\n4. Send the brochure on WhatsApp.' },
+  ] });
+
   console.log(`Demo data ready: My Company ${a} leads, ABC Group ${b} leads.`);
 }
 

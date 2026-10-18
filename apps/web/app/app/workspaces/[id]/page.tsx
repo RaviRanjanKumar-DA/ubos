@@ -10,13 +10,14 @@ import { FieldsSettings } from '@/components/FieldsSettings';
 import { OptionList } from '@/components/OptionList';
 import { CustomActions } from '@/components/CustomActions';
 import { AssignmentEditor } from '@/components/AssignmentEditor';
+import { CallScripts, LabelsSettings } from '@/components/LabelsScripts';
 import type { WorkspaceSettings } from '@/lib/workspace';
 
-type Tab = 'stages' | 'fields' | 'feedback' | 'lists' | 'actions' | 'assignment' | 'general';
+type Tab = 'stages' | 'fields' | 'feedback' | 'lists' | 'labels' | 'actions' | 'scripts' | 'assignment' | 'general';
 type Msg = { type: 'error' | 'notice'; text: string } | null;
 const TABS: [Tab, string][] = [
   ['stages', 'Lead stages'], ['fields', 'Fields'], ['feedback', 'Status & call feedback'], ['lists', 'Sources & lost reasons'],
-  ['actions', 'Custom actions'], ['assignment', 'Lead assignment'], ['general', 'General'],
+  ['labels', 'Labels'], ['actions', 'Custom actions'], ['scripts', 'Call scripts'], ['assignment', 'Lead assignment'], ['general', 'General'],
 ];
 
 export default function WorkspaceSettingsPage() {
@@ -106,6 +107,8 @@ export default function WorkspaceSettingsPage() {
         </div>
       )}
       {tab === 'actions' && <CustomActions workspaceId={id} readOnly={ro} />}
+      {tab === 'labels' && <LabelsSettings ws={data} readOnly={ro} isOrgAdmin={isOrgAdmin} />}
+      {tab === 'scripts' && <CallScripts ws={data} readOnly={ro} />}
       {tab === 'assignment' && <AssignmentEditor ws={data} readOnly={ro} act={act} />}
       {tab === 'general' && (
         <div className="card" style={{ maxWidth: 520 }}>

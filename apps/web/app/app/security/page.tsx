@@ -1,5 +1,6 @@
 'use client';
 
+import { MyNotificationsCard } from '@/components/NotificationSettings';
 import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -116,6 +117,7 @@ function SecurityInner() {
           </tbody>
         </table>
       </div>
+      <MyNotificationsCard />
     </>
   );
 }

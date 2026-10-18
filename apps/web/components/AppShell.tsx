@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { api, ApiError, session } from '@/lib/api';
 import { Icon } from './Icon';
+import { Bell } from './Bell';
 
 export interface Me {
   user: { id: string; name: string; email: string };
@@ -36,6 +37,8 @@ const NAV = [
   { href: '/app/dashboard', label: 'Dashboard', icon: 'dashboard', perm: 'dashboard.view' },
   { href: '/app/leads', label: 'Leads', icon: 'leads', perm: 'crm.lead.view' },
   { href: '/app/customers', label: 'Customers', icon: 'hr', perm: 'crm.customer.view' },
+  { href: '/app/calendar', label: 'Calendar & Tasks', icon: 'calls', perm: 'crm.lead.view' },
+  { href: '/app/goals', label: 'Goals', icon: 'dashboard', perm: 'dashboard.view' },
   { label: 'Calls', icon: 'calls', phase: 2 },
   { label: 'WhatsApp Inbox', icon: 'chat', phase: 2 },
   { section: 'Business' },
@@ -149,6 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
             <div className="spacer" />
             <span className="small muted hide-sm">{me.tenant.name} · {me.tenant.plan}</span>
+            {can('crm.lead.view') && <Bell version={version} />}
             <div className="avatar" title={`${me.user.name} (${me.roles.map((r) => r.role).join(', ')})`}>
               {me.user.name.slice(0, 1).toUpperCase()}
             </div>

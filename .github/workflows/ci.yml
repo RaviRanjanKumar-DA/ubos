@@ -68,3 +68,5 @@ jobs:
           npm run verify:admin
           npx tsx packages/database/prisma/seed.ts
           npm run verify:dashboards
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:productivity

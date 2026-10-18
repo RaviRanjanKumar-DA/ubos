@@ -10,12 +10,14 @@ import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { maskPan, PAN_PATTERN } from '../common/customers';
 import { encrypt, keyedHash } from '../auth/crypto';
+import { contact, contacts, fieldAccess } from '../common/field-access';
 
 const ListQuery = z.object({ q: z.string().trim().max(100).optional() });
 const UpdateCustomer = z.object({
   name: z.string().trim().min(2).max(120).optional(),
   mobile: z.string().trim().max(20).optional(),
   alternateMobiles: z.array(z.string().trim().max(20)).max(10).optional(),
+  alternateEmails: z.array(z.string().trim().toLowerCase().email()).max(10).optional(),
   email: z.string().trim().toLowerCase().email().nullable().optional().or(z.literal('')),
   city: z.string().trim().max(80).nullable().optional(),
   pan: z.string().trim().toUpperCase().regex(PAN_PATTERN, 'PAN must look like ABCDE1234F').nullable().optional().or(z.literal('')),
@@ -52,10 +54,11 @@ export class CustomersController {
           leads: { where: leadScope, select: { createdAt: true, workspace: { select: { name: true } }, ownerId: true }, orderBy: { createdAt: 'desc' } },
         },
       });
+      const fa = await fieldAccess(tx);
       const rmIds = [...new Set(customers.map((c) => c.primaryRmId).filter(Boolean) as string[])];
       const rms = new Map((await tx.user.findMany({ where: { id: { in: rmIds } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
       return customers.map((c) => ({
-        id: c.id, code: c.code, name: c.name, mobile: c.mobile, email: c.email, city: c.city,
+        id: c.id, code: c.code, name: c.name, mobile: contact(fa, 'mobile', c.mobile), email: contact(fa, 'email', c.email), city: c.city,
         workspaces: [...new Set(c.leads.map((l) => l.workspace.name))],
         leadCount: c.leads.length,
         lastActivityAt: c.leads[0]?.createdAt ?? c.createdAt,
@@ -104,8 +107,10 @@ export class CustomersController {
         where: { id: { in: ids } },
         include: { leads: { select: { workspace: { select: { name: true } } } } },
       });
+      const fa = await fieldAccess(tx);
       const card = new Map(rows.map((c) => [c.id, {
-        id: c.id, code: c.code, name: c.name, mobile: c.mobile, alternateMobiles: c.alternateMobiles, email: c.email, city: c.city,
+        id: c.id, code: c.code, name: c.name, mobile: contact(fa, 'mobile', c.mobile), alternateMobiles: contacts(fa, 'mobile', c.alternateMobiles),
+        email: contact(fa, 'email', c.email), alternateEmails: contacts(fa, 'email', c.alternateEmails), city: c.city,
         pan: maskPan(c.panLast4), leadCount: c.leads.length, workspaces: [...new Set(c.leads.map((l) => l.workspace.name))], createdAt: c.createdAt,
       }]));
       return [...pairs.values()]
@@ -158,9 +163,11 @@ export class CustomersController {
       const mergedCustomers = new Map((await tx.customer.findMany({ where: { id: { in: merges.map((m) => m.duplicateId) } }, select: { id: true, code: true, name: true } })).map((x) => [x.id, x]));
       const leadName = new Map(leads.map((l) => [l.id, `${l.workspace.name} · ${l.pipeline.name}`]));
       const bySource = [...leads].sort((x, y) => x.createdAt.getTime() - y.createdAt.getTime());
+      const fa = await fieldAccess(tx);
 
       return {
-        id: c.id, code: c.code, name: c.name, mobile: c.mobile, alternateMobiles: c.alternateMobiles, email: c.email, city: c.city,
+        id: c.id, code: c.code, name: c.name, mobile: contact(fa, 'mobile', c.mobile), alternateMobiles: contacts(fa, 'mobile', c.alternateMobiles),
+        email: contact(fa, 'email', c.email), alternateEmails: contacts(fa, 'email', c.alternateEmails), city: c.city,
         pan: maskPan(c.panLast4), hasPan: !!c.panHash, createdAt: c.createdAt,
         primaryRm: c.primaryRmId ? { id: c.primaryRmId, name: users.get(c.primaryRmId) ?? '?' } : null,
         firstSource: bySource[0]?.source ?? null,
@@ -217,6 +224,15 @@ export class CustomersController {
         }))].filter((m) => m !== (data.mobile ?? c.mobile));
         for (const m of list) await this.assertMobileFree(tx, m, id);
         data.alternateMobiles = list; changes.alternateMobiles = list; old.alternateMobiles = c.alternateMobiles;
+      }
+      if (input.alternateEmails !== undefined) {
+        const main = ((data.email as string | null | undefined) ?? c.email ?? '').toLowerCase();
+        const list = [...new Set(input.alternateEmails)].filter((e) => e !== main);
+        const other = list.length ? await tx.customer.findFirst({
+          where: { id: { not: id }, mergedIntoId: null, OR: [{ email: { in: list, mode: 'insensitive' } }, { alternateEmails: { hasSome: list } }] }, select: { code: true },
+        }) : null;
+        if (other) throw new ConflictException({ code: 'EMAIL_BELONGS_TO_OTHER', message: `One of these emails is already on customer ${other.code}. Merge the two records instead.` });
+        data.alternateEmails = list; changes.alternateEmails = list; old.alternateEmails = c.alternateEmails;
       }
       if (input.pan !== undefined) {
         if (input.pan) {

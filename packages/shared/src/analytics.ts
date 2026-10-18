@@ -5,8 +5,8 @@ export type MetricCategory = 'Leads & conversion' | 'Revenue' | 'Pipeline' | 'SL
 export type GroupBy =
   | 'none' | 'day' | 'week' | 'month' | 'stage' | 'status' | 'source' | 'owner' | 'workspace'
   | 'disposition' | 'lost_reason' | 'heatmap' | 'activity_type';
-export type RangePreset = 'today' | 'yesterday' | 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom';
-export type WidgetType = 'kpi' | 'line' | 'bar' | 'pie' | 'funnel' | 'table' | 'leaderboard' | 'heatmap' | 'gauge' | 'followups' | 'forecast';
+export type RangePreset = 'today' | 'yesterday' | 'this_week' | 'last_7_days' | 'last_30_days' | 'this_month' | 'last_month' | 'this_quarter' | 'this_year' | 'custom';
+export type WidgetType = 'kpi' | 'line' | 'bar' | 'pie' | 'funnel' | 'table' | 'leaderboard' | 'heatmap' | 'gauge' | 'followups' | 'forecast' | 'goals';
 
 export interface MetricDef {
   label: string;
@@ -76,19 +76,22 @@ export const GROUP_LABELS: Record<GroupBy, string> = {
 };
 
 export const RANGE_LABELS: Record<RangePreset, string> = {
-  today: 'Today', yesterday: 'Yesterday', last_7_days: 'Last 7 days', last_30_days: 'Last 30 days', this_month: 'This month',
+  today: 'Today', yesterday: 'Yesterday', this_week: 'This week', last_7_days: 'Last 7 days', last_30_days: 'Last 30 days', this_month: 'This month',
   last_month: 'Last month', this_quarter: 'This quarter', this_year: 'This year', custom: 'Custom',
 };
 
 export const WIDGET_LABELS: Record<WidgetType, string> = {
   kpi: 'KPI tile', line: 'Line / trend', bar: 'Bar chart', pie: 'Donut', funnel: 'Funnel', table: 'Table', leaderboard: 'Leaderboard',
-  heatmap: 'Heatmap (best time to call)', gauge: 'Target gauge', followups: 'Follow-up list', forecast: 'Month-end forecast',
+  heatmap: 'Heatmap (best time to call)', gauge: 'Target gauge', followups: 'Follow-up list', forecast: 'Month-end forecast', goals: 'Goals & targets',
 };
 
 export const METRIC_CATEGORIES: MetricCategory[] = ['Revenue', 'Leads & conversion', 'Pipeline', 'SLA & response', 'Calls', 'Follow-ups', 'Productivity', 'Audit'];
 
 /** Widgets that need no metric of their own. */
-export const SPECIAL_WIDGETS: WidgetType[] = ['funnel', 'leaderboard', 'followups', 'forecast'];
+export const SPECIAL_WIDGETS: WidgetType[] = ['funnel', 'leaderboard', 'followups', 'forecast', 'goals'];
+
+/** Metrics that can carry a goal (counts and amounts that add up over a period). */
+export const GOAL_METRICS = ['won', 'won_value', 'leads', 'calls', 'connected_calls', 'talk_time', 'activities', 'leads_worked', 'followups_done', 'remarks', 'actions_done'];
 
 export interface WidgetConfig {
   id: string;
@@ -130,6 +133,7 @@ export const DASHBOARD_TEMPLATES: { key: string; name: string; description: stri
     key: 'team_audit', name: 'Team performance & audit', description: 'Check every RM: activity, response time, SLA, follow-ups and results.',
     widgets: [
       kpi('k1', 'activities'), kpi('k2', 'response_1h'), kpi('k3', 'followup_compliance'), kpi('k4', 'stale_leads'),
+      { id: 'g1', type: 'goals', title: 'Goals & targets', w: 12, h: 2 },
       { id: 'c1', type: 'leaderboard', title: 'Every person — performance & audit', w: 12, h: 3 },
       { id: 'c2', type: 'bar', title: 'Activities by person', metric: 'activities', groupBy: 'owner', w: 6, h: 2 },
       { id: 'c3', type: 'bar', title: 'Stale leads by person (no work for 7+ days)', metric: 'stale_leads', groupBy: 'owner', w: 6, h: 2 },
@@ -180,6 +184,7 @@ export const DASHBOARD_TEMPLATES: { key: string; name: string; description: stri
     widgets: [
       kpi('k1', 'overdue_followups'), kpi('k2', 'calls'), kpi('k3', 'connected_calls'), kpi('k4', 'won'),
       kpi('k5', 'activities'), kpi('k6', 'response_1h'), kpi('k7', 'stale_leads'), kpi('k8', 'won_value'),
+      { id: 'g1', type: 'goals', title: 'My goals', w: 12, h: 1 },
       { id: 'c1', type: 'followups', title: 'Follow-ups due today & overdue', w: 6, h: 2 },
       { id: 'c2', type: 'bar', title: 'My open leads by stage', metric: 'open_leads', groupBy: 'stage', w: 6, h: 2 },
       { id: 'c3', type: 'line', title: 'My calls per day', metric: 'calls', groupBy: 'day', w: 6, h: 2 },

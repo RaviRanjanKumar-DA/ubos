@@ -195,6 +195,7 @@ export default function RolesPage() {
               );
             })}
             {!groups.length && <div className="empty">No permission matches “{q}”.</div>}
+            {current && !current.isProtected && <FieldAccessCard roleId={current.id} readOnly={!canManage} />}
 
             {!readOnly && (dirty || selected === 'new') && (
               <div className="save-bar">
@@ -208,5 +209,63 @@ export default function RolesPage() {
         )}
       </div>
     </>
+  );
+}
+
+type Vis = 'editable' | 'read' | 'masked' | 'hidden';
+const VIS: { v: Vis; label: string; hint: string; cls: string }[] = [
+  { v: 'editable', label: 'Edit', hint: 'Can see and change', cls: 'lvl-ORGANIZATION' },
+  { v: 'read', label: 'Read only', hint: 'Can see, cannot change', cls: 'lvl-OWN' },
+  { v: 'masked', label: 'Masked', hint: 'Sees part of it, e.g. 98•••••210', cls: 'lvl-TEAM' },
+  { v: 'hidden', label: 'Hidden', hint: 'Does not see it at all (also not in exports)', cls: 'lvl-DENY' },
+];
+
+/** Field-level security for one role: contact details and custom lead fields. The most open rule wins across roles. */
+function FieldAccessCard({ roleId, readOnly }: { roleId: string; readOnly: boolean }) {
+  const [fields, setFields] = useState<{ field: string; label: string; group: string }[]>([]);
+  const [rules, setRules] = useState<Record<string, Vis>>({});
+  const [saved, setSaved] = useState('');
+  const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  useEffect(() => {
+    setMsg(null);
+    api<{ field: string; label: string; group: string }[]>('/api/v1/field-rules/fields', { noWorkspace: true }).then(setFields).catch(() => setFields([]));
+    api<{ field: string; visibility: Vis }[]>(`/api/v1/roles/${roleId}/field-rules`, { noWorkspace: true }).then((r) => {
+      const m = Object.fromEntries(r.map((x) => [x.field, x.visibility])) as Record<string, Vis>;
+      setRules(m);
+      setSaved(JSON.stringify(m));
+    }).catch(() => setRules({}));
+  }, [roleId]);
+  const dirty = JSON.stringify(rules) !== saved;
+  async function save() {
+    setMsg(null);
+    try {
+      await api(`/api/v1/roles/${roleId}/field-rules`, { method: 'PUT', noWorkspace: true, body: { rules: Object.entries(rules).map(([field, visibility]) => ({ field, visibility })) } });
+      setSaved(JSON.stringify(rules));
+      setMsg({ type: 'notice', text: 'Field access saved.' });
+    } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
+  }
+  return (
+    <div className="card perm-section" style={{ marginTop: 14 }}>
+      <div className="perm-head">
+        <span><b>Field access</b> <span className="small muted">— hide, mask or lock contact details and lead fields for this role</span></span>
+        {!readOnly && dirty && <button type="button" className="btn sm" onClick={save}>Save field access</button>}
+      </div>
+      {msg && <div className={msg.type} style={{ margin: 10 }}>{msg.text}</div>}
+      {fields.map((f) => {
+        const v = rules[f.field] ?? 'editable';
+        return (
+          <div key={f.field} className="perm-row">
+            <div style={{ minWidth: 0 }}><div>{f.label}</div><div className="small muted">{f.group}</div></div>
+            <div className="seg">
+              {VIS.map((x) => (
+                <button type="button" key={x.v} title={x.hint} disabled={readOnly} className={`seg-btn ${v === x.v ? `on ${x.cls}` : ''}`}
+                  onClick={() => setRules({ ...rules, [f.field]: x.v })}>{x.label}</button>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+      <div className="small muted" style={{ padding: '8px 14px' }}>If a person has several roles, the most open setting wins. Organization Admins always see everything.</div>
+    </div>
   );
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 import type { Tx } from '@ubos/database';
 import { DbService } from '../common/db.service';
@@ -7,6 +7,8 @@ import { auth } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { activity, applyStageChange, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
+import { contact, contacts, customFields as visibleFields, fieldAccess } from '../common/field-access';
+import { notify, validMentions } from '../common/notify';
 
 const LogActivity = z.object({
   type: z.enum(['call', 'remark']),
@@ -15,14 +17,18 @@ const LogActivity = z.object({
   remark: z.string().trim().max(2000).optional(),
   followUpAt: z.coerce.date().optional(),
   followUpNote: z.string().trim().max(300).optional(),
+  mentionIds: z.array(z.string().uuid()).max(20).optional(),
 });
+const Labels = z.object({ labelIds: z.array(z.string().uuid()).max(30) });
 const PatchLead = z.object({ status: z.string().max(60).nullable().optional(), ownerId: z.string().uuid().optional() });
 const NewFollowUp = z.object({ dueAt: z.coerce.date(), note: z.string().trim().max(300).optional() });
 const DoneFollowUp = z.object({ done: z.literal(true), outcome: z.string().trim().max(300).optional() });
 const FollowUpQuery = z.object({ when: z.enum(['today', 'overdue', 'upcoming']).default('today') });
 const Bulk = z.object({
   leadIds: z.array(z.string().uuid()).min(1).max(1000),
-  action: z.enum(['assign', 'stage', 'status', 'remark', 'follow_up']),
+  action: z.enum(['assign', 'stage', 'status', 'remark', 'follow_up', 'labels']),
+  addLabelIds: z.array(z.string().uuid()).max(30).optional(),
+  removeLabelIds: z.array(z.string().uuid()).max(30).optional(),
   ownerIds: z.array(z.string().uuid()).min(1).max(50).optional(),
   stageId: z.string().uuid().optional(),
   lostReason: z.string().max(120).optional(),
@@ -77,13 +83,19 @@ export class LeadWorkController {
         tx.leadActivity.findMany({ where: { leadId: id }, orderBy: { createdAt: 'desc' }, take: 200 }),
         tx.followUp.findMany({ where: { leadId: id }, orderBy: [{ doneAt: { sort: 'asc', nulls: 'first' } }, { dueAt: 'asc' }], take: 50 }),
       ]);
-      const users = await this.names(tx, [lead.ownerId, ...activities.map((a) => a.userId), ...followUps.map((f) => f.userId)]);
+      const mentioned = activities.flatMap((x) => ((x.data as { mentions?: string[] } | null)?.mentions ?? []));
+      const users = await this.names(tx, [lead.ownerId, ...activities.map((a) => a.userId), ...followUps.map((f) => f.userId), ...mentioned]);
       const a = auth();
+      const fa = await fieldAccess(tx);
+      const fields = await tx.leadField.findMany({ where: { workspaceId: full.workspaceId }, select: { key: true } });
       return {
         id: full.id, customerId: full.customerId, customerCode: full.customer.code, name: full.customer.name,
-        mobile: full.customer.mobile, alternateMobiles: full.customer.alternateMobiles, email: full.customer.email, city: full.customer.city,
+        mobile: contact(fa, 'mobile', full.customer.mobile), alternateMobiles: contacts(fa, 'mobile', full.customer.alternateMobiles),
+        email: contact(fa, 'email', full.customer.email), alternateEmails: contacts(fa, 'email', full.customer.alternateEmails), city: full.customer.city,
         workspace: full.workspace, pipeline: { id: full.pipeline.id, name: full.pipeline.name, stages: full.pipeline.stages.map((s) => ({ id: s.id, name: s.name, isWon: s.isWon, isLost: s.isLost })) },
-        stageId: full.stageId, status: full.status, lostReason: full.lostReason, source: full.source, customFields: full.customFields ?? {},
+        stageId: full.stageId, status: full.status, lostReason: full.lostReason, source: full.source,
+        customFields: visibleFields(fa, full.customFields as Record<string, unknown>), labelIds: full.labelIds,
+        fieldAccess: Object.fromEntries([...['mobile', 'email'], ...fields.map((f) => `cf:${f.key}`)].map((k) => [k, fa.of(k)])),
         owner: full.ownerId ? { id: full.ownerId, name: users.get(full.ownerId) ?? '?' } : null,
         createdAt: full.createdAt, assignedAt: full.assignedAt, firstResponseAt: full.firstResponseAt,
         lastActivityAt: full.lastActivityAt, lastDisposition: full.lastDisposition, nextFollowUpAt: full.nextFollowUpAt,
@@ -92,6 +104,7 @@ export class LeadWorkController {
         activities: activities.map((x) => ({
           id: x.id, type: x.type, disposition: x.disposition, connected: x.connected, durationSec: x.durationSec, remark: x.remark,
           data: x.data, user: x.userId ? users.get(x.userId) ?? null : null, at: x.createdAt,
+          mentions: ((x.data as { mentions?: string[] } | null)?.mentions ?? []).map((id) => users.get(id) ?? 'Someone'),
         })),
         followUps: followUps.map((f) => ({ id: f.id, dueAt: f.dueAt, note: f.note, doneAt: f.doneAt, outcome: f.outcome, user: users.get(f.userId) ?? null })),
       };
@@ -113,11 +126,17 @@ export class LeadWorkController {
         connected = opt.connected;
       }
       const now = new Date();
+      const mentions = await validMentions(tx, input.mentionIds);
       await tx.leadActivity.create({
         data: activity(lead, auth().userId, {
           type: input.type, disposition: input.disposition ?? null, connected, durationSec: input.durationSec ?? null, remark: input.remark ?? null,
+          ...(mentions.length ? { data: { mentions } } : {}),
         }),
       });
+      if (mentions.length) {
+        const c = await tx.customer.findUnique({ where: { id: lead.customerId }, select: { name: true } });
+        await notify(tx, mentions, { type: 'mention', title: `${auth().name} mentioned you on ${c?.name ?? 'a lead'}`, body: input.remark ?? null, link: `/app/leads/${id}` });
+      }
       // A logged call completes the follow-ups that were due for this lead.
       if (input.type === 'call') {
         await tx.followUp.updateMany({ where: { leadId: id, doneAt: null, dueAt: { lte: new Date(now.getTime() + 3_600_000) } }, data: { doneAt: now, outcome: input.disposition } });
@@ -144,6 +163,20 @@ export class LeadWorkController {
       if (input.ownerId !== undefined) await this.applyAssign(tx, [id], [input.ownerId]);
       if (input.status !== undefined) await this.applyStatus(tx, [id], input.status);
       return { ok: true };
+    });
+  }
+
+  /** Replaces the labels of one lead. */
+  @Put('leads/:id/labels')
+  @RequirePermission('crm.lead.update')
+  setLabels(@Param('id') id: string, @Body() body: unknown) {
+    const { labelIds } = parse(Labels, body);
+    return this.db.tenant(async (tx) => {
+      const lead = await this.visibleLead(tx, id, 'crm.lead.update');
+      const ok = await this.checkLabels(tx, labelIds, lead.workspaceId);
+      await tx.lead.update({ where: { id }, data: { labelIds: ok } });
+      await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'labels', data: { from: lead.labelIds, to: ok } }) });
+      return { labelIds: ok };
     });
   }
 
@@ -204,6 +237,14 @@ export class LeadWorkController {
             await tx.lead.update({ where: { id: lead.id }, data: { lastActivityAt: new Date() } });
           });
           break;
+        case 'labels':
+          if (!b.addLabelIds?.length && !b.removeLabelIds?.length) throw new BadRequestException({ code: 'LABELS_REQUIRED', message: 'Choose labels to add or remove' });
+          result = await this.applyEach(tx, ids, 'crm.lead.update', async (lead) => {
+            const add = await this.checkLabels(tx, b.addLabelIds ?? [], lead.workspaceId);
+            const next = [...new Set([...lead.labelIds.filter((x) => !(b.removeLabelIds ?? []).includes(x)), ...add])];
+            await tx.lead.update({ where: { id: lead.id }, data: { labelIds: next } });
+          });
+          break;
         case 'follow_up':
           if (!b.followUpAt) throw new BadRequestException({ code: 'DATE_REQUIRED', message: 'Choose the follow-up date' });
           result = await this.applyEach(tx, ids, 'crm.lead.update', async (lead) => {
@@ -218,6 +259,14 @@ export class LeadWorkController {
       });
       return { updated: result.updated.length, skipped: result.skipped };
     }, { timeoutMs: 60_000 });
+  }
+
+  /** Labels must exist, be active and belong to the lead's business line or the whole organization. */
+  private async checkLabels(tx: Tx, ids: string[], workspaceId: string) {
+    if (!ids.length) return [];
+    const labels = await tx.label.findMany({ where: { id: { in: ids }, isArchived: false, OR: [{ workspaceId: null }, { workspaceId }] }, select: { id: true } });
+    if (labels.length !== new Set(ids).size) throw new BadRequestException({ code: 'INVALID_LABEL', message: 'Some labels do not exist in this business line' });
+    return labels.map((l) => l.id);
   }
 
   // ── shared actions (single lead and bulk use the same rules) ──

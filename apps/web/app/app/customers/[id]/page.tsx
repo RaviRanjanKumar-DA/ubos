@@ -11,7 +11,7 @@ interface Lead {
 }
 interface Event { id: string; at: string; action: string; actor: string; context: string | null; oldValue: unknown; newValue: unknown }
 interface Customer360 {
-  id: string; code: string; name: string; mobile: string | null; alternateMobiles: string[]; email: string | null; city: string | null;
+  id: string; code: string; name: string; mobile: string | null; alternateMobiles: string[]; email: string | null; alternateEmails: string[]; city: string | null;
   pan: string | null; hasPan: boolean; createdAt: string; primaryRm: { id: string; name: string } | null;
   firstSource: string | null; lastSource: string | null; sources: string[]; canEdit: boolean; canMerge: boolean;
   leads: Lead[]; timeline: Event[];
@@ -84,6 +84,7 @@ export default function Customer360Page() {
             <dt className="muted small">Mobile</dt><dd style={{ margin: 0 }}>{c.mobile ?? '—'}</dd>
             <dt className="muted small">Other numbers</dt><dd style={{ margin: 0 }}>{c.alternateMobiles.join(', ') || '—'}</dd>
             <dt className="muted small">Email</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{c.email ?? '—'}</dd>
+            <dt className="muted small">Other emails</dt><dd style={{ margin: 0, overflowWrap: 'anywhere' }}>{c.alternateEmails?.join(', ') || '—'}</dd>
             <dt className="muted small">City</dt><dd style={{ margin: 0 }}>{c.city ?? '—'}</dd>
             <dt className="muted small">PAN</dt><dd style={{ margin: 0 }}>{c.pan ?? '—'}</dd>
             <dt className="muted small">First source</dt><dd style={{ margin: 0 }}>{c.firstSource ?? '—'}</dd>
@@ -162,7 +163,7 @@ export default function Customer360Page() {
 }
 
 function EditCustomer({ c, onClose, onSaved }: { c: Customer360; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ name: c.name, mobile: c.mobile ?? '', alternateMobiles: c.alternateMobiles.join(', '), email: c.email ?? '', city: c.city ?? '', pan: '' });
+  const [f, setF] = useState({ name: c.name, mobile: c.mobile ?? '', alternateMobiles: c.alternateMobiles.join(', '), email: c.email ?? '', alternateEmails: (c.alternateEmails ?? []).join(', '), city: c.city ?? '', pan: '' });
   const [error, setError] = useState('');
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
@@ -173,8 +174,12 @@ function EditCustomer({ c, onClose, onSaved }: { c: Customer360; onClose: () => 
       await api(`/api/v1/customers/${c.id}`, {
         method: 'PATCH', noWorkspace: true,
         body: {
-          name: f.name, mobile: f.mobile, email: f.email, city: f.city,
-          alternateMobiles: f.alternateMobiles.split(',').map((x) => x.trim()).filter(Boolean),
+          name: f.name, city: f.city,
+          // Masked or unchanged contact details are not sent back.
+          ...(f.mobile !== (c.mobile ?? '') ? { mobile: f.mobile } : {}),
+          ...(f.email !== (c.email ?? '') ? { email: f.email } : {}),
+          ...(f.alternateMobiles !== c.alternateMobiles.join(', ') ? { alternateMobiles: f.alternateMobiles.split(',').map((x) => x.trim()).filter(Boolean) } : {}),
+          ...(f.alternateEmails !== (c.alternateEmails ?? []).join(', ') ? { alternateEmails: f.alternateEmails.split(',').map((x) => x.trim()).filter(Boolean) } : {}),
           ...(f.pan ? { pan: f.pan } : {}),
         },
       });
@@ -193,6 +198,7 @@ function EditCustomer({ c, onClose, onSaved }: { c: Customer360; onClose: () => 
           <div className="field"><label>Name</label><input className="input" value={f.name} onChange={set('name')} required /></div>
           <div className="field"><label>Mobile</label><input className="input" value={f.mobile} onChange={set('mobile')} required /></div>
           <div className="field" style={{ gridColumn: '1 / -1' }}><label>Other numbers (comma separated)</label><input className="input" value={f.alternateMobiles} onChange={set('alternateMobiles')} /></div>
+          <div className="field" style={{ gridColumn: '1 / -1' }}><label>Other emails (comma separated)</label><input className="input" value={f.alternateEmails} onChange={set('alternateEmails')} placeholder="work@company.com, personal@gmail.com" /></div>
           <div className="field"><label>Email</label><input className="input" type="email" value={f.email} onChange={set('email')} /></div>
           <div className="field"><label>City</label><input className="input" value={f.city} onChange={set('city')} /></div>
           <div className="field" style={{ gridColumn: '1 / -1' }}>

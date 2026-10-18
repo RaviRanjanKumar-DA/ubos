@@ -48,6 +48,7 @@ export function resolveRange(preset: RangePreset, tz: string, from?: string, to?
   switch (preset) {
     case 'today': return { from: day(0), to: day(1), ...shift(day(0), day(1)), label: 'Today' };
     case 'yesterday': return { from: day(-1), to: day(0), ...shift(day(-1), day(0)), label: 'Yesterday' };
+    case 'this_week': return { from: day(-t.wd), to: day(7 - t.wd), ...shift(day(-t.wd), day(7 - t.wd)), label: 'This week' };
     case 'last_7_days': return { from: day(-6), to: day(1), ...shift(day(-6), day(1)), label: 'Last 7 days' };
     case 'last_30_days': return { from: day(-29), to: day(1), ...shift(day(-29), day(1)), label: 'Last 30 days' };
     case 'last_month': return { from: midnight(t.y, t.m - 1, 1, tz), to: midnight(t.y, t.m, 1, tz), prevFrom: midnight(t.y, t.m - 2, 1, tz), prevTo: midnight(t.y, t.m - 1, 1, tz), label: 'Last month' };
@@ -173,7 +174,7 @@ const RATIO = ['win_rate', 'contact_rate', 'connect_rate', 'followup_compliance'
 const AVG = ['first_response', 'avg_deal_value', 'sales_cycle', 'talk_per_call', 'days_in_stage', 'avg_score'];
 const aggKind = (m: string): 'sum' | 'ratio' | 'avg' => (RATIO.includes(m) ? 'ratio' : AVG.includes(m) ? 'avg' : 'sum');
 
-async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Date) {
+export async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Date) {
   const all: Agg = { num: 0, den: 0 };
   const groups = new Map<string, Agg>();
   const { L } = c;

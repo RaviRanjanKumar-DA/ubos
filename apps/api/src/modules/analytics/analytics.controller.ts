@@ -1,13 +1,14 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
 import { z } from 'zod';
 import type { Prisma, Tx } from '@ubos/database';
-import { DASHBOARD_TEMPLATES, GROUP_LABELS, METRICS, RANGE_LABELS, WIDGET_LABELS } from '@ubos/shared';
+import { DASHBOARD_TEMPLATES, GOAL_METRICS, GROUP_LABELS, METRICS, RANGE_LABELS, WIDGET_LABELS } from '@ubos/shared';
 import { DbService } from '../../common/db.service';
 import { RequirePermission } from '../../common/auth.guard';
 import { auth, tenantId } from '../../common/context';
 import { parse } from '../../common/errors';
 import { scopeFilter } from '../../common/scope';
-import { AuditAccessError, Ctx, followUpList, forecast, funnel, leaderboard, loadLookups, resolveRange, runMetric } from './engine';
+import { visibleUserIds } from '../../common/people';
+import { aggregate, AuditAccessError, Ctx, followUpList, forecast, funnel, leaderboard, loadLookups, resolveRange, runMetric } from './engine';
 
 const RangeKey = z.enum(Object.keys(RANGE_LABELS) as [string, ...string[]]);
 const GroupKey = z.enum(Object.keys(GROUP_LABELS) as [string, ...string[]]);
@@ -49,6 +50,17 @@ const Sharing = z.object({
 });
 
 type DashboardRow = Prisma.DashboardGetPayload<object>;
+const GoalBody = z.object({
+  name: z.string().trim().max(80).optional(),
+  metric: z.enum(GOAL_METRICS as [string, ...string[]]),
+  period: z.enum(['week', 'month', 'quarter']).default('month'),
+  target: z.number().int().min(1).max(2_000_000_000),
+  userId: z.string().uuid().nullable().optional(),
+  teamId: z.string().uuid().nullable().optional(),
+  workspaceId: z.string().uuid().nullable().optional(),
+});
+const GoalPatch = z.object({ name: z.string().trim().max(80).optional(), target: z.number().int().min(1).max(2_000_000_000).optional(), isArchived: z.boolean().optional() });
+const PERIOD_RANGE = { week: 'this_week', month: 'this_month', quarter: 'this_quarter' } as const;
 
 /**
  * Dashboards & analytics. Every number is computed inside the viewer's "View dashboards" scope (own / team /
@@ -83,6 +95,7 @@ export class AnalyticsController {
           else if (w.type === 'leaderboard') out[w.id] = { ...period, rows: await leaderboard(c, r) };
           else if (w.type === 'followups') out[w.id] = { rows: await followUpList(c) };
           else if (w.type === 'forecast') out[w.id] = await forecast(c);
+          else if (w.type === 'goals') out[w.id] = { rows: await this.goalProgress(tx, L) };
           else {
             if (!w.metric) throw new BadRequestException({ code: 'METRIC_REQUIRED', message: `Choose a metric for "${w.title}"` });
             const group = w.type === 'kpi' || w.type === 'gauge' ? 'none' : (w.groupBy ?? 'none');
@@ -103,6 +116,93 @@ export class AnalyticsController {
   @RequirePermission('dashboard.view')
   catalog() {
     return { metrics: METRICS, groups: GROUP_LABELS, ranges: RANGE_LABELS, widgets: WIDGET_LABELS, templates: DASHBOARD_TEMPLATES };
+  }
+
+  // ── Goals & targets ──
+
+  @Get('goals')
+  @RequirePermission('dashboard.view')
+  goals() {
+    return this.db.tenant(async (tx) => this.goalProgress(tx, await loadLookups(tx, tenantId())));
+  }
+
+  @Post('goals')
+  @RequirePermission('crm.goal.manage')
+  createGoal(@Body() body: unknown) {
+    const input = parse(GoalBody, body);
+    if (input.userId && input.teamId) throw new BadRequestException({ code: 'ONE_TARGET', message: 'Set a goal for a person or a team, not both' });
+    return this.db.tenant(async (tx) => {
+      await this.assertGoalTarget(tx, input);
+      const label = METRICS[input.metric].label;
+      const g = await tx.goal.create({
+        data: {
+          tenantId: tenantId(), name: input.name || label, metric: input.metric, period: input.period, target: input.target,
+          userId: input.userId ?? null, teamId: input.teamId ?? null, workspaceId: input.workspaceId ?? auth().workspaceId ?? null, createdById: auth().userId,
+        },
+      });
+      await this.db.audit(tx, { entity: 'goal', entityId: g.id, action: 'goal.created', newValue: { metric: g.metric, period: g.period, target: g.target, userId: g.userId, teamId: g.teamId } });
+      return g;
+    });
+  }
+
+  @Patch('goals/:id')
+  @RequirePermission('crm.goal.manage')
+  updateGoal(@Param('id') id: string, @Body() body: unknown) {
+    const input = parse(GoalPatch, body);
+    return this.db.tenant(async (tx) => {
+      const g = await tx.goal.findUnique({ where: { id } });
+      if (!g) throw new NotFoundException({ code: 'GOAL_NOT_FOUND', message: 'Goal not found' });
+      await this.assertGoalTarget(tx, { userId: g.userId, teamId: g.teamId, workspaceId: g.workspaceId });
+      const updated = await tx.goal.update({ where: { id }, data: input });
+      await this.db.audit(tx, { entity: 'goal', entityId: id, action: input.isArchived ? 'goal.archived' : 'goal.updated', oldValue: { target: g.target, name: g.name }, newValue: input });
+      return updated;
+    });
+  }
+
+  /**
+   * Goals the viewer can see, with progress for the current week / month / quarter. Progress counts everything the goal
+   * covers (the person, the team or the business line), so a team target shows the team's total.
+   */
+  private async goalProgress(tx: Tx, L: Awaited<ReturnType<typeof loadLookups>>) {
+    const a = auth();
+    const people = await visibleUserIds(tx);
+    const me = await tx.user.findUnique({ where: { id: a.userId }, select: { teamId: true } });
+    const goals = await tx.goal.findMany({ where: { isArchived: false }, orderBy: { createdAt: 'asc' } });
+    const visible = goals.filter((g) =>
+      (!g.workspaceId || a.accessibleWorkspaceIds.includes(g.workspaceId)) && (!a.workspaceId || !g.workspaceId || g.workspaceId === a.workspaceId)
+      && (g.userId ? g.userId === a.userId || people === null || people.includes(g.userId) : g.teamId ? g.teamId === me?.teamId || people !== null && people.length > 1 || people === null : true));
+    const names = new Map((await tx.user.findMany({ where: { id: { in: visible.map((g) => g.userId).filter(Boolean) as string[] } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
+    const teams = new Map((await tx.team.findMany({ where: { id: { in: visible.map((g) => g.teamId).filter(Boolean) as string[] } }, include: { members: { select: { id: true } } } })).map((t) => [t.id, t]));
+    const out = [];
+    for (const g of visible) {
+      const r = resolveRange(PERIOD_RANGE[g.period as keyof typeof PERIOD_RANGE] ?? 'this_month', L.tz);
+      const ownerIds = g.userId ? [g.userId] : g.teamId ? (teams.get(g.teamId)?.members.map((m) => m.id) ?? ['00000000-0000-0000-0000-000000000000']) : undefined;
+      const c: Ctx = { tx, L, scope: {}, filters: { ownerIds, workspaceIds: g.workspaceId ? [g.workspaceId] : undefined }, tenantId: tenantId(), auditAllowed: false };
+      const agg = await aggregate(c, g.metric, 'none', r.from, r.to);
+      const value = agg.all.num;
+      const elapsed = Math.min(1, Math.max(0.01, (Date.now() - r.from.getTime()) / (r.to.getTime() - r.from.getTime())));
+      out.push({
+        id: g.id, name: g.name, metric: g.metric, format: METRICS[g.metric].format, period: g.period, target: g.target, value,
+        percent: Math.round((value / g.target) * 100), onTrack: value >= g.target * elapsed, periodLabel: r.label,
+        who: g.userId ? names.get(g.userId) ?? 'Former user' : g.teamId ? `Team ${teams.get(g.teamId)?.name ?? ''}` : g.workspaceId ? L.workspaces.get(g.workspaceId)?.name ?? 'Business line' : 'Whole organization',
+        isMine: g.userId === a.userId, userId: g.userId, teamId: g.teamId, workspaceId: g.workspaceId,
+      });
+    }
+    return out.sort((x, y) => Number(y.isMine) - Number(x.isMine));
+  }
+
+  /** Managers set goals within their reach; organization-wide goals need organization rights. */
+  private async assertGoalTarget(tx: Tx, g: { userId?: string | null; teamId?: string | null; workspaceId?: string | null }) {
+    const a = auth();
+    if (a.permissions['crm.goal.manage'] === 'ORGANIZATION') return;
+    const ws = g.workspaceId ?? a.workspaceId;
+    if (!ws || !a.accessibleWorkspaceIds.includes(ws)) throw new ForbiddenException({ code: 'ORG_GOAL', message: 'Choose one of your business lines for this goal' });
+    const people = await visibleUserIds(tx);
+    if (g.userId && people && !people.includes(g.userId)) throw new ForbiddenException({ code: 'NOT_IN_REACH', message: 'That person is not in your business line' });
+    if (g.teamId) {
+      const t = await tx.team.findUnique({ where: { id: g.teamId } });
+      if (!t || (t.workspaceId && !a.accessibleWorkspaceIds.includes(t.workspaceId))) throw new ForbiddenException({ code: 'NOT_IN_REACH', message: 'That team is not in your business line' });
+    }
   }
 
   // ── Saved dashboards ──

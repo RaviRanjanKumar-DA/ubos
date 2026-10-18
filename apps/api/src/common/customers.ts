@@ -11,7 +11,7 @@ export async function findCustomer(tx: Tx, ids: { mobile?: string | null; email?
   const active = { mergedIntoId: null };
   // Lead ID = email: match by email first.
   if (ids.preferEmail && ids.email) {
-    const byEmail = await tx.customer.findFirst({ where: { ...active, email: { equals: ids.email, mode: 'insensitive' } }, orderBy: { createdAt: 'asc' } });
+    const byEmail = await tx.customer.findFirst({ where: { ...active, OR: [{ email: { equals: ids.email, mode: 'insensitive' } }, { alternateEmails: { has: ids.email.toLowerCase() } }] }, orderBy: { createdAt: 'asc' } });
     if (byEmail) return { customer: byEmail, matchedBy: 'email' as const };
   }
   if (ids.mobile) {
@@ -27,7 +27,7 @@ export async function findCustomer(tx: Tx, ids: { mobile?: string | null; email?
   }
   if (ids.email) {
     const byEmail = await tx.customer.findFirst({
-      where: { ...active, email: { equals: ids.email, mode: 'insensitive' } },
+      where: { ...active, OR: [{ email: { equals: ids.email, mode: 'insensitive' } }, { alternateEmails: { has: ids.email.toLowerCase() } }] },
       orderBy: { createdAt: 'asc' },
     });
     if (byEmail) return { customer: byEmail, matchedBy: 'email' as const };
