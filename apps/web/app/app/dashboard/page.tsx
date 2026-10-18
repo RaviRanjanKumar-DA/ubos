@@ -1,13 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { METRICS, RANGE_LABELS, RangePreset, WidgetConfig } from '@ubos/shared';
+import { GROUP_LABELS, METRICS, RANGE_LABELS, RangePreset, WidgetConfig } from '@ubos/shared';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
-import { WidgetBody, MetricData } from '@/components/dashboard/Widget';
+import { CROSS_GROUPS, MetricData, WidgetBody } from '@/components/dashboard/Widget';
 import { ShareDialog, SharingState, WidgetDialog } from '@/components/dashboard/Dialogs';
-import { fmt } from '@/components/dashboard/charts';
+import { fmt, Pt } from '@/components/dashboard/charts';
+import type { WorkspaceSettings } from '@/lib/workspace';
 
 interface ListItem { id: string; name: string; description: string | null; isMine?: boolean; isShared?: boolean; isLocked?: boolean; widgetCount?: number }
 interface DashList { templates: { key: string; name: string; description: string }[]; mine: ListItem[]; shared: ListItem[]; defaultId: string; canShare: boolean }
@@ -15,11 +17,27 @@ interface Dash {
   id: string; name: string; description: string | null; widgets: WidgetConfig[]; range: RangePreset; isTemplate: boolean;
   canEdit: boolean; canShare: boolean; isMine?: boolean; isLocked?: boolean; sharing?: SharingState;
 }
+type Opt = { id: string; name: string };
 type Msg = { type: 'error' | 'notice'; text: string } | null;
+/** A filter set by clicking a chart: applies to every card. */
+interface Cross { group: string; key: string; label: string }
+
 const LAST = 'ubos.dashboard.last';
 const remember = (id: string) => { try { localStorage.setItem(LAST, id); } catch { /* storage unavailable */ } };
-const periodOf = (d: unknown) => (d && typeof d === 'object' && 'label' in d ? String((d as { label: unknown }).label ?? '') : '');
 const recall = () => { try { return localStorage.getItem(LAST); } catch { return null; } };
+const periodOf = (d: unknown) => (d && typeof d === 'object' && 'label' in d ? String((d as { label: unknown }).label ?? '') : '');
+const TAB_SHORT: Record<string, string> = {
+  management: 'Management', company: 'Company', business_line: 'Business line', team_audit: 'Team performance', team: 'Team', marketing: 'Marketing', my_day: 'My day',
+};
+
+function FilterBox({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
+  return (
+    <label className="fbox">
+      <span className="fbox-icon" aria-hidden="true">{icon}</span>
+      <span className="fbox-main"><span className="fbox-label">{label}</span>{children}</span>
+    </label>
+  );
+}
 
 export default function DashboardPage() {
   const { me, can, version } = useShell();
@@ -31,7 +49,16 @@ export default function DashboardPage() {
   const [to, setTo] = useState('');
   const [compare, setCompare] = useState(true);
   const [owner, setOwner] = useState('');
-  const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
+  const [line, setLine] = useState('');
+  const [team, setTeam] = useState('');
+  const [status, setStatus] = useState('');
+  const [source, setSource] = useState('');
+  const [cross, setCross] = useState<Cross[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [teams, setTeams] = useState<Opt[]>([]);
+  const [people, setPeople] = useState<Opt[]>([]);
+  const [statuses, setStatuses] = useState<Opt[]>([]);
+  const [sources, setSources] = useState<Opt[]>([]);
   const [data, setData] = useState<Record<string, unknown>>({});
   const [loading, setLoading] = useState(false);
   const [draft, setDraft] = useState<{ name: string; widgets: WidgetConfig[] } | null>(null);
@@ -39,6 +66,7 @@ export default function DashboardPage() {
   const [sharing, setSharing] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
   const editing = !!draft;
   const widgets = draft?.widgets ?? dash?.widgets ?? [];
   const scope = me.permissions['dashboard.view'];
@@ -70,24 +98,57 @@ export default function DashboardPage() {
       const id = known ? target : l.defaultId;
       api<Dash>(`/api/v1/dashboards/${encodeURIComponent(id)}`).then((d) => { setDash(d); setRange(d.range ?? 'this_month'); }).catch((e) => setMsg({ type: 'error', text: e.message }));
     }).catch((e) => setMsg({ type: 'error', text: e.message }));
-    setOwner('');
+    setOwner(''); setLine(''); setTeam(''); setStatus(''); setSource(''); setCross([]);
+    if (scope !== 'OWN' && can('org.user.view')) {
+      api<{ branches: { departments: { teams: Opt[] }[] }[] }>('/api/v1/org/structure', { noWorkspace: true })
+        .then((o) => setTeams(o.branches.flatMap((b) => b.departments.flatMap((d) => d.teams)))).catch(() => setTeams([]));
+    } else setTeams([]);
     const ws = me.currentWorkspaceId;
-    if (scope && scope !== 'OWN') {
-      (ws ? api<{ id: string; name: string }[]>(`/api/v1/workspaces/${ws}/assignees`) : can('org.user.view') ? api<{ id: string; name: string; isActive: boolean }[]>('/api/v1/users').then((u) => u.filter((x) => x.isActive)) : Promise.resolve([]))
+    if (scope !== 'OWN') {
+      (ws ? api<Opt[]>(`/api/v1/workspaces/${ws}/assignees`) : can('org.user.view') ? api<(Opt & { isActive: boolean })[]>('/api/v1/users').then((u) => u.filter((x) => x.isActive)) : Promise.resolve([]))
         .then((p) => setPeople(p.map((x) => ({ id: x.id, name: x.name })))).catch(() => setPeople([]));
-    }
+    } else setPeople([]);
+    // Status and source choices from the business lines in view.
+    const lines = ws ? [ws] : me.workspaces.map((w) => w.id);
+    Promise.all(lines.map((id) => api<WorkspaceSettings>(`/api/v1/workspaces/${id}/settings`, { workspace: id }).catch(() => null))).then((all) => {
+      const merge = (k: 'statuses' | 'sources') => [...new Map(all.flatMap((s) => s?.[k] ?? []).map((o) => [o.value!, { id: o.value!, name: o.label }])).values()];
+      setStatuses(merge('statuses'));
+      setSources(merge('sources'));
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 
+  useEffect(() => {
+    const close = (e: MouseEvent) => { if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
+
+  /** Dropdown filters, then chart clicks on top (a clicked value replaces the dropdown for that field). */
+  const filters = useMemo(() => {
+    const f: Record<string, string[]> = {};
+    if (owner) f.ownerIds = [owner];
+    if (line) f.workspaceIds = [line];
+    if (team) f.teamIds = [team];
+    if (status) f.statuses = [status];
+    if (source) f.sources = [source];
+    const field: Record<string, string> = { owner: 'ownerIds', source: 'sources', status: 'statuses', stage: 'stageIds', workspace: 'workspaceIds' };
+    for (const c of cross) {
+      if (c.key === '__unassigned__') continue;
+      f[field[c.group]] = [c.key];
+    }
+    return f;
+  }, [owner, line, team, status, source, cross]);
+
   const widgetKey = JSON.stringify(widgets.map(({ id, type, metric, groupBy, range: r, target }) => ({ id, type, metric, groupBy, r, target })));
+  const filterKey = JSON.stringify(filters);
   useEffect(() => {
     if (!widgets.length || (range === 'custom' && (!from || !to))) { setData({}); return; }
     setLoading(true);
-    const body = { range, from: from || undefined, to: to || undefined, compare, filters: owner ? { ownerIds: [owner] } : {}, widgets };
-    api<Record<string, unknown>>('/api/v1/analytics/batch', { method: 'POST', body })
+    api<Record<string, unknown>>('/api/v1/analytics/batch', { method: 'POST', body: { range, from: from || undefined, to: to || undefined, compare, filters, widgets } })
       .then(setData).catch((e) => setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Could not load the numbers' })).finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [widgetKey, range, from, to, compare, owner, version]);
+  }, [widgetKey, range, from, to, compare, filterKey, version]);
 
   async function run(fn: () => Promise<unknown>, text: string) {
     setMsg(null);
@@ -129,6 +190,22 @@ export default function DashboardPage() {
     URL.revokeObjectURL(url);
   }
 
+  const onCross = (w: WidgetConfig, p: Pt) => {
+    const group = w.groupBy ?? '';
+    if (!CROSS_GROUPS.includes(group)) return;
+    setCross((cur) => {
+      const same = cur.find((c) => c.group === group);
+      if (same?.key === p.key) return cur.filter((c) => c.group !== group); // click again to clear
+      return [...cur.filter((c) => c.group !== group), { group, key: p.key, label: p.label.replace(/^● /, '') }];
+    });
+  };
+  const leadsLink = () => {
+    const q = new URLSearchParams();
+    const map: Record<string, string> = { ownerIds: 'owners', sources: 'sources', statuses: 'statuses', stageIds: 'stageIds' };
+    for (const [k, v] of Object.entries(filters)) if (map[k]) q.set(map[k], v.join(','));
+    return `/app/leads?${q.toString()}`;
+  };
+
   const move = (fromIdx: number, toIdx: number) => {
     if (!draft || fromIdx === toIdx) return;
     const next = [...draft.widgets];
@@ -136,27 +213,24 @@ export default function DashboardPage() {
     next.splice(toIdx, 0, m);
     setDraft({ ...draft, widgets: next });
   };
-  const options = useMemo(() => list ? [
-    { label: 'Ready-made', items: list.templates.map((t) => ({ id: `tpl:${t.key}`, name: t.name })) },
-    { label: 'My dashboards', items: list.mine.map((d) => ({ id: d.id, name: d.name })) },
-    { label: 'Shared with me', items: list.shared.map((d) => ({ id: d.id, name: `${d.name}${d.isLocked ? ' 🔒' : ''}` })) },
-  ].filter((g) => g.items.length) : [], [list]);
+  const tabs = useMemo(() => list ? [
+    ...list.templates.map((t) => ({ id: `tpl:${t.key}`, name: TAB_SHORT[t.key] ?? t.name, hint: t.description, kind: '' })),
+    ...list.mine.map((d) => ({ id: d.id, name: d.name, hint: 'My dashboard', kind: 'mine' })),
+    ...list.shared.map((d) => ({ id: d.id, name: d.name, hint: 'Shared with me', kind: d.isLocked ? 'locked' : 'shared' })),
+  ] : [], [list]);
+  const activeFilters = [owner, line, team, status, source].filter(Boolean).length + cross.length + (range === 'custom' ? 1 : 0);
 
   if (!scope) return <div className="notice">Your role has no dashboard access. Ask your administrator for “View dashboards”.</div>;
   const scopeText = scope === 'OWN' ? 'your own leads and calls' : scope === 'TEAM' ? 'your team' : scope === 'WORKSPACE' ? 'your business lines' : me.currentWorkspaceId ? 'this business line' : 'the whole organization';
 
   return (
     <>
-      <div className="page-head" style={{ alignItems: 'flex-end' }}>
+      <div className="dash-head">
         <div style={{ minWidth: 0 }}>
           {editing ? (
-            <input className="input" style={{ fontSize: 20, fontWeight: 700, height: 40, maxWidth: 380 }} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Dashboard name" />
-          ) : (
-            <select className="dash-picker" value={dash?.id ?? ''} onChange={(e) => open(e.target.value)} aria-label="Choose dashboard">
-              {options.map((g) => <optgroup key={g.label} label={g.label}>{g.items.map((o) => <option key={o.id} value={o.id}>{o.name}</option>)}</optgroup>)}
-            </select>
-          )}
-          <div className="small muted">{dash?.description ? `${dash.description} · ` : ''}Showing {scopeText}.</div>
+            <input className="input" style={{ fontSize: 22, fontWeight: 750, height: 42, maxWidth: 420 }} value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label="Dashboard name" />
+          ) : <h1 style={{ margin: 0 }}>{dash?.name ?? 'Dashboard'}</h1>}
+          <div className="small muted">{dash?.description ? `${dash.description} ` : ''}Showing {scopeText}.</div>
         </div>
         <div className="row">
           {!editing && (
@@ -165,8 +239,7 @@ export default function DashboardPage() {
                 ? <button className="btn outline" onClick={() => setDraft({ name: dash.name, widgets: dash.widgets })}>Edit</button>
                 : <button className="btn outline" onClick={() => setDraft({ name: `${dash.name} (my copy)`, widgets: dash.widgets })} title="Change widgets and save it as your own dashboard">Customise</button>)}
               {dash?.canShare && !dash.isTemplate && list?.canShare && <button className="btn outline" onClick={() => setSharing(true)}>Share</button>}
-              {can('crm.lead.export') && <button className="btn ghost" onClick={exportCsv}>Export</button>}
-              <button className="btn" onClick={() => saveCopy('My dashboard', [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }]).then((id) => { if (id) setDraft({ name: 'My dashboard', widgets: [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] }); })}>+ New dashboard</button>
+              <button className="btn" onClick={() => saveCopy('My dashboard', [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }]).then((id) => { if (id) setDraft({ name: 'My dashboard', widgets: [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] }); })}>+ New</button>
             </>
           )}
           {editing && (
@@ -179,27 +252,92 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="card dash-controls">
-        <select className="input" style={{ width: 'auto' }} value={range} onChange={(e) => setRange(e.target.value as RangePreset)} aria-label="Period">
-          {(Object.keys(RANGE_LABELS) as RangePreset[]).map((r) => <option key={r} value={r}>{RANGE_LABELS[r]}</option>)}
-        </select>
-        {range === 'custom' && (
-          <>
-            <input className="input" type="date" value={from} onChange={(e) => setFrom(e.target.value)} aria-label="From" style={{ width: 'auto' }} />
-            <span className="muted">to</span>
-            <input className="input" type="date" value={to} onChange={(e) => setTo(e.target.value)} aria-label="To" style={{ width: 'auto' }} />
-          </>
-        )}
-        <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare with previous period</label>
-        {people.length > 0 && (
-          <select className="input" style={{ width: 'auto' }} value={owner} onChange={(e) => setOwner(e.target.value)} aria-label="Person">
-            <option value="">Everyone</option>
-            {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+      {!editing && tabs.length > 0 && (
+        <div className="dash-tabs" role="tablist" aria-label="Dashboards">
+          {tabs.map((t) => (
+            <button key={t.id} role="tab" aria-selected={dash?.id === t.id} className={`dash-tab ${dash?.id === t.id ? 'on' : ''}`} title={t.hint} onClick={() => { setCross([]); open(t.id); }}>
+              {t.kind === 'mine' ? '★ ' : t.kind === 'locked' ? '🔒 ' : t.kind === 'shared' ? '↗ ' : ''}{t.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="card fbar">
+        <FilterBox icon="📅" label="Period">
+          <select value={range} onChange={(e) => setRange(e.target.value as RangePreset)}>
+            {(Object.keys(RANGE_LABELS) as RangePreset[]).map((r) => <option key={r} value={r}>{RANGE_LABELS[r]}</option>)}
           </select>
+        </FilterBox>
+        {!me.currentWorkspaceId && me.workspaces.length > 1 && (
+          <FilterBox icon="🏢" label="Business line">
+            <select value={line} onChange={(e) => setLine(e.target.value)}>
+              <option value="">All business lines</option>
+              {me.workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            </select>
+          </FilterBox>
         )}
+        {teams.length > 0 && (
+          <FilterBox icon="👥" label="Team">
+            <select value={team} onChange={(e) => setTeam(e.target.value)}>
+              <option value="">All teams</option>
+              {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </FilterBox>
+        )}
+        {people.length > 0 && (
+          <FilterBox icon="👤" label="RM / person">
+            <select value={owner} onChange={(e) => setOwner(e.target.value)}>
+              <option value="">Everyone</option>
+              {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </FilterBox>
+        )}
+        <FilterBox icon="◎" label="Status">
+          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+            <option value="">All statuses</option>
+            {statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <option value="__none__">No status</option>
+          </select>
+        </FilterBox>
+        <FilterBox icon="⇲" label="Source">
+          <select value={source} onChange={(e) => setSource(e.target.value)}>
+            <option value="">All sources</option>
+            {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+        </FilterBox>
+        <div className="fbar-actions" ref={moreRef}>
+          <button className={`btn outline ${moreOpen ? 'on' : ''}`} onClick={() => setMoreOpen(!moreOpen)}>⚲ More filters ▾</button>
+          {moreOpen && (
+            <div className="card fbar-more">
+              <div className="field">
+                <label>Custom dates</label>
+                <div className="row" style={{ flexWrap: 'nowrap' }}>
+                  <input className="input" type="date" value={from} onChange={(e) => { setFrom(e.target.value); setRange('custom'); }} aria-label="From" />
+                  <span className="muted">to</span>
+                  <input className="input" type="date" value={to} onChange={(e) => { setTo(e.target.value); setRange('custom'); }} aria-label="To" />
+                </div>
+              </div>
+              <label className="row small"><input type="checkbox" checked={compare} onChange={(e) => setCompare(e.target.checked)} /> Compare with the previous period</label>
+              {activeFilters > 0 && (
+                <button className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => { setOwner(''); setLine(''); setTeam(''); setStatus(''); setSource(''); setCross([]); setRange(dash?.range ?? 'this_month'); setFrom(''); setTo(''); }}>Clear all filters</button>
+              )}
+            </div>
+          )}
+          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}>⬇ Export</button>}
+        </div>
+      </div>
+      <div className="fbar-foot">
+        {cross.length > 0 ? (
+          <>
+            <span className="small">Filtered by</span>
+            {cross.map((c) => (
+              <button key={c.group} className="chip on" onClick={() => setCross(cross.filter((x) => x.group !== c.group))} title="Remove">{GROUP_LABELS[c.group as keyof typeof GROUP_LABELS]}: {c.label} ✕</button>
+            ))}
+            <Link className="small" href={leadsLink()}>View these leads →</Link>
+          </>
+        ) : <span className="small muted">Tip: click a bar, slice or row to filter every card; click it again to clear.</span>}
         <span style={{ flex: 1 }} />
         {loading && <span className="small muted">Updating…</span>}
-        {dash?.isLocked && !editing && <span className="badge grey">🔒 Locked</span>}
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}
       {editing && <div className="notice small">Drag widgets to reorder. Use ✎ to change a widget, or the size buttons to resize it.</div>}
@@ -222,7 +360,10 @@ export default function DashboardPage() {
                 </span>
               )}
             </header>
-            <div className="dash-widget-body"><WidgetBody w={w} data={data[w.id]} onDrill={(href) => router.push(href)} /></div>
+            <div className="dash-widget-body">
+              <WidgetBody w={w} data={data[w.id]} onDrill={(href) => router.push(href)} onCross={editing ? undefined : onCross}
+                active={cross.filter((c) => c.group === w.groupBy).map((c) => c.key)} />
+            </div>
           </section>
         ))}
         {editing && (

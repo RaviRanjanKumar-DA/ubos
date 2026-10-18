@@ -13,7 +13,9 @@ export function fmt(v: number | null | undefined, format: string): string {
   switch (format) {
     case 'percent': return `${Math.round(v * 10) / 10}%`;
     case 'hours': return v < 1 ? `${Math.round(v * 60)} min` : `${Math.round(v * 10) / 10} h`;
-    case 'minutes': return v >= 120 ? `${Math.round(v / 6) / 10} h` : `${Math.round(v)} min`;
+    case 'minutes': return v >= 120 ? `${Math.round(v / 6) / 10} h` : v < 10 ? `${Math.round(v * 10) / 10} min` : `${Math.round(v)} min`;
+    case 'days': return `${Math.round(v * 10) / 10} days`;
+    case 'number': return (Math.round(v * 10) / 10).toLocaleString('en-IN');
     case 'currency': {
       const r = v / 100;
       if (r >= 1e7) return `₹${(r / 1e7).toFixed(2)} Cr`;
@@ -73,7 +75,7 @@ export function BarList({ points, format, onPick, limit = 10 }: { points: Pt[]; 
   return (
     <div className="barlist">
       {shown.map((p, i) => (
-        <button key={p.key} type="button" className="barlist-row" onClick={onPick ? () => onPick(p) : undefined} disabled={!onPick} title={onPick ? 'Open these leads' : undefined}>
+        <button key={p.key} type="button" className="barlist-row" onClick={onPick ? () => onPick(p) : undefined} disabled={!onPick} title={onPick ? 'Click to filter the dashboard' : undefined}>
           <span className="barlist-label">{p.label}</span>
           <span className="barlist-track"><span style={{ width: `${Math.max(2, (p.value / max) * 100)}%`, background: p.color && p.color !== '#e4e2ec' ? p.color : colorAt(i) }} /></span>
           <b className="barlist-value">{fmt(p.value, format)}</b>

@@ -7,7 +7,7 @@ import { RequirePermission } from '../../common/auth.guard';
 import { auth, tenantId } from '../../common/context';
 import { parse } from '../../common/errors';
 import { scopeFilter } from '../../common/scope';
-import { Ctx, followUpList, forecast, funnel, leaderboard, loadLookups, resolveRange, runMetric } from './engine';
+import { AuditAccessError, Ctx, followUpList, forecast, funnel, leaderboard, loadLookups, resolveRange, runMetric } from './engine';
 
 const RangeKey = z.enum(Object.keys(RANGE_LABELS) as [string, ...string[]]);
 const GroupKey = z.enum(Object.keys(GROUP_LABELS) as [string, ...string[]]);
@@ -30,7 +30,7 @@ const Widget = z.object({
 const Widgets = z.array(Widget).max(30);
 const Batch = z.object({
   range: RangeKey.default('this_month'), from: day.optional(), to: day.optional(), compare: z.boolean().default(true),
-  filters: z.object({ workspaceIds: ids, ownerIds: ids, sources: z.array(z.string().max(60)).max(50).optional(), stageIds: ids }).default({}),
+  filters: z.object({ workspaceIds: ids, ownerIds: ids, teamIds: ids, sources: z.array(z.string().max(60)).max(50).optional(), statuses: z.array(z.string().max(60)).max(50).optional(), stageIds: ids }).default({}),
   widgets: Widgets.min(1),
 });
 const DashboardBody = z.object({
@@ -66,7 +66,14 @@ export class AnalyticsController {
     const input = parse(Batch, body);
     return this.db.tenant(async (tx) => {
       const L = await loadLookups(tx, tenantId());
-      const c: Ctx = { tx, L, scope: await scopeFilter(tx, 'dashboard.view'), filters: input.filters };
+      const { teamIds, ...filters } = input.filters;
+      if (teamIds?.length) {
+        // A team filter becomes the people in those teams (intersected with any person filter).
+        const members = (await tx.user.findMany({ where: { teamId: { in: teamIds } }, select: { id: true } })).map((u) => u.id);
+        filters.ownerIds = filters.ownerIds?.length ? filters.ownerIds.filter((id) => members.includes(id)) : members;
+        if (!filters.ownerIds.length) filters.ownerIds = ['00000000-0000-0000-0000-000000000000'];
+      }
+      const c: Ctx = { tx, L, scope: await scopeFilter(tx, 'dashboard.view'), filters, tenantId: tenantId(), auditAllowed: auth().permissions['audit.view'] === 'ORGANIZATION' };
       const out: Record<string, unknown> = {};
       for (const w of input.widgets) {
         const r = resolveRange((w.range ?? input.range) as never, L.tz, input.from, input.to);
@@ -83,6 +90,7 @@ export class AnalyticsController {
           }
         } catch (e) {
           if (e instanceof BadRequestException) throw e;
+          if (e instanceof AuditAccessError) { out[w.id] = { error: 'Visible to people with organization-wide audit access' }; continue; }
           out[w.id] = { error: 'Could not compute this widget' };
         }
       }
@@ -108,7 +116,7 @@ export class AnalyticsController {
       const visible = all.filter((d) => this.canSee(d, me));
       const forMyRole = visible.find((d) => d.defaultForRoleIds.some((r) => me.roleIds.includes(r)));
       return {
-        templates: DASHBOARD_TEMPLATES.map((t) => ({ key: t.key, name: t.name, description: t.description })),
+        templates: DASHBOARD_TEMPLATES.filter((t) => this.templatesForScope().includes(t.key)).map((t) => ({ key: t.key, name: t.name, description: t.description })),
         mine: visible.filter((d) => d.ownerId === me.userId).map((d) => this.out(d, me)),
         shared: visible.filter((d) => d.ownerId !== me.userId).map((d) => this.out(d, me)),
         defaultId: forMyRole?.id ?? `tpl:${this.defaultTemplate()}`,
@@ -217,10 +225,19 @@ export class AnalyticsController {
 
   // ── helpers ──
 
+  /** Ready dashboards that make sense for the viewer's level (numbers are scoped either way). */
+  private templatesForScope() {
+    const scope = auth().permissions['dashboard.view'];
+    if (scope === 'ORGANIZATION') return ['management', 'company', 'business_line', 'team_audit', 'team', 'marketing', 'my_day'];
+    if (scope === 'WORKSPACE') return ['business_line', 'team_audit', 'team', 'marketing', 'my_day'];
+    if (scope === 'OWN') return ['my_day'];
+    return ['team', 'team_audit', 'my_day'];
+  }
+
   private defaultTemplate() {
     const a = auth();
     const scope = a.permissions['dashboard.view'];
-    if (scope === 'ORGANIZATION') return a.workspaceId ? 'business_line' : 'company';
+    if (scope === 'ORGANIZATION') return a.workspaceId ? 'business_line' : 'management';
     if (scope === 'WORKSPACE') return 'business_line';
     if (scope === 'OWN') return 'my_day';
     return 'team';

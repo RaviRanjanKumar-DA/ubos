@@ -41,7 +41,7 @@ const localDay = (iso, back = 0) => new Date(new Date(iso).getTime() - back).toL
 
 // ── Catalogue & validation ──
 const cat = await call('/api/v1/analytics/catalog', { token: admin });
-check('catalogue lists metrics, groupings, ranges, widgets and 5 templates', cat.status === 200 && Object.keys(cat.body.metrics).length >= 15 && cat.body.templates.length === 5, Object.keys(cat.body));
+check('catalogue lists 35+ metrics in categories, groupings, ranges, widgets and 7 templates', cat.status === 200 && Object.keys(cat.body.metrics).length >= 35 && Object.values(cat.body.metrics).every((m) => m.category) && cat.body.templates.length === 7, Object.keys(cat.body.metrics).length);
 const badMetric = await batch(admin, [kpi('x', 'happiness')]);
 check('unknown metrics are refused', badMetric.status === 400, badMetric.status);
 const tooMany = await batch(admin, Array.from({ length: 31 }, (_, i) => kpi(`k${i}`, 'leads')));
@@ -97,11 +97,47 @@ await call(`/api/v1/leads/${myLead.id}/activities`, { token: rm, workspace: VAST
 const after = (await batch(rm, [kpi('calls', 'calls', { range: 'today' }), kpi('conn', 'connected_calls', { range: 'today' }), kpi('rate', 'connect_rate', { range: 'today' }), kpi('talk', 'talk_time', { range: 'today' }), { id: 'heat', type: 'heatmap', title: '', metric: 'calls', groupBy: 'heatmap', w: 6, h: 2 }], {}, { workspace: VASTU })).body;
 check('logged calls show up at once (calls, connected, talk time)', after.calls.value === before.calls.value + 2 && after.conn.value === before.conn.value + 1 && after.talk.value >= 5, [before.calls.value, after.calls.value, after.conn.value, after.talk.value]);
 check('heatmap places calls on weekday × hour', after.heat.series.reduce((n, p) => n + p.value, 0) >= 2 && after.heat.series.every((p) => p.x >= 0 && p.x <= 6 && p.y >= 0 && p.y <= 23), after.heat.series);
+// ── Revenue, SLA, productivity and audit KPIs ──
+const nonAudit = Object.entries(cat.body.metrics).filter(([, m]) => !m.audit).map(([k]) => k);
+const auditKeys = Object.entries(cat.body.metrics).filter(([, m]) => m.audit).map(([k]) => k);
+const allKpis = { ...(await batch(admin, nonAudit.slice(0, 20).map((k) => kpi(k, k)), { range: 'last_30_days' })).body, ...(await batch(admin, nonAudit.slice(20).map((k) => kpi(k, k)), { range: 'last_30_days' })).body };
+check('every KPI computes for management', nonAudit.every((k) => allKpis[k] && !allKpis[k].error && (allKpis[k].value === null || typeof allKpis[k].value === 'number')), nonAudit.filter((k) => !allKpis[k] || allKpis[k].error));
+check('percent KPIs stay between 0 and 100', ['conversion_rate', 'response_1h', 'sla_breach_rate'].every((k) => allKpis[k].value === null || (allKpis[k].value >= 0 && allKpis[k].value <= 100)), ['conversion_rate', 'response_1h', 'sla_breach_rate'].map((k) => allKpis[k].value));
+check('activities include the calls; leads worked never exceed activities', allKpis.activities.value >= allKpis.calls.value && allKpis.leads_worked.value <= allKpis.activities.value, [allKpis.activities.value, allKpis.calls.value, allKpis.leads_worked.value]);
+const openStageIds = (await Promise.all(Object.values(ws).map((id) => call(`/api/v1/workspaces/${id}/settings`, { token: admin, workspace: id })))).flatMap((r) => r.body.pipelines.flatMap((p) => p.stages.filter((x) => !x.isWon && !x.isLost).map((x) => x.id)));
+const unassignedList = await call(`/api/v1/leads?owners=unassigned&stageIds=${openStageIds.join(',')}`, { token: admin });
+check('unassigned leads match the lead list', allKpis.unassigned_leads.value === unassignedList.total, [allKpis.unassigned_leads.value, unassignedList.total]);
+const byType = (await batch(admin, [{ id: 't', type: 'pie', title: '', metric: 'activities', groupBy: 'activity_type', w: 6, h: 2 }], { range: 'last_30_days' })).body.t;
+check('activities split by type (calls, remarks, stage moves…)', byType.series.some((p) => p.key === 'call') && byType.series.reduce((n, p) => n + p.value, 0) === byType.value, byType.series.map((p) => p.key));
+const adminAudit = (await batch(admin, auditKeys.map((k) => kpi(k, k)), { range: 'today' })).body;
+check('management sees the audit KPIs (sign-ins, exports, data changes)', auditKeys.every((k) => typeof adminAudit[k].value === 'number') && adminAudit.logins.value >= 1, auditKeys.map((k) => [k, adminAudit[k].value]));
+await call('/api/v1/leads/export', { token: admin });
+const afterExport = (await batch(admin, [kpi('exports', 'exports', { range: 'today' })])).body;
+check('an export shows up in the audit KPIs at once', afterExport.exports.value === adminAudit.exports.value + 1, [adminAudit.exports.value, afterExport.exports.value]);
+const rmAudit = (await batch(rm, [kpi('logins', 'logins')], {}, { workspace: VASTU })).body;
+const mgrAudit = (await batch(manager, [kpi('exports', 'exports')], {}, { workspace: VASTU })).body;
+check('RMs and managers cannot see audit KPIs', /audit access/.test(rmAudit.logins.error ?? '') && /audit access/.test(mgrAudit.exports.error ?? ''), [rmAudit.logins, mgrAudit.exports]);
+const teams = (await call('/api/v1/org/structure', { token: admin })).body.branches.flatMap((b) => b.departments.flatMap((d) => d.teams));
+const vastuTeam = teams.find((t) => t.name === 'Vastu Team');
+const teamMembers = users.filter((u) => u.team?.id === vastuTeam.id).map((u) => u.id);
+const byTeam = (await batch(admin, [kpi('open', 'open_leads')], { filters: { teamIds: [vastuTeam.id] } })).body;
+const byPeople = (await batch(admin, [kpi('open', 'open_leads')], { filters: { ownerIds: teamMembers } })).body;
+check('team filter = the people in that team', teamMembers.length >= 2 && byTeam.open.value === byPeople.open.value, [byTeam.open.value, byPeople.open.value]);
+const byLine = (await batch(admin, [kpi('open', 'open_leads')], { filters: { workspaceIds: [VASTU] } })).body;
+const hotOpen = (await batch(admin, [kpi('open', 'open_leads')], { filters: { statuses: ['hot'] } })).body;
+const hotList = await call(`/api/v1/leads?statuses=hot&stageIds=${openStageIds.join(',')}`, { token: admin });
+check('status filter matches the lead list', hotOpen.open.value === hotList.total, [hotOpen.open.value, hotList.total]);
+const tplRm = (await call('/api/v1/dashboards', { token: rm, workspace: VASTU })).body.templates.map((t) => t.key);
+const tplMgr = (await call('/api/v1/dashboards', { token: manager, workspace: VASTU })).body.templates.map((t) => t.key);
+const tplAdmin = (await call('/api/v1/dashboards', { token: admin })).body.templates.map((t) => t.key);
+check('each person gets the dashboard tabs that fit their level', tplRm.join() === 'my_day' && tplMgr.includes('team_audit') && !tplMgr.includes('management') && tplAdmin.includes('management') && tplAdmin.length === 7, [tplRm, tplMgr, tplAdmin]);
+check('business line filter from the organization view', byLine.open.value === adminVastu.open.value, [byLine.open.value, adminVastu.open.value]);
+
 // ── Funnel, leaderboard, forecast ──
 const special = (await batch(admin, [{ id: 'f', type: 'funnel', title: '', w: 6, h: 2 }, { id: 'lb', type: 'leaderboard', title: '', w: 12, h: 2 }, { id: 'fc', type: 'forecast', title: '', w: 4, h: 2 }], {}, { workspace: VASTU })).body;
 const steps = special.f.steps.map((s) => s.value);
 check('funnel starts with all new leads and never grows', steps.length >= 3 && steps[0] === special.f.total && steps.slice(0, -1).every((v, i) => i === 0 || v <= steps[i - 1]), [special.f.total, steps]);
-check('leaderboard ranks people with calls, connect rate and wins', special.lb.rows.length >= 2 && special.lb.rows.every((r) => typeof r.calls === 'number' && 'winRate' in r), special.lb.rows);
+check('per-person audit table: results, activity, speed & SLA, pipeline hygiene', special.lb.rows.length >= 2 && special.lb.rows.every((r) => ['calls', 'activities', 'wonValue', 'staleLeads', 'stuckLeads', 'overdueFollowups', 'openLeads', 'leadsWorked', 'followupsDone'].every((k) => typeof r[k] === 'number') && 'answered1h' in r && 'followupOnTime' in r), special.lb.rows[0]);
 check('forecast gives wins so far, run-rate and pipeline projection', ['wonSoFar', 'runRateWins', 'pipelineWins', 'openLeads', 'daysLeft'].every((k) => typeof special.fc[k] === 'number') && special.fc.pipelineWins >= special.fc.wonSoFar, special.fc);
 
 // ── Deal value & win probability ──
@@ -128,7 +164,7 @@ const tpl = await call('/api/v1/dashboards/tpl:company', { token: admin });
 const noTpl = await call('/api/v1/dashboards/tpl:nope', { token: admin });
 check('ready-made dashboards open by key', tpl.status === 200 && tpl.body.widgets.length >= 8 && tpl.body.isTemplate && noTpl.status === 404, [tpl.status, noTpl.status]);
 const lists = { admin: (await call('/api/v1/dashboards', { token: admin })).body, rm: (await call('/api/v1/dashboards', { token: rm, workspace: VASTU })).body, mgr: (await call('/api/v1/dashboards', { token: manager, workspace: VASTU })).body };
-check('each person lands on the dashboard for their level', lists.admin.defaultId === 'tpl:company' && lists.rm.defaultId === 'tpl:my_day' && lists.mgr.defaultId === 'tpl:business_line', [lists.admin.defaultId, lists.rm.defaultId, lists.mgr.defaultId]);
+check('each person lands on the dashboard for their level', lists.admin.defaultId === 'tpl:management' && lists.rm.defaultId === 'tpl:my_day' && lists.mgr.defaultId === 'tpl:business_line', [lists.admin.defaultId, lists.rm.defaultId, lists.mgr.defaultId]);
 const created = await call('/api/v1/dashboards', { token: admin, method: 'POST', body: { name: 'Sales review', range: 'last_30_days', widgets: [kpi('k1', 'leads'), { id: 'b1', type: 'bar', title: 'By stage', metric: 'open_leads', groupBy: 'stage', w: 6, h: 2 }] } });
 const dash = created.body;
 const rmSees = await call(`/api/v1/dashboards/${dash.id}`, { token: rm, workspace: VASTU });

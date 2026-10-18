@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { GROUP_LABELS, GroupBy, METRICS, RANGE_LABELS, RangePreset, SPECIAL_WIDGETS, WIDGET_LABELS, WidgetConfig, WidgetType } from '@ubos/shared';
+import { GROUP_LABELS, GroupBy, METRIC_CATEGORIES, METRICS, RANGE_LABELS, RangePreset, SPECIAL_WIDGETS, WIDGET_LABELS, WidgetConfig, WidgetType } from '@ubos/shared';
 import { api } from '@/lib/api';
 
 const TYPE_HINT: Record<WidgetType, string> = {
@@ -12,9 +12,9 @@ const TYPE_HINT: Record<WidgetType, string> = {
 /** Groupings that make sense for each chart type. */
 const TYPE_GROUPS: Partial<Record<WidgetType, GroupBy[]>> = {
   kpi: ['none'], gauge: ['none'], line: ['day', 'week', 'month'], heatmap: ['heatmap'],
-  bar: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason', 'day', 'week', 'month'],
-  pie: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason'],
-  table: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason', 'day', 'week', 'month'],
+  bar: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason', 'activity_type', 'day', 'week', 'month'],
+  pie: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason', 'activity_type'],
+  table: ['stage', 'status', 'source', 'owner', 'workspace', 'disposition', 'lost_reason', 'activity_type', 'day', 'week', 'month'],
 };
 
 export function WidgetDialog({ widget, onClose, onSave }: { widget: WidgetConfig | null; onClose: () => void; onSave: (w: WidgetConfig) => void }) {
@@ -57,7 +57,10 @@ export function WidgetDialog({ widget, onClose, onSave }: { widget: WidgetConfig
               <div className="field">
                 <label>Metric</label>
                 <select className="input" value={w.metric} onChange={(e) => setW({ ...w, metric: e.target.value })}>
-                  {metrics.map(([k, m]) => <option key={k} value={k}>{m.label}</option>)}
+                  {METRIC_CATEGORIES.map((cat) => {
+                    const items = metrics.filter(([, m]) => m.category === cat);
+                    return items.length ? <optgroup key={cat} label={cat}>{items.map(([k, m]) => <option key={k} value={k}>{m.label}{m.audit ? ' (audit access)' : ''}</option>)}</optgroup> : null;
+                  })}
                 </select>
                 {w.metric && <span className="small muted">{METRICS[w.metric].hint}</span>}
               </div>

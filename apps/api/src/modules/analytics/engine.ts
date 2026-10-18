@@ -7,7 +7,7 @@ import { defaultWinProbability, GroupBy, METRICS, RangePreset } from '@ubos/shar
  * fine for the volumes of Phase 1; heavy tenants move to pre-aggregated tables later without changing the API.
  */
 
-export interface Filters { workspaceIds?: string[]; ownerIds?: string[]; sources?: string[]; stageIds?: string[] }
+export interface Filters { workspaceIds?: string[]; ownerIds?: string[]; sources?: string[]; stageIds?: string[]; statuses?: string[] }
 export interface Range { from: Date; to: Date; prevFrom: Date; prevTo: Date; label: string }
 export interface Point { key: string; label: string; value: number; color?: string | null; x?: number; y?: number; count?: number }
 export interface MetricResult { metric: string; format: string; value: number | null; previous: number | null; series: Point[] }
@@ -135,7 +135,9 @@ function dealValue(L: Lookups, workspaceId: string, cf: unknown) {
 
 // ── The query ──
 
-export interface Ctx { tx: Tx; L: Lookups; scope: Prisma.LeadWhereInput; filters: Filters }
+export interface Ctx { tx: Tx; L: Lookups; scope: Prisma.LeadWhereInput; filters: Filters; tenantId: string; auditAllowed: boolean }
+/** Thrown for audit metrics when the viewer has no organization-wide audit access. */
+export class AuditAccessError extends Error {}
 
 function leadWhere(c: Ctx): Prisma.LeadWhereInput {
   const f = c.filters;
@@ -146,6 +148,7 @@ function leadWhere(c: Ctx): Prisma.LeadWhereInput {
       ...(f.ownerIds?.length ? [{ ownerId: { in: f.ownerIds } }] : []),
       ...(f.sources?.length ? [{ source: { in: f.sources } }] : []),
       ...(f.stageIds?.length ? [{ stageId: { in: f.stageIds } }] : []),
+      ...(f.statuses?.length ? [{ OR: [{ status: { in: f.statuses.filter((x) => x !== '__none__') } }, ...(f.statuses.includes('__none__') ? [{ status: null }] : [])] }] : []),
     ],
   };
 }
@@ -166,8 +169,9 @@ function total(metric: string, a: Agg): number | null {
   if (!a.den) return null;
   return kind === 'ratio' ? Math.round((a.num / a.den) * 1000) / 10 : Math.round((a.num / a.den) * 10) / 10;
 }
-const aggKind = (m: string): 'sum' | 'ratio' | 'avg' =>
-  ['win_rate', 'contact_rate', 'connect_rate', 'followup_compliance'].includes(m) ? 'ratio' : m === 'first_response' ? 'avg' : 'sum';
+const RATIO = ['win_rate', 'contact_rate', 'connect_rate', 'followup_compliance', 'conversion_rate', 'response_1h', 'sla_breach_rate'];
+const AVG = ['first_response', 'avg_deal_value', 'sales_cycle', 'talk_per_call', 'days_in_stage', 'avg_score'];
+const aggKind = (m: string): 'sum' | 'ratio' | 'avg' => (RATIO.includes(m) ? 'ratio' : AVG.includes(m) ? 'avg' : 'sum');
 
 async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Date) {
   const all: Agg = { num: 0, den: 0 };
@@ -178,17 +182,66 @@ async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Dat
   const put = (key: string | null, num: number, den: number) => { all.num += num; all.den += den; if (g !== 'none') add(groups, key ?? '—', num, den); };
   const range = { gte: from, lt: to };
 
-  if (['calls', 'connected_calls', 'connect_rate', 'talk_time'].includes(metric)) {
+  if (['calls', 'connected_calls', 'connect_rate', 'talk_time', 'talk_per_call'].includes(metric)) {
     const rows = await c.tx.leadActivity.findMany({
       where: { type: 'call', createdAt: range, lead: leadWhere({ ...c, filters: { ...c.filters, ownerIds: undefined } }), ...(c.filters.ownerIds?.length ? { userId: { in: c.filters.ownerIds } } : {}) },
       select: { createdAt: true, userId: true, workspaceId: true, disposition: true, connected: true, durationSec: true }, take: LIMIT,
     });
     for (const a of rows) {
-      const [num, den] = metric === 'calls' ? [1, 1] : metric === 'connected_calls' ? [a.connected ? 1 : 0, 1] : metric === 'connect_rate' ? [a.connected ? 1 : 0, 1] : [a.connected ? Math.round((a.durationSec ?? 0) / 60) : 0, 1];
+      if (metric === 'talk_per_call' && !a.connected) continue;
+      const [num, den] = metric === 'talk_per_call' ? [(a.durationSec ?? 0) / 60, 1] : metric === 'calls' ? [1, 1] : metric === 'connected_calls' ? [a.connected ? 1 : 0, 1] : metric === 'connect_rate' ? [a.connected ? 1 : 0, 1] : [a.connected ? Math.round((a.durationSec ?? 0) / 60) : 0, 1];
       const p = localParts(a.createdAt, L.tz);
       const key = g === 'owner' ? a.userId : g === 'workspace' ? a.workspaceId : g === 'disposition' ? a.disposition : g === 'heatmap' ? `${p.wd}:${p.h}` : ['day', 'week', 'month'].includes(g) ? bucket(a.createdAt) : null;
       put(key, num, den);
     }
+    return { all, groups };
+  }
+
+  if (['activities', 'remarks', 'actions_done', 'leads_worked'].includes(metric)) {
+    const type = metric === 'remarks' ? 'remark' : metric === 'actions_done' ? 'action' : undefined;
+    const rows = await c.tx.leadActivity.findMany({
+      where: {
+        createdAt: range, userId: { not: null }, ...(type ? { type } : { type: { not: 'import' } }),
+        lead: leadWhere({ ...c, filters: { ...c.filters, ownerIds: undefined } }), ...(c.filters.ownerIds?.length ? { userId: { in: c.filters.ownerIds } } : {}),
+      },
+      select: { createdAt: true, userId: true, workspaceId: true, type: true, leadId: true }, take: LIMIT,
+    });
+    const seen = new Set<string>();
+    for (const a of rows) {
+      const key = g === 'owner' ? a.userId : g === 'workspace' ? a.workspaceId : g === 'activity_type' ? a.type : ['day', 'week', 'month'].includes(g) ? bucket(a.createdAt) : null;
+      if (metric === 'leads_worked') {
+        // Count each lead once per group (and once in the total).
+        const totalKey = `all:${a.leadId}`;
+        const groupKey = `${key}:${a.leadId}`;
+        if (!seen.has(totalKey)) { seen.add(totalKey); all.num += 1; all.den += 1; }
+        if (g !== 'none' && !seen.has(groupKey)) { seen.add(groupKey); add(groups, key ?? '—', 1, 1); }
+        continue;
+      }
+      put(key, 1, 1);
+    }
+    return { all, groups };
+  }
+
+  if (metric === 'followups_done') {
+    const rows = await c.tx.followUp.findMany({
+      where: { doneAt: range, lead: leadWhere({ ...c, filters: { ...c.filters, ownerIds: undefined } }), ...(c.filters.ownerIds?.length ? { userId: { in: c.filters.ownerIds } } : {}) },
+      select: { doneAt: true, userId: true, lead: { select: { workspaceId: true } } }, take: LIMIT,
+    });
+    for (const f of rows) put(g === 'owner' ? f.userId : g === 'workspace' ? f.lead.workspaceId : ['day', 'week', 'month'].includes(g) ? bucket(f.doneAt!) : null, 1, 1);
+    return { all, groups };
+  }
+
+  if (def.audit) {
+    if (!c.auditAllowed) throw new AuditAccessError('Needs organization-wide audit access');
+    const action: Prisma.AuditLogWhereInput =
+      metric === 'logins' ? { action: 'auth.login' } : metric === 'failed_logins' ? { action: 'auth.login_failed' }
+      : metric === 'exports' ? { action: { endsWith: '.exported' } }
+      : { NOT: [{ action: { startsWith: 'auth.' } }, { action: { startsWith: 'session.' } }] };
+    const rows = await c.tx.auditLog.findMany({
+      where: { tenantId: c.tenantId, createdAt: range, ...action, ...(c.filters.ownerIds?.length ? { actorId: { in: c.filters.ownerIds } } : {}) },
+      select: { createdAt: true, actorId: true }, take: LIMIT,
+    });
+    for (const a of rows) put(g === 'owner' ? (a.actorId && L.users.has(a.actorId) ? a.actorId : '__system__') : ['day', 'week', 'month'].includes(g) ? bucket(a.createdAt) : null, 1, 1);
     return { all, groups };
   }
 
@@ -215,16 +268,18 @@ async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Dat
   }
 
   // Lead metrics
-  const wonLost = [...L.stages].filter(([, s]) => (metric === 'won' || metric === 'won_value' ? s.isWon : metric === 'lost' ? s.isLost : s.isWon || s.isLost)).map(([id]) => id);
+  const wonOnly = ['won', 'won_value', 'avg_deal_value', 'sales_cycle'].includes(metric);
+  const lostOnly = ['lost', 'lost_value'].includes(metric);
+  const wonLost = [...L.stages].filter(([, s]) => (wonOnly ? s.isWon : lostOnly ? s.isLost : s.isWon || s.isLost)).map(([id]) => id);
   const open = [...L.stages].filter(([, s]) => !s.isWon && !s.isLost).map(([id]) => id);
   const extra: Prisma.LeadWhereInput =
     def.basis === 'created' ? { createdAt: range }
     : def.basis === 'closed' ? { stageChangedAt: range, stageId: { in: wonLost } }
     : { stageId: { in: open } };
-  const needValue = ['pipeline_value', 'weighted_pipeline', 'won_value'].includes(metric);
+  const needValue = ['pipeline_value', 'weighted_pipeline', 'won_value', 'avg_deal_value', 'lost_value'].includes(metric);
   const rows = await c.tx.lead.findMany({
     where: { AND: [leadWhere(c), extra] },
-    select: { createdAt: true, stageId: true, stageChangedAt: true, status: true, source: true, ownerId: true, workspaceId: true, firstResponseAt: true, lostReason: true, ...(needValue ? { customFields: true } : {}) },
+    select: { createdAt: true, stageId: true, stageChangedAt: true, status: true, source: true, ownerId: true, workspaceId: true, firstResponseAt: true, lostReason: true, lastActivityAt: true, score: true, ...(needValue ? { customFields: true } : {}) },
     take: LIMIT,
   });
   const now = Date.now();
@@ -241,7 +296,23 @@ async function aggregate(c: Ctx, metric: string, g: GroupBy, from: Date, to: Dat
       case 'stuck_leads':
         if (!st?.slaDays || Math.floor((now - l.stageChangedAt.getTime()) / 86_400_000) < st.slaDays) continue;
         break;
-      case 'pipeline_value': case 'won_value': num = dealValue(L, l.workspaceId, (l as { customFields?: unknown }).customFields); break;
+      case 'pipeline_value': case 'won_value': case 'lost_value': num = dealValue(L, l.workspaceId, (l as { customFields?: unknown }).customFields); break;
+      case 'avg_deal_value':
+        num = dealValue(L, l.workspaceId, (l as { customFields?: unknown }).customFields);
+        if (!num) continue;
+        break;
+      case 'conversion_rate': num = st?.isWon ? 1 : 0; break;
+      case 'response_1h': num = l.firstResponseAt && l.firstResponseAt.getTime() - l.createdAt.getTime() <= 3_600_000 ? 1 : 0; break;
+      case 'sales_cycle': num = Math.max(0, (l.stageChangedAt.getTime() - l.createdAt.getTime()) / 86_400_000); break;
+      case 'sla_breach_rate':
+        if (!st?.slaDays) continue;
+        num = Math.floor((now - l.stageChangedAt.getTime()) / 86_400_000) >= st.slaDays ? 1 : 0; break;
+      case 'stale_leads':
+        if ((l.lastActivityAt ?? l.createdAt).getTime() > now - 7 * 86_400_000) continue;
+        break;
+      case 'unassigned_leads': if (l.ownerId) continue; break;
+      case 'days_in_stage': num = Math.max(0, (now - l.stageChangedAt.getTime()) / 86_400_000); break;
+      case 'avg_score': num = l.score; break;
       case 'weighted_pipeline': num = Math.round((dealValue(L, l.workspaceId, (l as { customFields?: unknown }).customFields) * (st?.prob ?? 0)) / 100); break;
     }
     const date = def.basis === 'closed' ? l.stageChangedAt : l.createdAt;
@@ -263,7 +334,7 @@ function toSeries(L: Lookups, metric: string, g: GroupBy, groups: Map<string, Ag
   }
   const label = (k: string) =>
     g === 'stage' ? L.stages.get(k)?.name ?? '—'
-    : g === 'owner' ? (k === '__unassigned__' ? 'Unassigned' : L.users.get(k) ?? 'Former user')
+    : g === 'owner' ? (k === '__unassigned__' ? 'Unassigned' : k === '__system__' ? 'System / UBOS team' : L.users.get(k) ?? 'Former user')
     : g === 'workspace' ? L.workspaces.get(k)?.name ?? '—'
     : g === 'status' ? (k === '__none__' ? 'No status' : L.labels.lead_status.get(k) ?? k)
     : g === 'source' ? L.labels.lead_source.get(k) ?? k
@@ -305,22 +376,29 @@ export async function funnel(c: Ctx, r: Range) {
 
 /** Per-person numbers for the range. */
 export async function leaderboard(c: Ctx, r: Range) {
-  const [leads, won, lost, calls] = await Promise.all([
-    aggregate(c, 'leads', 'owner', r.from, r.to), aggregate(c, 'won', 'owner', r.from, r.to),
-    aggregate(c, 'lost', 'owner', r.from, r.to), aggregate(c, 'calls', 'owner', r.from, r.to),
+  const agg = (m: string) => aggregate(c, m, 'owner', r.from, r.to);
+  const [leads, won, lost, calls, connected, talk, wonValue, activities, worked, fuDone, fast, firstResp, compliance] = await Promise.all([
+    agg('leads'), agg('won'), agg('lost'), agg('calls'), agg('connected_calls'), agg('talk_time'), agg('won_value'),
+    agg('activities'), agg('leads_worked'), agg('followups_done'), agg('response_1h'), agg('first_response'), agg('followup_compliance'),
   ]);
-  const [connected, talk] = await Promise.all([aggregate(c, 'connected_calls', 'owner', r.from, r.to), aggregate(c, 'talk_time', 'owner', r.from, r.to)]);
-  const ids = new Set([...leads.groups.keys(), ...won.groups.keys(), ...calls.groups.keys()].filter((k) => k !== '__unassigned__' && k !== '—'));
+  const [stale, stuck, overdue, open] = await Promise.all([agg('stale_leads'), agg('stuck_leads'), agg('overdue_followups'), agg('open_leads')]);
+  const ids = new Set([...leads.groups.keys(), ...won.groups.keys(), ...calls.groups.keys(), ...activities.groups.keys(), ...open.groups.keys()].filter((k) => k !== '__unassigned__' && k !== '—'));
+  const n = (m: { groups: Map<string, Agg> }, id: string) => m.groups.get(id)?.num ?? 0;
+  const pct = (m: { groups: Map<string, Agg> }, id: string) => { const a = m.groups.get(id); return a?.den ? Math.round((a.num / a.den) * 100) : null; };
   return [...ids].map((id) => {
-    const w = won.groups.get(id)?.num ?? 0;
+    const w = n(won, id);
     const l = lost.groups.get(id)?.num ?? 0;
-    const cl = calls.groups.get(id)?.num ?? 0;
-    const cn = connected.groups.get(id)?.num ?? 0;
+    const cl = n(calls, id);
+    const cn = n(connected, id);
+    const fr = firstResp.groups.get(id);
     return {
-      userId: id, name: c.L.users.get(id) ?? 'Former user', leads: leads.groups.get(id)?.num ?? 0, calls: cl, connected: cn,
-      connectRate: cl ? Math.round((cn / cl) * 100) : null, talkMinutes: talk.groups.get(id)?.num ?? 0, won: w, winRate: w + l ? Math.round((w / (w + l)) * 100) : null,
+      userId: id, name: c.L.users.get(id) ?? 'Former user', leads: n(leads, id), openLeads: n(open, id), calls: cl, connected: cn,
+      connectRate: cl ? Math.round((cn / cl) * 100) : null, talkMinutes: n(talk, id), won: w, winRate: w + l ? Math.round((w / (w + l)) * 100) : null,
+      wonValue: n(wonValue, id), activities: n(activities, id), leadsWorked: n(worked, id), followupsDone: n(fuDone, id),
+      followupOnTime: pct(compliance, id), answered1h: pct(fast, id), firstResponseHours: fr?.den ? Math.round((fr.num / fr.den) * 10) / 10 : null,
+      staleLeads: n(stale, id), stuckLeads: n(stuck, id), overdueFollowups: n(overdue, id),
     };
-  }).sort((a, b) => b.won - a.won || b.connected - a.connected || b.calls - a.calls).slice(0, 25);
+  }).sort((a, b) => b.won - a.won || b.wonValue - a.wonValue || b.activities - a.activities).slice(0, 50);
 }
 
 /** Open follow-ups due by the end of today (overdue first). */
