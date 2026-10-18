@@ -9,7 +9,10 @@ import { SchedulerService } from './scheduler.service';
 
 const OrgSettings = z.object({ digestHour: z.number().int().min(0).max(23), reminderMinutes: z.number().int().min(0).max(1440) });
 const MySettings = z.object({ digestEnabled: z.boolean() });
-const Recording = z.object({ recordingMode: z.enum(['ubos', 'provider']), recordingRetentionDays: z.number().int().min(1).max(3650).nullable() });
+const Recording = z.object({
+  recordingMode: z.enum(['ubos', 'provider']), recordingRetentionDays: z.number().int().min(1).max(3650).nullable(),
+  unknownCallerWorkspaceId: z.string().uuid().nullable().optional(), dispositionRequired: z.boolean().optional(),
+});
 const Subscription = z.object({ frequency: z.enum(['daily', 'weekly']).default('daily'), hour: z.number().int().min(0).max(23).default(9) });
 
 /** Reminder & daily-summary settings, "email me this dashboard", and running the scheduler on demand. */
@@ -47,13 +50,15 @@ export class NotificationsSettingsController {
   calling() {
     return this.db.tenant(async (tx) => {
       const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, include: { plan: { include: { features: true } } }, orderBy: { currentPeriodEnd: 'desc' } });
-      const org = await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() }, select: { recordingMode: true, recordingRetentionDays: true } });
+      const org = await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() }, select: { recordingMode: true, recordingRetentionDays: true, unknownCallerWorkspaceId: true, dispositionRequired: true } });
       const features = sub?.plan.features.map((f) => f.featureKey) ?? [];
       const planDays = sub?.plan.recordingRetentionDays ?? 0;
       return {
         plan: sub?.plan.name ?? null, cloudCalling: features.includes('module.telephony'), simCalling: features.includes('module.sim_calling'),
         planRetentionDays: planDays, recordingMode: org?.recordingMode ?? 'ubos', recordingRetentionDays: org?.recordingRetentionDays ?? null,
-        effectiveRetentionDays: Math.min(planDays, org?.recordingRetentionDays ?? planDays), canManage: auth().permissions['org.security.manage'] === 'ORGANIZATION',
+        effectiveRetentionDays: Math.min(planDays, org?.recordingRetentionDays ?? planDays),
+        unknownCallerWorkspaceId: org?.unknownCallerWorkspaceId ?? null, dispositionRequired: !!org?.dispositionRequired,
+        workspaces: await tx.workspace.findMany({ where: { isArchived: false }, select: { id: true, name: true }, orderBy: { name: 'asc' } }), canManage: auth().permissions['org.security.manage'] === 'ORGANIZATION',
       };
     });
   }
@@ -68,6 +73,7 @@ export class NotificationsSettingsController {
       if (input.recordingRetentionDays !== null && input.recordingRetentionDays > max) {
         throw new BadRequestException({ code: 'OVER_PLAN', message: `Your plan keeps recordings for up to ${max} days` });
       }
+      if (input.unknownCallerWorkspaceId && !(await tx.workspace.findFirst({ where: { id: input.unknownCallerWorkspaceId, isArchived: false } }))) throw new BadRequestException({ code: 'INVALID_WORKSPACE', message: 'Unknown business line' });
       await tx.organizationSetting.upsert({ where: { tenantId: tenantId() }, create: { tenantId: tenantId(), ...input }, update: input });
       await this.db.audit(tx, { entity: 'settings', entityId: 'calling', action: 'settings.recordings_changed', newValue: input });
       return input;

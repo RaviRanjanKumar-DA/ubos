@@ -11,8 +11,10 @@ import { TaskDialog, TaskRow } from '@/components/TaskDialog';
 import { Field, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 import type { CustomAction } from '@/components/CustomActions';
 import { DealsPanel } from '@/components/deals/DealsPanel';
+import { RecordingPlayer, CHANNEL } from '@/components/calls/Player';
+import { useLive } from '@/lib/live';
 
-interface Activity { mentions?: string[]; id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
+interface Activity { recording?: boolean; mentions?: string[]; id: string; type: string; disposition: string | null; connected: boolean | null; durationSec: number | null; remark: string | null; data: Record<string, unknown> | null; user: string | null; at: string }
 interface FollowUp { id: string; dueAt: string; note: string | null; doneAt: string | null; outcome: string | null; user: string | null }
 interface LeadDetail {
   id: string; customerId: string; customerCode: string; name: string; mobile: string | null; alternateMobiles: string[]; email: string | null; city: string | null;
@@ -63,6 +65,8 @@ function LeadPage() {
     }
   }, [id, workspace]);
   useEffect(() => { load(); }, [load]);
+  // Calls synced from the phone app or a cloud provider appear without reloading the page.
+  useLive((e) => { if (e.leadId === id && e.type.startsWith('call.')) load(); });
 
   const call = (path: string, method: string, body?: unknown) => api(path, { method, body, workspace: lead?.workspace.id ?? workspace });
   const act = async (fn: () => Promise<unknown>, text: string) => {
@@ -93,7 +97,7 @@ function LeadPage() {
   function describe(a: Activity) {
     const d = a.data ?? {};
     switch (a.type) {
-      case 'call': return `Call — ${label('dispositions', a.disposition)}${a.durationSec ? ` · ${Math.round(a.durationSec / 60)} min` : ''}`;
+      case 'call': return `${d.direction === 'inbound' ? 'Incoming call' : 'Call'}${d.channel && d.channel !== 'manual' ? ` (${CHANNEL[String(d.channel)] ?? d.channel})` : ''} — ${label('dispositions', a.disposition) || 'no outcome'}${a.durationSec ? ` · ${Math.floor(a.durationSec / 60)}:${String(a.durationSec % 60).padStart(2, '0')} min` : ''}`;
       case 'remark': return 'Remark';
       case 'status': return `Status → ${label('statuses', d.to as string) || 'none'}`;
       case 'assignment': return `Assigned to ${people.find((p) => p.id === d.to)?.name ?? 'a new owner'}`;
@@ -141,6 +145,7 @@ function LeadPage() {
           </div>
         </div>
         <div className="row">
+          {lead.canUpdate && lead.mobile && <DialButton leadId={lead.id} workspaceId={lead.workspace.id} onMsg={setMsg} />}
           {lead.canAssign && people.length > 0 ? (
             <label className="row small" style={{ gap: 6 }}>Owner
               <select className="input" style={{ width: 180 }} value={lead.owner?.id ?? ''} onChange={(e) => act(() => call(`/api/v1/leads/${id}`, 'PATCH', { ownerId: e.target.value }), 'Owner changed.')}>
@@ -222,6 +227,7 @@ function LeadPage() {
                   <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{relTime(a.at)}</span>
                 </div>
                 {a.remark && <div style={{ fontSize: 13.5, margin: '2px 0' }}>{a.remark}</div>}
+                {a.type === 'call' && a.recording && <div style={{ margin: '4px 0' }}><RecordingPlayer callId={String(a.data?.callId)} workspaceId={lead.workspace.id} /></div>}
                 {!!a.mentions?.length && <div className="small" style={{ color: 'var(--brand)' }}>{a.mentions.map((m) => `@${m}`).join(' ')}</div>}
                 {a.type === 'action' && a.data?.answers ? <Answers answers={a.data.answers as Record<string, unknown>} labels={a.data.labels as Record<string, string> | undefined} /> : null}
                 <div className="small muted">{a.user ?? 'System'} · {new Date(a.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
@@ -475,6 +481,19 @@ function TasksCard({ lead, people, onChange }: { lead: LeadDetail; people: { id:
           onClose={() => setDialog(null)} onSaved={() => { setDialog(null); load(); onChange(); }} />
       )}
     </div>
+  );
+}
+
+/** “Call”: the paired phone dials (SIM) or the cloud provider connects (CallerDesk). */
+function DialButton({ leadId, workspaceId, onMsg }: { leadId: string; workspaceId: string; onMsg: (m: { type: 'error' | 'notice'; text: string }) => void }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button className="btn" disabled={busy} onClick={async () => {
+      setBusy(true);
+      try { const r = await api<{ message: string }>(`/api/v1/leads/${leadId}/dial`, { method: 'POST', body: {}, workspace: workspaceId }); onMsg({ type: 'notice', text: r.message }); }
+      catch (e) { onMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
+      setBusy(false);
+    }}>📞 Call</button>
   );
 }
 

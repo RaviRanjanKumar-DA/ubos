@@ -130,7 +130,7 @@ const CATALOGUE: Record<string, Entry> = {
 };
 export const INTEGRATION_KEYS = Object.keys(CATALOGUE);
 /** Lead sources whose live connection works now (webhook receiver or Google Sheets sync). */
-export const LIVE_NOW = new Set(['website_api', 'google_sheets', 'indiamart', 'justdial', 'google_forms', 'google_ads', 'wordpress', 'shopify', 'woocommerce', 'calendly', 'zapier', 'make', 'n8n', 'pabbly']);
+export const LIVE_NOW = new Set(['website_api', 'google_sheets', 'indiamart', 'justdial', 'google_forms', 'google_ads', 'wordpress', 'shopify', 'woocommerce', 'calendly', 'zapier', 'make', 'n8n', 'pabbly', 'callerdesk']);
 for (const k of LIVE_NOW) CATALOGUE[k].phase = 'Live';
 registerIntegrationNames(Object.fromEntries(Object.entries(CATALOGUE).map(([k, e]) => [k, e.name])));
 export const INTEGRATION_CATEGORIES: Category[] = [

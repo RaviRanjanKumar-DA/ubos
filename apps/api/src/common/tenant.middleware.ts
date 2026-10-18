@@ -29,7 +29,9 @@ export class TenantMiddleware implements NestMiddleware {
       const domain = await this.db.app.tenantDomain.findUnique({ where: { host }, include: { tenant: true } });
       if (domain?.verified) tenant = domain.tenant;
     }
-    const header = req.headers['x-tenant'];
+    // Browsers cannot set headers on a live-update stream (EventSource): it names the organization in the query.
+    // The session token must still belong to that organization (checked by the guard).
+    const header = req.headers['x-tenant'] ?? (req.originalUrl.startsWith('/api/v1/stream') ? req.query.tenant : undefined);
     if (!tenant && typeof header === 'string' && header) {
       tenant = await this.db.app.tenant.findUnique({ where: { slug: header.toLowerCase() } });
     }

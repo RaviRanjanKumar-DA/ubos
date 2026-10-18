@@ -30,7 +30,8 @@
     "verify:dashboards": "node scripts/verify-dashboards.mjs",
     "verify:productivity": "node scripts/verify-productivity.mjs",
     "verify:process": "node scripts/verify-process.mjs",
-    "verify:integrations": "node scripts/verify-integrations.mjs"
+    "verify:integrations": "node scripts/verify-integrations.mjs",
+    "verify:calling": "node scripts/verify-calling.mjs"
   },
   "engines": {
     "node": ">=20"

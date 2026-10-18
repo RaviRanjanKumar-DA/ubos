@@ -17,6 +17,7 @@ export const WEBHOOK_EVENTS = {
   'payment.received': 'A payment was recorded',
   'process.completed': 'An after-sale process was completed',
   'quote.accepted': 'A customer accepted a quote',
+  'call.logged': 'A call was logged (phone app, cloud calling or by hand)',
 } as const;
 export type WebhookEvent = keyof typeof WEBHOOK_EVENTS;
 

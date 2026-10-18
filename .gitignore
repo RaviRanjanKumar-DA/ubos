@@ -7,3 +7,6 @@ next-env.d.ts
 *.tsbuildinfo
 *.log
 coverage/
+
+# Encrypted recordings / attachments (local storage driver)
+storage/

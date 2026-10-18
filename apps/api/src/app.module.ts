@@ -39,6 +39,9 @@ import { DealsController } from './modules/deals.controller';
 import { DeveloperController } from './modules/developer.controller';
 import { HooksController, PublicApiController, PublicFormsController } from './modules/public.controller';
 import { IntakeService, WebhookDispatcher } from './modules/integration-runtime';
+import { CallsController } from './modules/calling/calls.controller';
+import { MobileController } from './modules/calling/mobile.controller';
+import { CallingService } from './modules/calling/calling.service';
 
 @Controller('health')
 class HealthController {
@@ -57,7 +60,7 @@ class HealthController {
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
     WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, AnalyticsController, LabelsScriptsController, ViewsTasksController, NotificationsSettingsController, DataToolsController, LeadWorkController,
-    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController,
+    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController, CallsController, MobileController,
   ],
   providers: [
     DbService,
@@ -67,6 +70,7 @@ class HealthController {
     SchedulerService,
     IntakeService,
     WebhookDispatcher,
+    CallingService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },
     { provide: APP_FILTER, useClass: ErrorFilter },

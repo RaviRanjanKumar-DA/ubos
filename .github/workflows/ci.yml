@@ -74,3 +74,5 @@ jobs:
           npm run verify:process
           npx tsx packages/database/prisma/seed.ts
           npm run verify:integrations
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:calling

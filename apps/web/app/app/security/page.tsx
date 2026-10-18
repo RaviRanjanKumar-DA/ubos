@@ -2,6 +2,7 @@
 
 import { MyNotificationsCard } from '@/components/NotificationSettings';
 import { AvailabilityCard } from '@/components/deals/AvailabilityCard';
+import { MyPhoneCard } from '@/components/calls/MyPhone';
 import { Suspense, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -120,6 +121,7 @@ function SecurityInner() {
       </div>
       <MyNotificationsCard />
       <AvailabilityCard />
+      <MyPhoneCard />
     </>
   );
 }

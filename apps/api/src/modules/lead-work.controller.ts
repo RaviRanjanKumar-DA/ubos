@@ -6,6 +6,8 @@ import { RequireFeature, RequirePermission } from '../common/auth.guard';
 import { auth } from '../common/context';
 import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
+import { emitEvent } from '../common/events';
+import { live } from '../common/live';
 import { activity, applyStageChange, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
 import { contact, contacts, customFields as visibleFields, fieldAccess } from '../common/field-access';
 import { notify, validMentions } from '../common/notify';
@@ -88,6 +90,8 @@ export class LeadWorkController {
       const a = auth();
       const fa = await fieldAccess(tx);
       const fields = await tx.leadField.findMany({ where: { workspaceId: full.workspaceId }, select: { key: true } });
+      // Calls on the journey that have a recording this person may play (the player asks again, and it is audited).
+      const playable = new Set(a.permissions['crm.call.recording'] ? (await tx.call.findMany({ where: { leadId: full.id, recordingStatus: { in: ['ready', 'link'] } }, select: { activityId: true } })).map((c) => c.activityId) : []);
       return {
         id: full.id, customerId: full.customerId, customerCode: full.customer.code, name: full.customer.name,
         mobile: contact(fa, 'mobile', full.customer.mobile), alternateMobiles: contacts(fa, 'mobile', full.customer.alternateMobiles),
@@ -103,7 +107,7 @@ export class LeadWorkController {
         canUpdate: !!a.permissions['crm.lead.update'], canAssign: !!a.permissions['crm.lead.assign'],
         activities: activities.map((x) => ({
           id: x.id, type: x.type, disposition: x.disposition, connected: x.connected, durationSec: x.durationSec, remark: x.remark,
-          data: x.data, user: x.userId ? users.get(x.userId) ?? null : null, at: x.createdAt,
+          data: x.data, user: x.userId ? users.get(x.userId) ?? null : null, at: x.createdAt, recording: playable.has(x.id),
           mentions: ((x.data as { mentions?: string[] } | null)?.mentions ?? []).map((id) => users.get(id) ?? 'Someone'),
         })),
         followUps: followUps.map((f) => ({ id: f.id, dueAt: f.dueAt, note: f.note, doneAt: f.doneAt, outcome: f.outcome, user: users.get(f.userId) ?? null })),
@@ -127,7 +131,7 @@ export class LeadWorkController {
       }
       const now = new Date();
       const mentions = await validMentions(tx, input.mentionIds);
-      await tx.leadActivity.create({
+      const act = await tx.leadActivity.create({
         data: activity(lead, auth().userId, {
           type: input.type, disposition: input.disposition ?? null, connected, durationSec: input.durationSec ?? null, remark: input.remark ?? null,
           ...(mentions.length ? { data: { mentions } } : {}),
@@ -136,6 +140,20 @@ export class LeadWorkController {
       if (mentions.length) {
         const c = await tx.customer.findUnique({ where: { id: lead.customerId }, select: { name: true } });
         await notify(tx, mentions, { type: 'mention', title: `${auth().name} mentioned you on ${c?.name ?? 'a lead'}`, body: input.remark ?? null, link: `/app/leads/${id}` });
+      }
+      // Calls logged by hand also go into the call log (all channels in one place).
+      if (input.type === 'call') {
+        const cust = await tx.customer.findUnique({ where: { id: lead.customerId }, select: { mobile: true } });
+        const call = await tx.call.create({
+          data: {
+            tenantId: lead.tenantId, externalId: `manual:${act.id}`, channel: 'manual', direction: 'outbound', phone: cust?.mobile ?? '', userId: auth().userId,
+            workspaceId: lead.workspaceId, leadId: lead.id, customerId: lead.customerId, activityId: act.id, startedAt: now, talkSec: input.durationSec ?? 0,
+            answered: !!connected, disposition: input.disposition ?? null, remark: input.remark ?? null,
+          },
+        });
+        await tx.leadActivity.update({ where: { id: act.id }, data: { data: { ...(mentions.length ? { mentions } : {}), callId: call.id, channel: 'manual' } } });
+        await emitEvent(tx, lead.tenantId, lead.workspaceId, 'call.logged', { callId: call.id, leadId: lead.id, customerId: lead.customerId, userId: auth().userId, channel: 'manual', direction: 'outbound', startedAt: now, talkSec: call.talkSec, answered: call.answered, disposition: call.disposition });
+        live.publish(lead.tenantId, { type: 'call.logged', leadId: lead.id, userId: auth().userId, callId: call.id });
       }
       // A logged call completes the follow-ups that were due for this lead.
       if (input.type === 'call') {

@@ -6,6 +6,8 @@ import { AuthInfo, contextStore, tenantId, TenantInfo } from '../common/context'
 import { scopeFilter } from '../common/scope';
 import { Mailer } from '../auth/mailer';
 import { dueSheetSyncs, IntakeService } from './integration-runtime';
+import { authFor } from '../common/auth-for';
+import { CallingService } from './calling/calling.service';
 import { localParts, loadLookups, resolveRange, runMetric } from './analytics/engine';
 
 const WEB = () => (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(',')[0];
@@ -30,7 +32,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService) {}
+  private lastPurge = 0;
+  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService) {}
 
   onModuleInit() {
     if (process.env.SCHEDULER_DISABLED === 'true') return;
@@ -56,6 +59,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
         });
       }
       if (!onlyTenantId) await dueSheetSyncs(this.db, this.intake).catch((e) => this.log.error(e instanceof Error ? e.message : e));
+      // Recordings past their retention, once an hour.
+      if (!onlyTenantId && Date.now() - this.lastPurge > 3_600_000) { this.lastPurge = Date.now(); await this.calling.purge().catch((e) => this.log.error(e instanceof Error ? e.message : e)); }
+      if (onlyTenantId) await this.calling.purge(onlyTenantId).catch((e) => this.log.error(e instanceof Error ? e.message : e));
     } finally {
       this.running = false;
     }
@@ -170,23 +176,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     return sent;
   }
 
-  /** The same permissions the person gets when signed in (organization view). */
-  private async authFor(t: TenantInfo, userId: string): Promise<AuthInfo> {
-    return contextStore.run({ traceId: 'auth', ip: null, tenant: t }, () => this.db.tenant(async (tx: Tx) => {
-      const user = await tx.user.findUniqueOrThrow({ where: { id: userId }, include: { roles: { include: { role: { include: { permissions: { include: { permission: true } } } } } } } });
-      const workspaces = await tx.workspace.findMany({ where: { isArchived: false }, select: { id: true } });
-      const sub = await tx.subscription.findFirst({ where: { status: { in: ['active', 'trialing'] } }, include: { plan: { include: { features: true } } }, orderBy: { currentPeriodEnd: 'desc' } });
-      const features = new Set<FeatureKey>((sub?.plan.features ?? []).map((f) => f.featureKey as FeatureKey));
-      for (const o of await tx.tenantEntitlement.findMany()) { if (o.enabled) features.add(o.featureKey as FeatureKey); else features.delete(o.featureKey as FeatureKey); }
-      const assignments: RoleAssignment[] = user.roles.map((r) => ({
-        roleName: r.role.name, workspaceId: r.workspaceId, validFrom: r.validFrom, validTo: r.validTo,
-        grants: r.role.permissions.map((p) => ({ key: p.permission.key, scope: p.scope as DataScope, isDeny: p.isDeny })),
-      }));
-      return {
-        userId: user.id, sessionId: 'scheduler', totpEnabled: user.totpEnabled, mustChangePassword: false, mfaSetupRequired: false, name: user.name, email: user.email,
-        teamId: user.teamId, assignments, workspaceId: null, accessibleWorkspaceIds: accessibleWorkspaceIds(assignments, workspaces.map((w) => w.id)),
-        permissions: resolvePermissions(assignments, { workspaceId: null, features }), features,
-      };
-    }));
+  private authFor(t: TenantInfo, userId: string): Promise<AuthInfo> {
+    return authFor(this.db, t, userId, 'scheduler');
   }
 }

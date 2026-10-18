@@ -42,7 +42,7 @@ const NAV = [
   { href: '/app/processes', label: 'Processes', icon: 'workspaces', perm: 'crm.lead.view' },
   { href: '/app/approvals', label: 'Approvals', icon: 'audit', perm: 'crm.lead.view' },
   { href: '/app/products', label: 'Products & prices', icon: 'finance', perm: 'crm.lead.view' },
-  { label: 'Calls', icon: 'calls', phase: 2 },
+  { href: '/app/calls', label: 'Calls', icon: 'calls', perm: 'crm.lead.view' },
   { label: 'WhatsApp Inbox', icon: 'chat', phase: 2 },
   { section: 'Business' },
   { label: 'HR & People', icon: 'hr', phase: 3 },

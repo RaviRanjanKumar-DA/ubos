@@ -7,6 +7,7 @@ import { ctx } from '../common/context';
 import { parse } from '../common/errors';
 import { activity, applyStageChange } from '../common/lead-ops';
 import { asTenant, IntakeService, rateLimit, readConfig, sha256 } from './integration-runtime';
+import { CALL_PROVIDERS, CallingService } from './calling/calling.service';
 
 const CATALOGUE_NAMES: Record<string, string> = {}; // filled by IntegrationsController at startup (display names for "via")
 export const registerIntegrationNames = (names: Record<string, string>) => Object.assign(CATALOGUE_NAMES, names);
@@ -20,7 +21,7 @@ const pickHeaders = (h: Record<string, unknown>) => Object.fromEntries(['content
  */
 @Controller('hooks')
 export class HooksController {
-  constructor(private db: DbService, private intake: IntakeService) {}
+  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService) {}
 
   @Post(':slug/:key/:token')
   @HttpCode(200)
@@ -38,6 +39,12 @@ export class HooksController {
       if (!records.length) throw new BadRequestException({ code: 'EMPTY', message: 'Send the lead as a JSON object (or an array of objects)' });
       if (records.length > 100) throw new BadRequestException({ code: 'TOO_MANY', message: 'At most 100 records per call' });
       const results = [];
+      // Cloud-calling providers send calls, not enquiries: they go through the call pipeline.
+      if (CALL_PROVIDERS.has(key)) {
+        for (const r of records) results.push(await this.calling.ingestCloud(t.id, key, cfg, r));
+        await this.db.tenant((tx) => tx.integrationConnection.update({ where: { id: conn.id }, data: { lastEventAt: new Date() } }));
+        return { ok: results.every((r) => r.status !== 'rejected'), results };
+      }
       for (const r of records) {
         const out = await this.intake.viaMapping(t.id, key, CATALOGUE_NAMES[key] ?? key, cfg, r, this.intake.externalIdOf(r, headers['idempotency-key'] as string), pickHeaders(headers));
         results.push({ outcome: out.outcome, leadId: out.leadId, errors: out.errors, ...('duplicate' in out && out.duplicate ? { duplicate: true } : {}) });

@@ -99,7 +99,7 @@ const SPECIFIC: Record<string, SetupDef> = {
   },
   callerdesk: {
     steps: ['In CallerDesk, open Settings → API and copy the auth code.', 'Paste it below with your CallerDesk number.', 'Copy the webhook URL into CallerDesk → Webhook so calls, missed calls and recordings land on leads.'],
-    fields: [key('CallerDesk auth code'), { key: 'callerId', label: 'CallerDesk number', type: 'text', required: true }, workspaceField], webhook: true,
+    fields: [key('CallerDesk auth code'), { key: 'callerId', label: 'CallerDesk number', type: 'text', required: true }, { key: 'apiBase', label: 'API address', type: 'url', placeholder: 'https://app.callerdesk.io/api', help: 'Leave empty for CallerDesk’s usual address.' }, { ...workspaceField, label: 'Business line for calls from unknown numbers', required: false }], webhook: true,
   },
   whatsapp: {
     steps: ['Create a Meta app with WhatsApp in Meta for Developers and add your business number.', 'Paste the phone number ID, business account ID and a permanent access token.', 'Copy the webhook URL and verify token into the app’s WhatsApp → Configuration.'],

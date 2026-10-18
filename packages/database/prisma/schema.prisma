@@ -164,6 +164,8 @@ model OrganizationSetting {
   reminderMinutes    Int      @default(15) // remind this many minutes before a task / follow-up
   recordingMode      String   @default("ubos") // cloud-call recordings: ubos (copied to UBOS storage) | provider (link only)
   recordingRetentionDays Int?  // shorter than the plan limit if the organization wants
+  unknownCallerWorkspaceId String? // calls from numbers not in UBOS become leads here (null = keep as unmatched calls)
+  dispositionRequired Boolean @default(false) // the phone app asks for a call outcome after every call
   updatedAt          DateTime @updatedAt
 }
 
@@ -1270,4 +1272,89 @@ model TenantOrder {
   note          String?
 
   @@index([tenantId, createdAt])
+}
+
+// ═════════════════════════ Calling (Phase 2) ═════════════════════════
+
+// Every call, whatever the channel (SIM phone app, cloud provider, logged by hand). The same externalId is stored once.
+model Call {
+  id               String    @id @default(uuid())
+  tenantId         String
+  externalId       String    // deviceId:callLogId:startTime (SIM) / provider call id (cloud) / activity id (manual)
+  channel          String    // sim | cloud | manual
+  provider         String?   // callerdesk …
+  direction        String    // outbound | inbound
+  phone            String    // the other party (E.164 when it could be read)
+  userId           String?
+  deviceId         String?
+  workspaceId      String?
+  leadId           String?   // null = unmatched (number not in UBOS yet)
+  customerId       String?
+  activityId       String?   // the call on the lead's journey
+  startedAt        DateTime
+  ringSec          Int       @default(0)
+  talkSec          Int       @default(0)
+  answered         Boolean   @default(false)
+  disposition      String?
+  remark           String?
+  recordingStatus  String    @default("none") // none | uploading | ready | link | deleted
+  recordingKey     String?   // storage key (encrypted file)
+  recordingLinkEnc String?   // provider recording URL, encrypted (recording mode "link only")
+  recordingBytes   Int?
+  recordingMime    String?
+  recordingTotal   Int?      // expected size while uploading
+  clientUpdatedAt  DateTime? // edit time on the phone (latest edit wins)
+  receivedAt       DateTime  @default(now())
+  updatedAt        DateTime  @default(now()) @updatedAt
+
+  @@unique([tenantId, externalId])
+  @@index([tenantId, startedAt])
+  @@index([tenantId, leadId])
+  @@index([tenantId, userId, startedAt])
+}
+
+// A paired phone (SIM-calling app). Only a hash of its token is stored.
+model Device {
+  id           String    @id @default(uuid())
+  tenantId     String
+  userId       String
+  name         String
+  platform     String    @default("android")
+  appVersion   String?
+  tokenHash    String    @unique
+  lastSeenAt   DateTime?
+  lastSyncAt   DateTime?
+  pendingCalls Int       @default(0) // reported by the app: calls waiting to sync
+  revokedAt    DateTime?
+  revokedById  String?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, userId])
+}
+
+model PairingCode {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  codeHash  String
+  attempts  Int       @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tenantId, codeHash])
+}
+
+// "Call" pressed on the web: the paired phone picks it up and dials.
+model DialRequest {
+  id        String    @id @default(uuid())
+  tenantId  String
+  userId    String
+  leadId    String
+  phone     String
+  status    String    @default("pending") // pending | picked | expired
+  createdAt DateTime  @default(now())
+  pickedAt  DateTime?
+
+  @@index([tenantId, userId, status])
 }

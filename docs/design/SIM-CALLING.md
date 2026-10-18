@@ -15,6 +15,13 @@ duplicates and nothing missing.
 - Calls already land on the lead as `LeadActivity` (type `call`, disposition, connected, duration), so dashboards,
   leaderboards and follow-up rules work the same for every calling type.
 
+## Server side built (slice 2.1, 18 Oct 2026)
+
+Pairing, the mobile API below, idempotent calls (`Call.externalId` unique per organization), edits (latest wins),
+reconciliation, resumable recording upload (encrypted at rest), dial requests from the web, live updates to open
+browsers, phones admin, retention purge — tested end to end with a simulated phone (`npm run verify:calling`).
+The Android app itself is slice 2.2.
+
 ## The phone app (Android first)
 
 | Part | Behaviour |

@@ -72,7 +72,7 @@ export function MyNotificationsCard() {
   );
 }
 
-interface Calling { plan: string | null; cloudCalling: boolean; simCalling: boolean; planRetentionDays: number; recordingMode: 'ubos' | 'provider'; recordingRetentionDays: number | null; effectiveRetentionDays: number; canManage: boolean }
+interface Calling { plan: string | null; cloudCalling: boolean; simCalling: boolean; planRetentionDays: number; recordingMode: 'ubos' | 'provider'; recordingRetentionDays: number | null; effectiveRetentionDays: number; canManage: boolean; unknownCallerWorkspaceId: string | null; dispositionRequired: boolean; workspaces: { id: string; name: string }[] }
 
 /** Which calling the plan includes and how call recordings are stored. */
 export function CallingCard() {
@@ -83,7 +83,7 @@ export function CallingCard() {
   async function save() {
     setMsg(null);
     try {
-      await api('/api/v1/settings/calling', { method: 'PUT', noWorkspace: true, body: { recordingMode: c!.recordingMode, recordingRetentionDays: c!.recordingRetentionDays } });
+      await api('/api/v1/settings/calling', { method: 'PUT', noWorkspace: true, body: { recordingMode: c!.recordingMode, recordingRetentionDays: c!.recordingRetentionDays, unknownCallerWorkspaceId: c!.unknownCallerWorkspaceId, dispositionRequired: c!.dispositionRequired } });
       setMsg({ type: 'notice', text: 'Recording settings saved.' });
     } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
   }
@@ -108,6 +108,14 @@ export function CallingCard() {
             <input className="input" type="number" min={1} max={c.planRetentionDays} placeholder={`Plan limit: ${c.planRetentionDays}`} value={c.recordingRetentionDays ?? ''} disabled={!c.canManage}
               onChange={(e) => setC({ ...c, recordingRetentionDays: e.target.value ? Number(e.target.value) : null })} />
           </div>
+          <div className="field" style={{ maxWidth: 420 }}>
+            <label>Calls from numbers not in UBOS</label>
+            <select className="input" value={c.unknownCallerWorkspaceId ?? ''} disabled={!c.canManage} onChange={(e) => setC({ ...c, unknownCallerWorkspaceId: e.target.value || null })}>
+              <option value="">Keep them as “unknown numbers” to put on a lead by hand</option>
+              {c.workspaces.map((w) => <option key={w.id} value={w.id}>Incoming calls become a new lead in {w.name}</option>)}
+            </select>
+          </div>
+          <label className="row small" style={{ marginBottom: 10 }}><input type="checkbox" checked={c.dispositionRequired} disabled={!c.canManage} onChange={(e) => setC({ ...c, dispositionRequired: e.target.checked })} /> The phone app asks for the call outcome after every call</label>
           {c.canManage && <div className="row end"><button type="button" className="btn" onClick={save}>Save</button></div>}
         </>
       ) : <p className="small muted">Your plan has no calling. Upgrade on Billing & Licences to add cloud calling, SIM calling or both.</p>}

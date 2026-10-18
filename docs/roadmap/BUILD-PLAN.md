@@ -62,7 +62,7 @@ click-to-filter), integrations catalogue (93 services).
 1. **1.5c Productivity** — smart views, Kanban, tasks & meetings with calendar and reminders, daily digest + scheduled dashboard emails (Mailpit locally), goals, call scripts, @mentions, labels, field-level security, alternate emails, Excel bulk update, import of past activities, export of actions.
 2. **1.5d Process & deals** — process templates (Blueprint-style), approvals, products / price lists / quotes, lock / unlock, payment rules. **Done 18 Oct 2026.**
 3. **1.7 Integrations & API** — API keys, webhooks, web-to-lead forms, Website API, Google Sheets, portals, Google Forms, automation tools. **Done 18 Oct 2026.** Facebook Lead Ads (native, needs a Meta app review), Gmail / Outlook sync and the meeting scheduler moved to Phase 2 (Facebook leads can already arrive through Zapier / Make).
-4. **Phase 2** — calling (CallerDesk, SIM app, power dialer), WhatsApp, SMS, sequences, automation rules, help desk.
+4. **Phase 2** — calling (CallerDesk, SIM app, power dialer), WhatsApp, SMS, sequences, automation rules, help desk. Slices in `docs/PHASE2.md`; 2.1 calling core done 18 Oct 2026.
 5. **Phase 3 – 5** — finance & P&L, e-commerce, AI, marketing, remaining adapters.
 
 Each slice ends the same way: end-to-end tests, browser check, Setup Guide steps switched from "Coming in …" to live, local commit.

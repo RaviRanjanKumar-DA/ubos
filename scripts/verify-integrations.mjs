@@ -119,7 +119,7 @@ try {
   const imLead = im1.body.results?.[0]?.leadId ? (await call(`/api/v1/leads/${im1.body.results[0].leadId}`, { ...A, workspace: COURSE })).body : null;
   check('IndiaMART push (wrapped in RESPONSE) becomes a lead; the same enquiry id is never added twice', im1.body.results[0].outcome === 'created' && imLead?.workspace.id === COURSE && imLead.source === 'indiamart' && im2.body.results[0].duplicate === true, [im1.body, im2.body]);
   const catalogue = (await call('/api/v1/integrations', A)).body;
-  check('catalogue marks the lead sources that work now as Live', ['website_api', 'google_sheets', 'indiamart', 'zapier'].every((k) => catalogue.find((c) => c.key === k)?.phase === 'Live') && catalogue.find((c) => c.key === 'callerdesk').phase !== 'Live', catalogue.filter((c) => c.phase === 'Live').map((c) => c.key));
+  check('catalogue marks the lead sources that work now as Live', ['website_api', 'google_sheets', 'indiamart', 'zapier'].every((k) => catalogue.find((c) => c.key === k)?.phase === 'Live') && catalogue.find((c) => c.key === 'whatsapp').phase !== 'Live', catalogue.filter((c) => c.phase === 'Live').map((c) => c.key));
 
   // ── API keys & public API ──
   const rmKey = await call('/api/v1/api-keys', { token: rm, workspace: VASTU, method: 'POST', body: { name: 'Mine', scopes: ['leads:read'] } });
