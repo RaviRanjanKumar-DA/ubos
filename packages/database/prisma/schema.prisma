@@ -442,6 +442,8 @@ model Customer {
   email        String?
   alternateEmails String[]       @default([])
   whatsappOptOut  Boolean        @default(false) // replied STOP: no templates or broadcasts any more
+  smsOptOut       Boolean        @default(false)
+  emailOptOut     Boolean        @default(false) // used the unsubscribe link
   city         String?
   panEncrypted String?
   panLast4     String?
@@ -1412,7 +1414,10 @@ model MessageTemplate {
   language    String   @default("en")
   category    String   @default("marketing") // marketing | utility
   body        String
-  variables   String[] @default([]) // what fills {{1}}, {{2}}…: name | mobile | city | owner | cf:<key> | text:<fixed>
+  variables   String[] @default([]) // what fills {{1}}, {{2}}… (SMS: each {#var#} in order): name | mobile | city | owner | cf:<key> | text:<fixed>
+  subject     String?  // email
+  dltTemplateId String? // SMS: the ID registered on the DLT portal
+  providerTemplateId String? // SMS: the gateway's own template ID (MSG91)
   isArchived  Boolean  @default(false)
   createdById String
   createdAt   DateTime @default(now())

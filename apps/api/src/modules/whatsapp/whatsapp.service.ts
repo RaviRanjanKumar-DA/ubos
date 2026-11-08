@@ -7,6 +7,7 @@ import { activity } from '../../common/lead-ops';
 import { intakeLead } from '../../common/lead-intake';
 import { live } from '../../common/live';
 import { assertPublicUrl, readConfig, type IntegrationConfig } from '../integration-runtime';
+import { fillVariables } from '../messaging/messaging.service';
 
 const WINDOW_MS = 24 * 3_600_000;
 const STATUS_ORDER = ['queued', 'sent', 'delivered', 'read'];
@@ -138,11 +139,7 @@ export class WhatsAppService {
       if (!lead.customer.mobile) throw new BadRequestException({ code: 'NO_NUMBER', message: 'This lead has no mobile number' });
       if (lead.customer.whatsappOptOut) throw new BadRequestException({ code: 'OPTED_OUT', message: `${lead.customer.name} opted out of WhatsApp messages` });
       const owner = lead.ownerId ? await tx.user.findUnique({ where: { id: lead.ownerId }, select: { name: true } }) : null;
-      const cf = (lead.customFields ?? {}) as Record<string, unknown>;
-      const params = t.variables.map((v) => String(
-        v === 'name' ? lead.customer.name : v === 'mobile' ? lead.customer.mobile : v === 'city' ? lead.customer.city ?? '' : v === 'owner' ? owner?.name ?? '' :
-          v.startsWith('cf:') ? cf[v.slice(3)] ?? '' : v.startsWith('text:') ? v.slice(5) : '',
-      ));
+      const params = fillVariables(t.variables, lead, owner?.name ?? null);
       const body = t.body.replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] ?? '');
       const waId = toWaId(lead.customer.mobile);
       let conv = await tx.conversation.findUnique({ where: { tenantId_channel_waId: { tenantId, channel: 'whatsapp', waId } } });

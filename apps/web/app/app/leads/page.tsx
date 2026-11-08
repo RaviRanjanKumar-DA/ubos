@@ -51,7 +51,7 @@ function LeadsPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulk, setBulk] = useState<BulkAction | null>(null);
-  const [broadcast, setBroadcast] = useState(false);
+  const [broadcast, setBroadcast] = useState<'whatsapp' | 'outreach' | null>(null);
   const [adding, setAdding] = useState(false);
   const [losing, setLosing] = useState<{ lead: Lead; stageId: string } | null>(null);
   const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
@@ -374,13 +374,14 @@ function LeadsPage() {
           {can('crm.lead.update') && <button className="btn sm" onClick={() => setBulk('remark')}>Add remark</button>}
           {can('crm.lead.update') && <button className="btn sm" onClick={() => setBulk('follow_up')}>Schedule follow-up</button>}
           {can('crm.lead.update') && labels.length > 0 && <button className="btn sm" onClick={() => setBulk('labels')}>Labels</button>}
-          {can('crm.whatsapp.broadcast') && <button className="btn sm" onClick={() => setBroadcast(true)}>WhatsApp</button>}
+          {can('crm.whatsapp.broadcast') && <button className="btn sm" onClick={() => setBroadcast('whatsapp')}>WhatsApp</button>}
+          {can('crm.message.manage') && <button className="btn sm" onClick={() => setBroadcast('outreach')}>SMS / Email</button>}
           <button className="btn sm" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}
 
       {showFilters && ws && <LeadFilters ws={ws} people={people} labels={labels} value={adv} onClose={() => setShowFilters(false)} onApply={(a) => { setAdv(a); setShowFilters(false); }} />}
-      {broadcast && <BroadcastDialog ids={[...selected]} onClose={() => setBroadcast(false)} onDone={(text) => { setBroadcast(false); setMsg({ type: 'notice', text }); }} />}
+      {broadcast && <BroadcastDialog ids={[...selected]} kind={broadcast} onClose={() => setBroadcast(null)} onDone={(text) => { setBroadcast(null); setMsg({ type: 'notice', text }); }} />}
       {bulk && (
         <BulkDialog
           action={bulk} ids={[...selected]} ws={ws} people={people} labels={labels}

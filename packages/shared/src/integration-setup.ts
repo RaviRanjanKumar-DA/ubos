@@ -115,8 +115,9 @@ const SPECIFIC: Record<string, SetupDef> = {
     fields: [{ key: 'host', label: 'SMTP server', type: 'text', required: true, placeholder: 'smtp.gmail.com' }, { key: 'port', label: 'Port', type: 'number', required: true, placeholder: '587' }, { key: 'user', label: 'Username / email', type: 'text', required: true }, { key: 'password', label: 'Password / app password', type: 'secret', required: true }],
   },
   sms_dlt: {
-    steps: ['Register your sender ID and templates on the DLT portal.', 'Enter your SMS provider’s API key, sender ID and DLT entity ID.'],
-    fields: [{ key: 'provider', label: 'Provider', type: 'select', options: ['MSG91', 'Kaleyra', 'Gupshup', 'Textlocal', 'Other'], required: true }, key(), { key: 'senderId', label: 'Sender ID (6 letters)', type: 'text', required: true }, { key: 'entityId', label: 'DLT entity ID', type: 'text', required: true }],
+    steps: ['Register your sender ID and templates on the DLT portal (India rule).', 'Enter your SMS provider’s API key, sender ID and DLT entity ID. For anything other than MSG91, paste the provider’s send address as the Gateway URL.', 'Register each approved template under SMS & Email; copy the webhook URL below into your provider’s delivery-report setting.'],
+    fields: [{ key: 'provider', label: 'Provider', type: 'select', options: ['MSG91', 'Kaleyra', 'Gupshup', 'Textlocal', 'Other'], required: true }, key(), { key: 'senderId', label: 'Sender ID (6 letters)', type: 'text', required: true }, { key: 'entityId', label: 'DLT entity ID', type: 'text', required: true }, { key: 'gatewayUrl', label: 'Gateway URL (not needed for MSG91)', type: 'url', placeholder: 'https://…/send?apikey={key}&to={to}&sender={sender}&message={text}&dlt_template_id={dlt}&entity_id={entity}', help: 'Your provider’s send address, with {to} {text} {sender} {dlt} {entity} {key} where each value goes.' }, { key: 'apiBase', label: 'MSG91 API address', type: 'url', placeholder: 'https://control.msg91.com/api/v5', help: 'Leave empty for MSG91’s usual address.' }],
+    webhook: true,
   },
   razorpay: {
     steps: ['In Razorpay Dashboard → Settings → API keys, generate keys (start in TEST mode).', 'Paste the key ID and secret below.', 'Add the webhook URL in Settings → Webhooks for payment.captured and payment_link.paid.'],

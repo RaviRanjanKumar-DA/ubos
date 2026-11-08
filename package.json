@@ -32,7 +32,8 @@
     "verify:process": "node scripts/verify-process.mjs",
     "verify:integrations": "node scripts/verify-integrations.mjs",
     "verify:calling": "node scripts/verify-calling.mjs",
-    "verify:whatsapp": "node scripts/verify-whatsapp.mjs"
+    "verify:whatsapp": "node scripts/verify-whatsapp.mjs",
+    "verify:messaging": "node scripts/verify-messaging.mjs"
   },
   "engines": {
     "node": ">=20"

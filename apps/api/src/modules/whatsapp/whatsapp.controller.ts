@@ -30,6 +30,7 @@ export class WhatsAppController {
       const me = auth().userId;
       const where: Prisma.ConversationWhereInput = {
         AND: [await this.visible(tx),
+          { channel: 'whatsapp' },
           q.view === 'mine' ? { assigneeId: me } : q.view === 'unassigned' ? { assigneeId: null } : {},
           q.q ? { OR: [{ waId: { contains: q.q.replace(/\D/g, '') || '§' } }, { leadId: { in: (await tx.lead.findMany({ where: { customer: { name: { contains: q.q, mode: 'insensitive' } } }, select: { id: true }, take: 200 })).map((l) => l.id) } }] } : {}],
       };

@@ -28,7 +28,7 @@ interface LabelRow { id: string; name: string; color: string }
 interface Script { id: string; stageId: string | null; title: string; body: string }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥' };
+const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥', message: '✉' };
 const at = (h: number, addDays: number) => { const d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
@@ -111,6 +111,7 @@ function LeadPage() {
       case 'payment': return 'Payment';
       case 'process': return 'Process';
       case 'team': return 'Lead team';
+      case 'message': return 'Message';
       default: return a.type;
     }
   }

@@ -44,6 +44,7 @@ const NAV = [
   { href: '/app/products', label: 'Products & prices', icon: 'finance', perm: 'crm.lead.view' },
   { href: '/app/calls', label: 'Calls', icon: 'calls', perm: 'crm.lead.view' },
   { href: '/app/inbox', label: 'WhatsApp Inbox', icon: 'chat', perm: 'crm.whatsapp.chat' },
+  { href: '/app/outreach', label: 'SMS & Email', icon: 'chat', perm: 'crm.message.send' },
   { section: 'Business' },
   { label: 'HR & People', icon: 'hr', phase: 3 },
   { label: 'Finance', icon: 'finance', phase: 3 },

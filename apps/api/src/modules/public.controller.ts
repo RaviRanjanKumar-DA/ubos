@@ -9,6 +9,7 @@ import { activity, applyStageChange } from '../common/lead-ops';
 import { asTenant, IntakeService, rateLimit, readConfig, sha256 } from './integration-runtime';
 import { CALL_PROVIDERS, CallingService } from './calling/calling.service';
 import { WhatsAppService } from './whatsapp/whatsapp.service';
+import { MessagingService } from './messaging/messaging.service';
 
 const CATALOGUE_NAMES: Record<string, string> = {}; // filled by IntegrationsController at startup (display names for "via")
 export const registerIntegrationNames = (names: Record<string, string>) => Object.assign(CATALOGUE_NAMES, names);
@@ -22,7 +23,7 @@ const pickHeaders = (h: Record<string, unknown>) => Object.fromEntries(['content
  */
 @Controller('hooks')
 export class HooksController {
-  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService, private wa: WhatsAppService) {}
+  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService, private wa: WhatsAppService, private messaging: MessagingService) {}
 
   /** Meta's webhook check: echoes hub.challenge when the verify token is this integration's token. */
   @Get(':slug/:key/:token')
@@ -53,6 +54,8 @@ export class HooksController {
         return this.wa.receive(t.id, cfg, body);
       }
       const records = this.intake.records(body);
+      // SMS gateways post delivery reports here.
+      if (key === 'sms_dlt') return this.messaging.deliveryReport(t.id, records);
       if (!records.length) throw new BadRequestException({ code: 'EMPTY', message: 'Send the lead as a JSON object (or an array of objects)' });
       if (records.length > 100) throw new BadRequestException({ code: 'TOO_MANY', message: 'At most 100 records per call' });
       const results = [];
