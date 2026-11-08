@@ -69,8 +69,9 @@ function refreshOnce(path: string, headers: Record<string, string>) {
 
 async function request<T>(path: string, init: { method: string; headers: Record<string, string>; body?: string }, refreshPath: string, onHeaders?: (h: Headers) => void): Promise<T> {
   let { res, body } = await raw(API_URL + path, init);
-  // Access tokens live 15 minutes; refresh silently and retry once.
-  if (res.status === 401 && (body as { code?: string }).code === 'TOKEN_EXPIRED') {
+  // Access tokens live 15 minutes, and the browser then drops the cookie (UNAUTHENTICATED); refresh silently and retry once.
+  const code = (body as { code?: string }).code;
+  if (res.status === 401 && (code === 'TOKEN_EXPIRED' || code === 'UNAUTHENTICATED') && !path.endsWith('/auth/login')) {
     if (await refreshOnce(refreshPath, init.headers)) ({ res, body } = await raw(API_URL + path, init));
   }
   onHeaders?.(res.headers);

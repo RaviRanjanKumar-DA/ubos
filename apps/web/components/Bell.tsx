@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Icon } from './Icon';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { relTime } from '@/lib/workspace';
@@ -36,7 +37,7 @@ export function Bell({ version }: { version: number }) {
   return (
     <div className="bell" ref={box}>
       <button className="btn ghost sm" aria-label={`Notifications${data?.unread ? ` (${data.unread} unread)` : ''}`} onClick={() => setOpen(!open)}>
-        <span aria-hidden="true" style={{ fontSize: 17 }}>🔔</span>
+        <Icon name="bell" />
         {!!data?.unread && <span className="bell-count">{data.unread > 99 ? '99+' : data.unread}</span>}
       </button>
       {open && (
