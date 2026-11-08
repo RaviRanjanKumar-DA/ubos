@@ -7,6 +7,7 @@ import { FieldInput } from '@/components/FieldInput';
 import { useShell } from '@/components/AppShell';
 import { inr, QUOTE_STATUS, toPaise } from '@/lib/money';
 import { ReasonDialog } from './ReasonDialog';
+import { LeadWhatsApp } from '@/components/whatsapp/Chat';
 
 interface QuoteItem { id?: string; packageId: string | null; name: string; qty: number; listPricePaise: number; pricePaise: number; gstRate: number }
 export interface Quote {
@@ -30,7 +31,7 @@ interface Payment { id: string; amountPaise: number; kind: string; mode: string;
 interface Processes { canStart: boolean; canUnlock: boolean; canPay: boolean; startable: { id: string; name: string; trigger: string }[]; runs: Run[]; payments: Payment[] }
 interface Member { id: string; userId: string; name: string; roleLabel: string }
 
-type Tab = 'process' | 'quotes' | 'payments' | 'team';
+type Tab = 'process' | 'quotes' | 'payments' | 'team' | 'whatsapp';
 const STEP_TONE: Record<string, string> = { done: 'ok', active: '', awaiting_approval: 'warn', pending: 'grey' };
 const STEP_LABEL: Record<string, string> = { done: 'Done', active: 'In progress', awaiting_approval: 'Waiting for sign-off', pending: 'Waiting' };
 const toField = (f: StepField) => ({ id: f.key, key: f.key, label: f.label, type: f.type, options: f.options ?? [], required: !!f.required, isArchived: false });
@@ -42,7 +43,7 @@ export function DealsPanel({ lead, people, initialTab, onChange }: {
   people: { id: string; name: string }[]; initialTab?: string | null; onChange: () => void;
 }) {
   const { can } = useShell();
-  const [tab, setTab] = useState<Tab>((['process', 'quotes', 'payments', 'team'].includes(initialTab ?? '') ? initialTab : 'process') as Tab);
+  const [tab, setTab] = useState<Tab>((['process', 'quotes', 'payments', 'team', 'whatsapp'].includes(initialTab ?? '') ? initialTab : 'process') as Tab);
   const [proc, setProc] = useState<Processes | null>(null);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [team, setTeam] = useState<Member[]>([]);
@@ -74,13 +75,14 @@ export function DealsPanel({ lead, people, initialTab, onChange }: {
     quotes: quotes.length ? String(quotes.length) : '',
     payments: proc?.payments.filter((p) => !p.isVoided).length ? String(proc.payments.filter((p) => !p.isVoided).length) : '',
     team: team.length ? String(team.length) : '',
+    whatsapp: '',
   };
 
   return (
     <div className="card" style={{ marginBottom: 14 }} id="deals">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="dash-tabs" role="tablist" aria-label="Sale and delivery" style={{ marginBottom: 0 }}>
-          {([['process', '⚙ Process'], ['quotes', '🧾 Quotes'], ['payments', '₹ Payments'], ['team', '👥 Lead team']] as [Tab, string][]).map(([k, l]) => (
+          {([['process', '⚙ Process'], ['quotes', '🧾 Quotes'], ['payments', '₹ Payments'], ['team', '👥 Lead team'], ...(can('crm.whatsapp.chat') ? [['whatsapp', '💬 WhatsApp']] : [])] as [Tab, string][]).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={`dash-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
               {l}{counts[k] && <span className="tab-count" style={{ marginLeft: 6 }}>{counts[k]}</span>}
             </button>
@@ -94,6 +96,7 @@ export function DealsPanel({ lead, people, initialTab, onChange }: {
         {tab === 'quotes' && <QuotesTab quotes={quotes} lead={lead} canQuote={can('crm.quote.manage') && lead.canUpdate} act={act} call={call} />}
         {tab === 'payments' && proc && <PaymentsTab proc={proc} lead={lead} act={act} call={call} />}
         {tab === 'team' && <TeamTab team={team} people={people} lead={lead} act={act} call={call} />}
+        {tab === 'whatsapp' && <LeadWhatsApp leadId={lead.id} workspace={ws} />}
       </div>
     </div>
   );

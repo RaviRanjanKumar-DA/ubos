@@ -441,6 +441,7 @@ model Customer {
   alternateMobiles String[]      @default([])
   email        String?
   alternateEmails String[]       @default([])
+  whatsappOptOut  Boolean        @default(false) // replied STOP: no templates or broadcasts any more
   city         String?
   panEncrypted String?
   panLast4     String?
@@ -1357,4 +1358,77 @@ model DialRequest {
   pickedAt  DateTime?
 
   @@index([tenantId, userId, status])
+}
+
+// ═════════════════════════ WhatsApp (Phase 2.3) ═════════════════════════
+
+// One chat with one WhatsApp number (the customer's), on the organization's business number.
+model Conversation {
+  id            String    @id @default(uuid())
+  tenantId      String
+  channel       String    @default("whatsapp")
+  waId          String    // customer's number as WhatsApp sends it (digits, with country code)
+  workspaceId   String?
+  customerId    String?
+  leadId        String?
+  assigneeId    String?
+  status        String    @default("open") // open | closed
+  lastMessageAt DateTime  @default(now())
+  lastInboundAt DateTime? // free replies are allowed for 24 hours after this
+  unread        Int       @default(0)
+  createdAt     DateTime  @default(now())
+
+  @@unique([tenantId, channel, waId])
+  @@index([tenantId, lastMessageAt])
+  @@index([tenantId, leadId])
+}
+
+model Message {
+  id             String   @id @default(uuid())
+  tenantId       String
+  conversationId String
+  direction      String   // in | out
+  type           String   @default("text") // text | template | image | document | audio | other
+  body           String?
+  templateName   String?
+  waMessageId    String?  // WhatsApp's id (same id never stored twice)
+  status         String   @default("received") // received | queued | sent | delivered | read | failed
+  error          String?
+  userId         String?
+  broadcastId    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now()) @updatedAt
+
+  @@unique([tenantId, waMessageId])
+  @@index([conversationId, createdAt])
+}
+
+// Approved WhatsApp message templates ({{1}}, {{2}} … placeholders filled from lead fields when sending).
+model MessageTemplate {
+  id          String   @id @default(uuid())
+  tenantId    String
+  channel     String   @default("whatsapp")
+  name        String   // as approved in WhatsApp Manager
+  language    String   @default("en")
+  category    String   @default("marketing") // marketing | utility
+  body        String
+  variables   String[] @default([]) // what fills {{1}}, {{2}}…: name | mobile | city | owner | cf:<key> | text:<fixed>
+  isArchived  Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, channel, name, language])
+}
+
+model Broadcast {
+  id          String   @id @default(uuid())
+  tenantId    String
+  templateId  String
+  name        String
+  total       Int      @default(0)
+  sent        Int      @default(0)
+  skipped     Int      @default(0) // opted out / no number
+  failed      Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
 }

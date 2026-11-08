@@ -12,7 +12,7 @@ interface Mapping {
   targets: Target[]; leadIdentifier: 'mobile' | 'email'; duplicateModes: { value: string; label: string }[];
 }
 interface Setup {
-  key: string; name: string; description: string; category: string; phase: string; status: string; activatedAt: string | null;
+  key: string; name: string; description: string; category: string; phase: string; status: string; activatedAt: string | null; verifyToken?: string | null;
   steps: string[]; where: string | null; fields: Field[]; values: Record<string, string>; configured: boolean; webhookUrl: string | null; needsWebhook: boolean;
   mapping: Mapping | null;
 }
@@ -129,6 +129,7 @@ export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: st
                         <button className="btn sm outline" onClick={() => navigator.clipboard?.writeText(s.webhookUrl!).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })}>{copied ? 'Copied' : 'Copy'}</button>
                       </div>
                     ) : <p className="small muted">Save the settings once to get your private webhook URL.</p>}
+                    {s.verifyToken && <><h3 className="drawer-h">Verify token</h3><code className="webhook">{s.verifyToken}</code></>}
                   </>
                 )}
                 {s.fields.length > 0 && (

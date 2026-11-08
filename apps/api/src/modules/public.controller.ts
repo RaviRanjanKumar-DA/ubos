@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, HttpCode, Ip, NotFoundException, Param, Patch, Post, Query, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, HttpCode, Ip, NotFoundException, Param, Patch, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
 import { DUPLICATE_MODES, normalizeMobile, type ApiScope, type DuplicateMode } from '@ubos/shared';
@@ -8,6 +8,7 @@ import { parse } from '../common/errors';
 import { activity, applyStageChange } from '../common/lead-ops';
 import { asTenant, IntakeService, rateLimit, readConfig, sha256 } from './integration-runtime';
 import { CALL_PROVIDERS, CallingService } from './calling/calling.service';
+import { WhatsAppService } from './whatsapp/whatsapp.service';
 
 const CATALOGUE_NAMES: Record<string, string> = {}; // filled by IntegrationsController at startup (display names for "via")
 export const registerIntegrationNames = (names: Record<string, string>) => Object.assign(CATALOGUE_NAMES, names);
@@ -21,11 +22,22 @@ const pickHeaders = (h: Record<string, unknown>) => Object.fromEntries(['content
  */
 @Controller('hooks')
 export class HooksController {
-  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService) {}
+  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService, private wa: WhatsAppService) {}
+
+  /** Meta's webhook check: echoes hub.challenge when the verify token is this integration's token. */
+  @Get(':slug/:key/:token')
+  verify(@Param('slug') slug: string, @Param('key') key: string, @Param('token') token: string, @Query('hub.verify_token') vt?: string, @Query('hub.challenge') challenge?: string) {
+    return asTenant(this.db, slug, async () => {
+      const conn = await this.db.tenant((tx) => tx.integrationConnection.findFirst({ where: { key, workspaceId: null } }));
+      const cfg = readConfig(conn?.configEncrypted);
+      if (!cfg.webhookToken || !safeEq(cfg.webhookToken, token) || !vt || !safeEq(cfg.webhookToken, vt)) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Not found' });
+      return challenge ?? '';
+    });
+  }
 
   @Post(':slug/:key/:token')
   @HttpCode(200)
-  receive(@Param('slug') slug: string, @Param('key') key: string, @Param('token') token: string, @Body() body: unknown, @Headers() headers: Record<string, unknown>) {
+  receive(@Param('slug') slug: string, @Param('key') key: string, @Param('token') token: string, @Body() body: unknown, @Headers() headers: Record<string, unknown>, @Req() req: unknown) {
     return asTenant(this.db, slug, async (t) => {
       rateLimit(`hook:${t.id}:${key}`, 300);
       const conn = await this.db.tenant((tx) => tx.integrationConnection.findFirst({ where: { key, workspaceId: null } }));
@@ -35,6 +47,11 @@ export class HooksController {
       if (conn.status !== 'active') throw new ForbiddenException({ code: 'INTEGRATION_INACTIVE', message: 'This integration is switched off in UBOS' });
       // Google Ads sends the key typed in its lead form; it must match the one saved in UBOS.
       if (key === 'google_ads' && (!cfg.values.googleKey || !body || typeof body !== 'object' || !safeEq(String((body as Record<string, unknown>).google_key ?? ''), cfg.values.googleKey))) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Not found' });
+      // WhatsApp sends chats and delivery statuses, signed by Meta: its own pipeline.
+      if (key === 'whatsapp') {
+        if (!this.wa.verifySignature(cfg, (req as { rawBody?: Buffer }).rawBody, headers['x-hub-signature-256'] as string | undefined)) throw new UnauthorizedException({ code: 'BAD_SIGNATURE', message: 'Signature does not match' });
+        return this.wa.receive(t.id, cfg, body);
+      }
       const records = this.intake.records(body);
       if (!records.length) throw new BadRequestException({ code: 'EMPTY', message: 'Send the lead as a JSON object (or an array of objects)' });
       if (records.length > 100) throw new BadRequestException({ code: 'TOO_MANY', message: 'At most 100 records per call' });

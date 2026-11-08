@@ -5,7 +5,7 @@ import { EventEmitter } from 'events';
  * through the normal API, so permissions and field rules always apply. In-memory for one API instance; Redis pub/sub
  * replaces it when UBOS runs on several servers.
  */
-export interface LiveEvent { type: 'call.logged' | 'call.updated' | 'dial.requested' | 'lead.created'; leadId?: string | null; userId?: string | null; callId?: string }
+export interface LiveEvent { type: 'call.logged' | 'call.updated' | 'dial.requested' | 'lead.created' | 'message.received' | 'message.updated'; leadId?: string | null; userId?: string | null; callId?: string; conversationId?: string }
 
 const bus = new EventEmitter();
 bus.setMaxListeners(0);

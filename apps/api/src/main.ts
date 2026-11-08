@@ -20,7 +20,8 @@ async function bootstrap() {
   for (const key of ['ENCRYPTION_KEY']) {
     if (!process.env[key]) throw new Error(`Missing environment variable ${key}`);
   }
-  const app = await NestFactory.create(AppModule);
+  // rawBody: webhook signatures (WhatsApp / Meta) are checked against the exact bytes received.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
   app.use(cookieParser());
   app.enableCors({
     origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(','),

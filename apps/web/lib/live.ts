@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { API_URL, session } from './api';
 
-export interface LiveEvent { type: string; leadId?: string | null; userId?: string | null; callId?: string }
+export interface LiveEvent { type: string; leadId?: string | null; userId?: string | null; callId?: string; conversationId?: string }
 
 /**
  * Live updates from the API (server-sent events). One shared connection per tab; pages get ids only and re-read
@@ -11,7 +11,7 @@ export interface LiveEvent { type: string; leadId?: string | null; userId?: stri
  */
 let source: EventSource | null = null;
 const handlers = new Set<(e: LiveEvent) => void>();
-const TYPES = ['call.logged', 'call.updated', 'dial.requested', 'lead.created'];
+const TYPES = ['call.logged', 'call.updated', 'dial.requested', 'lead.created', 'message.received', 'message.updated'];
 
 function connect() {
   const t = session.get()?.tenant;

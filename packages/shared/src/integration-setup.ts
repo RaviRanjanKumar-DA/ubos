@@ -102,8 +102,8 @@ const SPECIFIC: Record<string, SetupDef> = {
     fields: [key('CallerDesk auth code'), { key: 'callerId', label: 'CallerDesk number', type: 'text', required: true }, { key: 'apiBase', label: 'API address', type: 'url', placeholder: 'https://app.callerdesk.io/api', help: 'Leave empty for CallerDesk’s usual address.' }, { ...workspaceField, label: 'Business line for calls from unknown numbers', required: false }], webhook: true,
   },
   whatsapp: {
-    steps: ['Create a Meta app with WhatsApp in Meta for Developers and add your business number.', 'Paste the phone number ID, business account ID and a permanent access token.', 'Copy the webhook URL and verify token into the app’s WhatsApp → Configuration.'],
-    fields: [{ key: 'phoneNumberId', label: 'Phone number ID', type: 'text', required: true }, { key: 'wabaId', label: 'WhatsApp business account ID', type: 'text', required: true }, { key: 'accessToken', label: 'Permanent access token', type: 'secret', required: true }, workspaceField],
+    steps: ['Create a Meta app with WhatsApp in Meta for Developers and add your business number.', 'Paste the phone number ID, business account ID and a permanent access token.', 'In the app’s WhatsApp → Configuration paste the webhook URL below as the Callback URL and the token shown with it as the Verify token, then subscribe to “messages”.'],
+    fields: [{ key: 'phoneNumberId', label: 'Phone number ID', type: 'text', required: true }, { key: 'wabaId', label: 'WhatsApp business account ID', type: 'text', required: true }, { key: 'accessToken', label: 'Permanent access token', type: 'secret', required: true }, { key: 'appSecret', label: 'App secret', type: 'secret', help: 'Meta app → Settings → Basic. UBOS uses it to check that incoming messages really come from Meta.' }, { key: 'apiBase', label: 'Graph API address', type: 'url', placeholder: 'https://graph.facebook.com/v21.0', help: 'Leave empty for Meta’s usual address.' }, workspaceField],
     webhook: true, where: 'developers.facebook.com → your app → WhatsApp → API setup',
   },
   whatsapp_widget: {
