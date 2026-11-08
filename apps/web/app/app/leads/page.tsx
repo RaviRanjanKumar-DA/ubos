@@ -5,6 +5,7 @@ import { BroadcastDialog } from '@/components/whatsapp/BroadcastDialog';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError } from '@/lib/api';
+import { fromIstInput } from '@/lib/ist';
 import { useShell } from '@/components/AppShell';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
@@ -432,7 +433,7 @@ function BulkDialog({ action, ids, ws, people, labels = [], onClose, onDone }: {
           ...(action === 'stage' ? { stageId, lostReason: lostReason || undefined } : {}),
           ...(action === 'status' ? { status: status || undefined } : {}),
           ...(action === 'remark' || action === 'follow_up' ? { remark: remark || undefined } : {}),
-          ...(action === 'follow_up' ? { followUpAt: new Date(date).toISOString() } : {}),
+          ...(action === 'follow_up' ? { followUpAt: fromIstInput(date).toISOString() } : {}),
           ...(action === 'labels' ? { addLabelIds: addL, removeLabelIds: removeL } : {}),
         },
       });
@@ -547,7 +548,7 @@ function AddLead({ ws, people, canAssign, meId, onClose, onSaved }: {
           ...rest, customFields: custom,
           ...(mobile ? { mobile } : {}), ...(email ? { email } : {}), ...(city ? { city } : {}),
           ...(ownerId ? { ownerId } : {}), ...(status ? { status } : {}), ...(remark.trim() ? { remark: remark.trim() } : {}),
-          ...(followUpAt ? { followUpAt: new Date(followUpAt).toISOString() } : {}),
+          ...(followUpAt ? { followUpAt: fromIstInput(followUpAt).toISOString() } : {}),
         },
       });
       onSaved(r.id);

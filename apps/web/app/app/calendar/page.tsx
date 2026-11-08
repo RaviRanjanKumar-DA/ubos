@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import { istDay, istDayStart } from '@/lib/ist';
 import { useShell } from '@/components/AppShell';
 import { TaskDialog, TaskRow } from '@/components/TaskDialog';
 import { relTime } from '@/lib/workspace';
@@ -11,12 +12,14 @@ interface CalEvent { kind: 'task' | 'meeting' | 'call' | 'follow_up'; id: string
 type Person = { id: string; name: string };
 const KIND: Record<CalEvent['kind'], [string, string]> = { meeting: ['👥', 'Meeting'], task: ['✔', 'Task'], call: ['📞', 'Call'], follow_up: ['⏰', 'Follow-up'] };
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const dayKey = (d: Date) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+/** A square on the grid, as a date (the same form as istDay). */
+const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const thisMonth = () => { const t = istDay(new Date()); return new Date(Number(t.slice(0, 4)), Number(t.slice(5, 7)) - 1, 1); };
+const time = (iso: string) => new Date(iso).toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit' });
 
 export default function CalendarPage() {
   const { me, can, version } = useShell();
-  const [month, setMonth] = useState(() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); });
+  const [month, setMonth] = useState(thisMonth);
   const [events, setEvents] = useState<CalEvent[] | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
@@ -37,8 +40,8 @@ export default function CalendarPage() {
   }, [month]);
 
   const load = useCallback(() => {
-    const from = grid[0].toISOString();
-    const to = new Date(grid[grid.length - 1].getTime() + 86_400_000).toISOString();
+    const from = istDayStart(dayKey(grid[0])).toISOString();
+    const to = new Date(istDayStart(dayKey(grid[grid.length - 1])).getTime() + 86_400_000).toISOString();
     api<CalEvent[]>(`/api/v1/calendar?from=${from}&to=${to}${who ? `&assigneeId=${who}` : ''}`).then(setEvents).catch((e) => setMsg({ type: 'error', text: e.message }));
     api<TaskRow[]>(`/api/v1/tasks?status=open${who ? `&assigneeId=${who}` : ''}`).then(setTasks).catch(() => setTasks([]));
   }, [grid, who]);
@@ -51,7 +54,7 @@ export default function CalendarPage() {
 
   const byDay = useMemo(() => {
     const m = new Map<string, CalEvent[]>();
-    for (const e of events ?? []) { const k = dayKey(new Date(e.at)); m.set(k, [...(m.get(k) ?? []), e]); }
+    for (const e of events ?? []) { const k = istDay(new Date(e.at)); m.set(k, [...(m.get(k) ?? []), e]); }
     return m;
   }, [events]);
 
@@ -65,7 +68,7 @@ export default function CalendarPage() {
     } catch (err) { setMsg({ type: 'error', text: err instanceof ApiError ? err.message : 'Failed' }); }
   }
 
-  const today = dayKey(new Date());
+  const today = istDay(new Date());
   const overdue = tasks.filter((t) => t.overdue);
 
   return (
@@ -92,10 +95,10 @@ export default function CalendarPage() {
           <div className="row" style={{ justifyContent: 'space-between', marginBottom: 10 }}>
             <div className="row">
               <button className="btn sm outline" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} aria-label="Previous month">‹</button>
-              <button className="btn sm outline" onClick={() => { const d = new Date(); setMonth(new Date(d.getFullYear(), d.getMonth(), 1)); }}>Today</button>
+              <button className="btn sm outline" onClick={() => setMonth(thisMonth())}>Today</button>
               <button className="btn sm outline" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button>
             </div>
-            <h2 style={{ margin: 0 }}>{month.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</h2>
+            <h2 style={{ margin: 0 }}>{month.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' })}</h2>
             <div className="row small" style={{ gap: 10 }}>{Object.entries(KIND).map(([k, [i, l]]) => <span key={k} className={`cal-key k-${k}`}>{i} {l}</span>)}</div>
           </div>
           <div className="cal-grid">
@@ -104,7 +107,7 @@ export default function CalendarPage() {
               const list = byDay.get(dayKey(d)) ?? [];
               return (
                 <div key={d.toISOString()} className={`cal-day ${d.getMonth() !== month.getMonth() ? 'other' : ''} ${dayKey(d) === today ? 'today' : ''}`}
-                  onDoubleClick={() => { const at = new Date(d); at.setHours(11, 0, 0, 0); setDialog({ date: at }); }}>
+                  onDoubleClick={() => { setDialog({ date: new Date(istDayStart(dayKey(d)).getTime() + 11 * 3_600_000) }); }}>
                   <div className="cal-date">{d.getDate()}</div>
                   {list.slice(0, 4).map((e) => (
                     <button key={`${e.kind}-${e.id}`} className={`cal-ev k-${e.kind} ${e.done ? 'done' : ''}`} onClick={() => setPicked(e)} title={`${KIND[e.kind][1]}: ${e.title}`}>
@@ -143,7 +146,7 @@ export default function CalendarPage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="small muted">{KIND[picked.kind][0]} {KIND[picked.kind][1]}{picked.done ? ' · done' : ''}</div>
             <h2 style={{ marginTop: 4 }}>{picked.title}</h2>
-            <p className="small">{new Date(picked.at).toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'short' })}{picked.durationMin ? ` · ${picked.durationMin} min` : ''}</p>
+            <p className="small">{new Date(picked.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'short' })}{picked.durationMin ? ` · ${picked.durationMin} min` : ''}</p>
             {picked.location && <p className="small">📍 {/^https?:/.test(picked.location) ? <a href={picked.location} target="_blank" rel="noreferrer">{picked.location}</a> : picked.location}</p>}
             {picked.assignee && <p className="small muted">Assigned to {picked.assignee}</p>}
             <div className="row end">

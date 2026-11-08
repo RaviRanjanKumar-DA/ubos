@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Post, Query, Res } from '@nestjs/common';
+import { istDate, istStamp } from '../common/ist';
 import type { Response } from 'express';
 import { z } from 'zod';
 import { FieldDef, normalizeMobile, parseDateInput, toCsv, validateCustomFields } from '@ubos/shared';
@@ -99,7 +100,7 @@ export class DataToolsController {
         if (r.followUp?.trim()) {
           followUp = parseDateInput(r.followUp);
           if (!followUp) { fail(`Follow-up date "${r.followUp}" not understood`, name); continue; }
-          changes.push(`follow-up ${followUp.toISOString().slice(0, 10)}`);
+          changes.push(`follow-up ${istDate(followUp)}`);
         }
         let cf: Record<string, unknown> | null = null;
         if (r.fields && Object.keys(r.fields).length) {
@@ -196,7 +197,7 @@ export class DataToolsController {
           });
           created++;
         }
-        results.push({ row, status: 'ok', name, changes: [`${type} on ${at.toISOString().slice(0, 10)}`] });
+        results.push({ row, status: 'ok', name, changes: [`${type} on ${istDate(at)}`] });
       }
       if (!input.dryRun) await this.db.audit(tx, { workspaceId: ws, entity: 'lead', entityId: 'activities-import', action: 'lead.activities_imported', newValue: { rows: input.rows.length, created } });
       return { dryRun: input.dryRun, ok: results.filter((r) => r.status === 'ok').length, errors: results.filter((r) => r.status === 'error').length, created, results };
@@ -227,7 +228,7 @@ export class DataToolsController {
         ...acts.map((a) => {
           const d = (a.data ?? {}) as Record<string, unknown>;
           return [
-            a.createdAt.toISOString(), a.type, a.lead.customer.code, a.lead.customer.name, contact(fa, 'mobile', a.lead.customer.mobile) ?? '', a.lead.workspace.name,
+            istStamp(a.createdAt), a.type, a.lead.customer.code, a.lead.customer.name, contact(fa, 'mobile', a.lead.customer.mobile) ?? '', a.lead.workspace.name,
             a.disposition ? opts.get(`${a.workspaceId}:${a.disposition}`) ?? a.disposition : '', a.connected === null ? '' : a.connected ? 'Yes' : 'No',
             a.durationSec ? String(Math.round(a.durationSec / 6) / 10) : '', a.remark ?? (a.type === 'action' ? String(d.name ?? '') : a.type === 'task' ? String(d.title ?? '') : ''),
             a.userId ? users.get(a.userId) ?? '' : 'System',

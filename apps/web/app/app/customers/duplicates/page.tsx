@@ -23,7 +23,7 @@ function CustomerCard({ c, selected, onSelect }: { c: Card; selected: boolean; o
         {c.city && <div>📍 {c.city}</div>}
         {c.pan && <div>PAN {c.pan}</div>}
         <div className="muted">{c.leadCount} enquiries · {c.workspaces.join(', ') || 'no leads'}</div>
-        <div className="muted">Since {new Date(c.createdAt).toLocaleDateString('en-IN')}</div>
+        <div className="muted">Since {new Date(c.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
       </div>
     </label>
   );

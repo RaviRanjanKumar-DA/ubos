@@ -61,6 +61,6 @@ export function showValue(f: Field | undefined, v: unknown): string {
   if (Array.isArray(v)) return v.join(', ');
   if (f?.type === 'checkbox') return v ? 'Yes' : 'No';
   if (f?.type === 'currency') return '₹' + Number(v).toLocaleString('en-IN');
-  if (f?.type === 'date') return new Date(String(v)).toLocaleDateString('en-IN');
+  if (f?.type === 'date') return new Date(String(v)).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' });
   return String(v);
 }

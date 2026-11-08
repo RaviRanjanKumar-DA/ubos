@@ -38,7 +38,7 @@ export default function OutreachPage() {
       {tab === 'bulk' ? (
         <div className="card">{!bulk?.length ? <p className="small muted" style={{ margin: 0 }}>No bulk sends yet.</p> : (
           <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>When</th><th>Leads</th><th>Sent</th><th>Skipped</th><th>Failed</th></tr></thead>
-            <tbody>{bulk.map((b) => <tr key={b.id}><td><b>{b.name}</b></td><td className="small">{new Date(b.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td><td>{b.total}</td><td>{b.sent}</td><td>{b.skipped}</td><td>{b.failed}</td></tr>)}</tbody></table></div>
+            <tbody>{bulk.map((b) => <tr key={b.id}><td><b>{b.name}</b></td><td className="small">{new Date(b.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</td><td>{b.total}</td><td>{b.sent}</td><td>{b.skipped}</td><td>{b.failed}</td></tr>)}</tbody></table></div>
         )}</div>
       ) : (
         <div className={data?.canManage ? 'prod-grid' : ''}>

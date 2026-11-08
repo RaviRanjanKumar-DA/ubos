@@ -156,7 +156,7 @@ function PriceListsTab({ lists, products, manage, act }: { lists: PriceList[]; p
       {lists.map((l) => (
         <div key={l.id} className="run-card" style={{ marginTop: 10 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <span><b>{l.name}</b> {l.isDefault && <span className="badge ok">Default</span>} <span className="small muted">{l.validFrom || l.validTo ? `${l.validFrom ? new Date(l.validFrom).toLocaleDateString('en-IN') : '…'} – ${l.validTo ? new Date(l.validTo).toLocaleDateString('en-IN') : '…'}` : 'Always valid'}</span></span>
+            <span><b>{l.name}</b> {l.isDefault && <span className="badge ok">Default</span>} <span className="small muted">{l.validFrom || l.validTo ? `${l.validFrom ? new Date(l.validFrom).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '…'} – ${l.validTo ? new Date(l.validTo).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' }) : '…'}` : 'Always valid'}</span></span>
             <span className="row" style={{ gap: 6 }}>
               {manage && <button className="btn sm ghost" onClick={() => open(l)}>Edit</button>}
               {manage && !l.isDefault && <button className="btn sm ghost" onClick={() => act(() => api(`/api/v1/price-lists/${l.id}`, { method: 'PUT', body: { isDefault: true } }), `${l.name} is now the default.`)}>Make default</button>}

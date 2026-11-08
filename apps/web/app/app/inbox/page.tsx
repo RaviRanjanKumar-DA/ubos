@@ -132,7 +132,7 @@ function Broadcasts() {
       <p className="small muted" style={{ marginTop: 0 }}>To send one: on the Leads page tick the leads and choose “WhatsApp”. Customers who replied STOP are always skipped.</p>
       {!rows?.length ? <p className="small muted">No broadcasts yet.</p> : (
         <div className="table-wrap"><table className="table"><thead><tr><th>Name</th><th>When</th><th>Leads</th><th>Sent</th><th>Skipped</th><th>Failed</th></tr></thead>
-          <tbody>{rows.map((b) => <tr key={b.id}><td><b>{b.name}</b></td><td className="small">{new Date(b.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</td><td>{b.total}</td><td>{b.sent}</td><td>{b.skipped}</td><td>{b.failed}</td></tr>)}</tbody></table></div>
+          <tbody>{rows.map((b) => <tr key={b.id}><td><b>{b.name}</b></td><td className="small">{new Date(b.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</td><td>{b.total}</td><td>{b.sent}</td><td>{b.skipped}</td><td>{b.failed}</td></tr>)}</tbody></table></div>
       )}
     </div>
   );

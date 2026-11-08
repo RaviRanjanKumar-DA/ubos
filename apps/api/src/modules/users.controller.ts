@@ -1,4 +1,5 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Res } from '@nestjs/common';
+import { istDate } from '../common/ist';
 import type { Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
@@ -199,7 +200,7 @@ export class UsersController {
           u.name, u.email, u.username ?? '', u.mobile ?? '',
           u.roles.map((r) => `${r.role.name} (${r.workspaceId ? workspaces.get(r.workspaceId) ?? '?' : 'All workspaces'})`).join('; '),
           u.team?.name ?? '', !u.isActive ? 'Inactive' : u.lockedUntil && u.lockedUntil > new Date() ? 'Locked' : 'Active', u.totpEnabled ? 'On' : 'Off',
-          u.isActive ? sub?.plan.name ?? '' : '', u.isActive && sub ? sub.currentPeriodEnd.toISOString().slice(0, 10) : '',
+          u.isActive ? sub?.plan.name ?? '' : '', u.isActive && sub ? istDate(sub.currentPeriodEnd) : '',
         ]),
       ];
     });

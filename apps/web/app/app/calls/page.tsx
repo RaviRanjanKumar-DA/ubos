@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
+import { istDay, istDayStart } from '@/lib/ist';
 import { useShell } from '@/components/AppShell';
 import { useLive } from '@/lib/live';
 import { CHANNEL, dur, RecordingPlayer } from '@/components/calls/Player';
@@ -15,12 +16,12 @@ interface CallRow {
 interface Device { id: string; userId: string; userName: string; name: string; platform: string; appVersion: string | null; lastSeenAt: string | null; lastSyncAt: string | null; pendingCalls: number; revokedAt: string | null; createdAt: string }
 type Tab = 'log' | 'unmatched' | 'phones';
 const RANGES: Record<string, () => { from?: string }> = {
-  today: () => { const d = new Date(); d.setHours(0, 0, 0, 0); return { from: d.toISOString() }; },
+  today: () => ({ from: istDayStart(istDay(new Date())).toISOString() }),
   '7d': () => ({ from: new Date(Date.now() - 7 * 86_400_000).toISOString() }),
   '30d': () => ({ from: new Date(Date.now() - 30 * 86_400_000).toISOString() }),
   all: () => ({}),
 };
-const when = (d: string | null) => (d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const when = (d: string | null) => (d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
 /** Every call — phone app, cloud calling and calls logged by hand — with recordings, unmatched calls and paired phones. */
 export default function CallsPage() {

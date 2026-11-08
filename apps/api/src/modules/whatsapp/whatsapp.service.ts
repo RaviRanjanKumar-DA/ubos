@@ -8,6 +8,7 @@ import { intakeLead } from '../../common/lead-intake';
 import { live } from '../../common/live';
 import { assertPublicUrl, readConfig, type IntegrationConfig } from '../integration-runtime';
 import { fillVariables } from '../messaging/messaging.service';
+import { emitEvent } from '../../common/events';
 
 const WINDOW_MS = 24 * 3_600_000;
 const STATUS_ORDER = ['queued', 'sent', 'delivered', 'read'];
@@ -81,6 +82,11 @@ export class WhatsAppService {
       const newer = !conv.lastInboundAt || at > conv.lastInboundAt;
       await tx.conversation.update({ where: { id: conv.id }, data: { ...(newer ? { lastInboundAt: at } : {}), ...(at > conv.lastMessageAt ? { lastMessageAt: at } : {}), unread: { increment: 1 }, status: 'open' } });
       if (conv.leadId) await tx.lead.update({ where: { id: conv.leadId }, data: { lastActivityAt: at } });
+      // A reply ends sequences that stop on reply.
+      if (conv.leadId) {
+        await tx.sequenceEnrollment.updateMany({ where: { leadId: conv.leadId, status: 'active', sequence: { stopOnReply: true } }, data: { status: 'stopped', stopReason: 'customer replied' } });
+        await emitEvent(tx, tenantId, conv.workspaceId, 'whatsapp.received', { leadId: conv.leadId, customerId: conv.customerId, conversationId: conv.id, text });
+      }
       // Opt-out / opt-in words (also required by WhatsApp's business policy).
       if (text && conv.customerId && (STOP.test(text) || START.test(text))) {
         const optOut = STOP.test(text);

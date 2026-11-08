@@ -6,7 +6,7 @@ import { useShell } from '@/components/AppShell';
 
 interface Cover { id: string; userId: string; coverUserId: string; userName: string; coverName: string; startsAt: string; endsAt: string; note: string | null; isActive: boolean }
 
-const day = (d: string) => new Date(d).toLocaleDateString('en-IN', { dateStyle: 'medium' });
+const day = (d: string) => new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });
 
 /** Accepting new leads on / off, and "I'm away — X covers for me" (user managers can set it for anyone). */
 export function AvailabilityCard() {

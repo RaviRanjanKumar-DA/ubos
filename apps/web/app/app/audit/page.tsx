@@ -50,7 +50,7 @@ export default function AuditPage() {
             <tbody>
               {logs?.map((l) => (
                 <tr key={l.id}>
-                  <td className="small" style={{ whiteSpace: 'nowrap' }}>{new Date(l.createdAt).toLocaleString('en-IN')}</td>
+                  <td className="small" style={{ whiteSpace: 'nowrap' }}>{new Date(l.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                   <td>{l.actor}</td>
                   <td><span className="badge">{l.action}</span></td>
                   <td className="small muted" style={{ maxWidth: 220, overflowWrap: 'anywhere' }}>{fmt(l.oldValue)}</td>

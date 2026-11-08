@@ -129,7 +129,7 @@ check('filter by a custom field', office.body.length >= 1 && office.body.every((
 const notCalled = await list('contacted=no');
 const called = await list('contacted=yes');
 check('worked / not worked yet split the list', notCalled.total + called.total === all.total && called.body.every((l) => l.lastActivityAt) && notCalled.body.every((l) => !l.lastActivityAt), [notCalled.total, called.total, all.total]);
-const today = new Date().toISOString().slice(0, 10);
+const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // UBOS works in IST
 const createdToday = await list(`createdFrom=${today}&createdTo=${today}`);
 check('created-date range', createdToday.body.some((l) => l.id === gaurav.id), createdToday.total);
 const future = await list('createdFrom=2099-01-01');

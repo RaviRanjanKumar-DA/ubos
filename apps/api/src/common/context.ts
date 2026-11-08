@@ -32,6 +32,8 @@ export interface RequestContext {
   tenant?: TenantInfo;
   auth?: AuthInfo;
   platformUserId?: string;
+  /** Set while automation runs: how many rules led here (stops endless chains). */
+  automationDepth?: number;
 }
 
 export const contextStore = new AsyncLocalStorage<RequestContext>();

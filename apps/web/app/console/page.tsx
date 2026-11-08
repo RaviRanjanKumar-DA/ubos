@@ -125,7 +125,7 @@ export default function ConsolePage() {
                     <td>
                       {statusBadge(t)}
                       {t.trialEndsAt && t.subscriptionStatus === 'trialing' && (
-                        <div className="small muted">ends {new Date(t.trialEndsAt).toLocaleDateString('en-IN')}</div>
+                        <div className="small muted">ends {new Date(t.trialEndsAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
                       )}
                     </td>
                     <td className="small" title="Setup Guide steps done (available steps)">{t.setup ? `${Math.round((t.setup.done / Math.max(1, t.setup.total)) * 100)}% · ${t.setup.done}/${t.setup.total}` : '—'}</td>
@@ -264,7 +264,7 @@ function Orders({ onChanged }: { onChanged: () => void }) {
             <tbody>
               {shown.map((o) => (
                 <tr key={o.id}>
-                  <td><b>{o.number}</b><div className="small muted">{new Date(o.createdAt).toLocaleDateString('en-IN')} · {o.cycle.replace('_', '-')}</div></td>
+                  <td><b>{o.number}</b><div className="small muted">{new Date(o.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} · {o.cycle.replace('_', '-')}</div></td>
                   <td>{o.tenant?.name ?? '—'}<div className="small muted">{o.tenant?.slug}</div></td>
                   <td className="small">{o.items.map((i) => `${i.quantity} × ${i.name}`).join(', ')}</td>
                   <td>{rupees(o.totalPaise)}</td>

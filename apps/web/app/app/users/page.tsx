@@ -18,7 +18,7 @@ interface Team { id: string; label: string }
 interface Licences { plan: string | null; status: string | null; licences: number; used: number; available: number; expiresAt: string | null; trialEndsAt: string | null }
 type StatusFilter = '' | 'active' | 'inactive' | 'locked' | 'invited';
 const PAGE = 20;
-const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+const fmtDate = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 
 export default function UsersPage() {
   const { me, version, can } = useShell();
@@ -149,7 +149,7 @@ export default function UsersPage() {
                   <td>
                     <div className="row" style={{ gap: 4 }}>
                       {u.roles.map((r, i) => (
-                        <span key={i} className="badge" title={r.validTo ? `until ${new Date(r.validTo).toLocaleDateString('en-IN')}` : undefined}>
+                        <span key={i} className="badge" title={r.validTo ? `until ${new Date(r.validTo).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : undefined}>
                           {r.role} · {r.workspace ?? 'All workspaces'}
                         </span>
                       ))}
@@ -164,7 +164,7 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="small">{u.isActive ? <>{lic?.plan ?? '—'}<div className="muted">till {fmtDate(lic?.expiresAt ?? null)}</div></> : <span className="muted">Not using a licence</span>}</td>
-                  <td className="small muted">{u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString('en-IN') : 'Never'}</td>
+                  <td className="small muted">{u.lastActiveAt ? new Date(u.lastActiveAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }) : 'Never'}</td>
                   {canManage && <td style={{ textAlign: 'right' }}><button className="btn sm outline" onClick={() => setEditing(u)}>Manage</button></td>}
                 </tr>
               ))}

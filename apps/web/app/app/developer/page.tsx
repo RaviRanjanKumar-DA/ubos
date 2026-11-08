@@ -8,7 +8,7 @@ interface Key { id: string; name: string; prefix: string; scopes: string[]; work
 interface Hook { id: string; name: string; url: string; events: string[]; workspaceId: string | null; isActive: boolean; failureCount: number; lastDeliveryAt: string | null; lastStatus: number | null; last7Days: Record<string, number> }
 interface Delivery { id: string; event: string; status: string; attempts: number; responseStatus: number | null; error: string | null; createdAt: string; deliveredAt: string | null; nextAttemptAt: string; payload: unknown }
 type Tab = 'keys' | 'hooks' | 'docs';
-const when = (d: string | null) => (d ? new Date(d).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const when = (d: string | null) => (d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : '—');
 
 /** Settings → Developer: API keys, outgoing webhooks and a short API reference. */
 export default function DeveloperPage() {
@@ -109,7 +109,7 @@ function Keys({ data, wsName, act, onSecret }: { data: { scopes: { value: string
             <tbody>
               {data.keys.map((k) => (
                 <tr key={k.id} style={k.revokedAt ? { opacity: 0.5 } : undefined}>
-                  <td><b>{k.name}</b><div className="small muted">Created {when(k.createdAt)}{k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString('en-IN')}` : ''}</div></td>
+                  <td><b>{k.name}</b><div className="small muted">Created {when(k.createdAt)}{k.expiresAt ? ` · expires ${new Date(k.expiresAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</div></td>
                   <td><code>{k.prefix}…</code></td>
                   <td className="small">{k.scopes.join(', ')}</td>
                   <td className="small">{wsName(k.workspaceId)}</td>

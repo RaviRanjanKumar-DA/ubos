@@ -61,7 +61,7 @@ export default function CustomersPage() {
                   <td><div className="row" style={{ gap: 4 }}>{c.workspaces.map((w) => <span key={w} className="badge">{w}</span>)}{!c.workspaces.length && <span className="muted small">—</span>}</div></td>
                   <td>{c.leadCount}</td>
                   <td className="small">{c.primaryRm ?? <span className="muted">—</span>}</td>
-                  <td className="small muted">{new Date(c.lastActivityAt).toLocaleDateString('en-IN')}</td>
+                  <td className="small muted">{new Date(c.lastActivityAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                 </tr>
               ))}
             </tbody>

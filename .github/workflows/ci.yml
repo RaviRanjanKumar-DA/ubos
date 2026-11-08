@@ -80,3 +80,5 @@ jobs:
           npm run verify:whatsapp
           npx tsx packages/database/prisma/seed.ts
           npm run verify:messaging
+          npx tsx packages/database/prisma/seed.ts
+          npm run verify:automation

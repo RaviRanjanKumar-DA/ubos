@@ -61,7 +61,7 @@ export default function Customer360Page() {
         <div>
           <div className="small muted"><Link href="/app/customers">Customers</Link> /</div>
           <h1>{c.name} <span className="badge grey" style={{ verticalAlign: 'middle' }}>{c.code}</span></h1>
-          <div className="small muted">Customer since {new Date(c.createdAt).toLocaleDateString('en-IN')}{c.primaryRm ? ` · Primary RM: ${c.primaryRm.name}` : ''}</div>
+          <div className="small muted">Customer since {new Date(c.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}{c.primaryRm ? ` · Primary RM: ${c.primaryRm.name}` : ''}</div>
         </div>
         <div className="row">
           {c.canEdit && <button className="btn outline" onClick={() => setEditing(true)}>Edit details</button>}
@@ -96,7 +96,7 @@ export default function Customer360Page() {
               {c.merges.map((m) => (
                 <div key={m.id} className="row small" style={{ justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)' }}>
                   <span>
-                    {m.duplicate.name} ({m.duplicate.code}) · {m.leadsMoved} lead(s) · {new Date(m.at).toLocaleDateString('en-IN')}
+                    {m.duplicate.name} ({m.duplicate.code}) · {m.leadsMoved} lead(s) · {new Date(m.at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}
                     {m.undoneAt && <span className="badge grey" style={{ marginLeft: 6 }}>Undone</span>}
                   </span>
                   {c.canMerge && !m.undoneAt && (
@@ -130,7 +130,7 @@ export default function Customer360Page() {
                     </td>
                     <td className="small">{l.source}</td>
                     <td className="small">{l.owner ?? '—'}</td>
-                    <td className="small muted">{new Date(l.createdAt).toLocaleDateString('en-IN')}</td>
+                    <td className="small muted">{new Date(l.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -149,7 +149,7 @@ export default function Customer360Page() {
               <b>{ACTION_TEXT[e.action] ?? e.action}</b>{e.context && <span className="muted"> · {e.context}</span>}
               <div className="small muted">{describe(e)}</div>
             </div>
-            <div className="small muted" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{e.actor}<br />{new Date(e.at).toLocaleString('en-IN')}</div>
+            <div className="small muted" style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{e.actor}<br />{new Date(e.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
           </div>
         ))}
         {!c.timeline.length && <div className="empty">No activity yet.</div>}

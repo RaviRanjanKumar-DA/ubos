@@ -1437,3 +1437,89 @@ model Broadcast {
   createdById String
   createdAt   DateTime @default(now())
 }
+
+// ═════════════════════════ Automation (Phase 2.5) ═════════════════════════
+
+// "When X, if Y, then Z" for one business line.
+model AutomationRule {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  trigger     String    // lead.created, lead.won, lead.idle …
+  idleDays    Int?      // lead.idle only
+  conditions  Json      @default("[]") // [{ field, op, value }]
+  actions     Json      // [{ type, ... }]
+  isActive    Boolean   @default(true)
+  isArchived  Boolean   @default(false)
+  runCount    Int       @default(0)
+  lastRunAt   DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @default(now()) @updatedAt
+
+  @@index([tenantId, workspaceId, trigger])
+}
+
+// Something happened that rules may react to; handled in the background.
+model AutomationEvent {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String?
+  event       String
+  data        Json
+  depth       Int       @default(0) // rules triggering rules stop after three links
+  status      String    @default("pending") // pending | done
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+model AutomationRun {
+  id        String   @id @default(uuid())
+  tenantId  String
+  ruleId    String
+  event     String
+  leadId    String?
+  status    String   // done | failed
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, ruleId, createdAt])
+  @@index([ruleId, leadId, createdAt])
+}
+
+// Messages sent over time, stopped by a reply.
+model Sequence {
+  id          String               @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  steps       Json                 // [{ delayHours, templateId }]
+  stopOnReply Boolean              @default(true)
+  isArchived  Boolean              @default(false)
+  createdById String
+  createdAt   DateTime             @default(now())
+  enrollments SequenceEnrollment[]
+
+  @@index([tenantId, workspaceId])
+}
+
+model SequenceEnrollment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  sequenceId  String
+  sequence    Sequence @relation(fields: [sequenceId], references: [id])
+  leadId      String
+  stepIndex   Int      @default(0)
+  nextAt      DateTime
+  status      String   @default("active") // active | completed | stopped
+  stopReason  String?
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([status, nextAt])
+  @@index([tenantId, leadId])
+}

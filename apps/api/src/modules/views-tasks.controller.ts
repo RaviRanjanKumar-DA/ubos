@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Query } from '@nestjs/common';
+import { istText } from '../common/ist';
 import { z } from 'zod';
 import type { Prisma, Tx } from '@ubos/database';
 import { DbService } from '../common/db.service';
@@ -142,7 +143,7 @@ export class ViewsTasksController {
       });
       if (lead) await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'task', data: { taskId: t.id, kind: t.type, title: t.title, dueAt: t.dueAt.toISOString() } }) });
       const link = lead ? `/app/leads/${lead.id}` : '/app/calendar';
-      await notify(tx, [assigneeId], { type: 'assignment', title: `${auth().name} gave you a ${t.type}: ${t.title}`, body: t.dueAt.toISOString(), link });
+      await notify(tx, [assigneeId], { type: 'assignment', title: `${auth().name} gave you a ${t.type}: ${t.title}`, body: istText(t.dueAt), link });
       await notify(tx, mentions.filter((m) => m !== assigneeId), { type: 'mention', title: `${auth().name} mentioned you in “${t.title}”`, body: t.notes, link });
       return t;
     });

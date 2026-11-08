@@ -6,7 +6,7 @@ import { Field, FIELD_TYPE_LABELS, WorkspaceSettings } from '@/lib/workspace';
 
 type Act = (fn: () => Promise<unknown>, text: string) => Promise<boolean>;
 const BUILT_IN: [string, string][] = [['name', 'Name'], ['mobile', 'Mobile'], ['email', 'Email ID'], ['city', 'City'], ['source', 'Source'], ['customerCode', 'Customer ID']];
-const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+const fmt = (d?: string) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 
 /** Fields settings: Lead ID, primary display fields (H1 / H2) and the custom lead fields of a workspace. */
 export function FieldsSettings({ ws, readOnly, isOrgAdmin, act }: { ws: WorkspaceSettings; readOnly: boolean; isOrgAdmin: boolean; act: Act }) {

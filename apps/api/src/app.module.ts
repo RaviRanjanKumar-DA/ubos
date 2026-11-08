@@ -46,6 +46,8 @@ import { WhatsAppController } from './modules/whatsapp/whatsapp.controller';
 import { WhatsAppService } from './modules/whatsapp/whatsapp.service';
 import { MessagingController, UnsubscribeController } from './modules/messaging/messaging.controller';
 import { MessagingService } from './modules/messaging/messaging.service';
+import { AutomationController } from './modules/automation/automation.controller';
+import { AutomationService } from './modules/automation/automation.service';
 
 @Controller('health')
 class HealthController {
@@ -64,7 +66,7 @@ class HealthController {
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
     WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, AnalyticsController, LabelsScriptsController, ViewsTasksController, NotificationsSettingsController, DataToolsController, LeadWorkController,
-    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController, CallsController, MobileController, WhatsAppController, MessagingController, UnsubscribeController,
+    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController, CallsController, MobileController, WhatsAppController, MessagingController, UnsubscribeController, AutomationController,
   ],
   providers: [
     DbService,
@@ -77,6 +79,7 @@ class HealthController {
     CallingService,
     WhatsAppService,
     MessagingService,
+    AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },
     { provide: APP_FILTER, useClass: ErrorFilter },

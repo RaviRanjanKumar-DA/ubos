@@ -157,7 +157,7 @@ function RunCard({ run, proc, act, call }: { run: Run; proc: Processes; act: Act
         <div>
           <b>{run.templateName}</b>{' '}
           <span className={`badge ${run.status === 'completed' ? 'ok' : run.status === 'cancelled' ? 'bad' : ''}`}>{run.status === 'active' ? 'Running' : run.status === 'completed' ? 'Completed' : 'Cancelled'}</span>
-          <div className="small muted">Started {new Date(run.startedAt).toLocaleDateString('en-IN')}{run.completedAt ? ` · ${run.status === 'completed' ? 'completed' : 'closed'} ${new Date(run.completedAt).toLocaleDateString('en-IN')}` : ''}{run.cancelledReason ? ` · ${run.cancelledReason}` : ''}</div>
+          <div className="small muted">Started {new Date(run.startedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}{run.completedAt ? ` · ${run.status === 'completed' ? 'completed' : 'closed'} ${new Date(run.completedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}{run.cancelledReason ? ` · ${run.cancelledReason}` : ''}</div>
         </div>
         <div className="row" style={{ gap: 6 }}>
           {run.status === 'active' && current && current.access === 'edit' && current.position > 0 && <button className="btn sm ghost" onClick={() => setSendingBack(true)}>↩ Send back</button>}
@@ -173,7 +173,7 @@ function RunCard({ run, proc, act, call }: { run: Run; proc: Processes; act: Act
               <span className={`badge ${STEP_TONE[s.status] ?? ''}`}>{STEP_LABEL[s.status] ?? s.status}</span>
               {s.locked && <span title="Completed and locked">🔒</span>}
               {s.sentBackCount > 0 && <span className="badge warn" title="Sent back to this step">↩ {s.sentBackCount}</span>}
-              <span className="small muted step-meta">{s.assigneeName ?? ''}{s.dueAt && s.status !== 'done' ? ` · due ${new Date(s.dueAt).toLocaleDateString('en-IN')}` : ''}{s.completedAt ? ` · ${s.completedByName ?? ''} ${new Date(s.completedAt).toLocaleDateString('en-IN')}` : ''}</span>
+              <span className="small muted step-meta">{s.assigneeName ?? ''}{s.dueAt && s.status !== 'done' ? ` · due ${new Date(s.dueAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}{s.completedAt ? ` · ${s.completedByName ?? ''} ${new Date(s.completedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</span>
             </button>
             {open === s.id && <StepBody step={s} run={run} canUnlock={proc.canUnlock} onUnlock={() => setUnlocking(s)} act={act} call={call} />}
           </li>
@@ -286,7 +286,7 @@ function QuotesTab({ quotes, lead, canQuote, act, call }: { quotes: Quote[]; lea
                 const st = QUOTE_STATUS[q.status] ?? { label: q.status, tone: 'grey' };
                 return (
                   <tr key={q.id}>
-                    <td><b>{q.number}</b><div className="small muted">{new Date(q.createdAt).toLocaleDateString('en-IN')}{q.validUntil ? ` · valid till ${new Date(q.validUntil).toLocaleDateString('en-IN')}` : ''}</div></td>
+                    <td><b>{q.number}</b><div className="small muted">{new Date(q.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}{q.validUntil ? ` · valid till ${new Date(q.validUntil).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</div></td>
                     <td className="small">{q.items.map((i) => `${i.name}${i.qty > 1 ? ` × ${i.qty}` : ''}`).join(', ')}</td>
                     <td style={{ textAlign: 'right' }}><b>{inr(q.totalPaise)}</b>{q.discountPaise > 0 && <div className="small muted">−{inr(q.discountPaise)} discount</div>}</td>
                     <td><span className={`badge ${st.tone}`}>{st.label}</span>{q.approval?.status === 'rejected' && q.status === 'draft' && <div className="small" style={{ color: 'var(--bad)' }}>Discount rejected: {q.approval.decisionNote}</div>}</td>
@@ -329,7 +329,7 @@ export function QuoteDialog({ lead, quote, onClose, onSaved }: { lead: { id: str
   const [lines, setLines] = useState<{ packageId: string; name: string; qty: number; price: string; gstRate: number }[]>(
     quote?.items.map((i) => ({ packageId: i.packageId ?? '', name: i.name, qty: i.qty, price: String(i.pricePaise / 100), gstRate: i.gstRate })) ?? [],
   );
-  const [validUntil, setValidUntil] = useState(quote?.validUntil?.slice(0, 10) ?? new Date(Date.now() + 15 * 86_400_000).toISOString().slice(0, 10));
+  const [validUntil, setValidUntil] = useState(quote?.validUntil?.slice(0, 10) ?? new Date(Date.now() + 15 * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
   const [notes, setNotes] = useState(quote?.notes ?? '');
   const [terms, setTerms] = useState(quote?.terms ?? '');
   const [err, setErr] = useState('');
@@ -441,7 +441,7 @@ function PaymentsTab({ proc, lead, act, call }: { proc: Processes; lead: { id: s
   const [kind, setKind] = useState('instalment');
   const [mode, setMode] = useState('upi');
   const [reference, setReference] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
   const [voiding, setVoiding] = useState<Payment | null>(null);
   const live = proc.payments.filter((p) => !p.isVoided);
   return (
@@ -467,7 +467,7 @@ function PaymentsTab({ proc, lead, act, call }: { proc: Processes; lead: { id: s
             <tbody>
               {proc.payments.map((p) => (
                 <tr key={p.id} style={p.isVoided ? { opacity: 0.55 } : undefined}>
-                  <td>{new Date(p.receivedAt).toLocaleDateString('en-IN')}</td>
+                  <td>{new Date(p.receivedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                   <td style={{ textAlign: 'right', textDecoration: p.isVoided ? 'line-through' : undefined }}><b>{inr(p.amountPaise)}</b></td>
                   <td className="small">{p.kind}{p.source === 'rule' ? ' · by rule' : ''}</td>
                   <td className="small">{p.mode}</td>

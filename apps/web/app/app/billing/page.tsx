@@ -16,7 +16,7 @@ interface Order {
   id: string; number: string; cycle: string; items: OrderItem[]; subtotalPaise: number; gstPaise: number; totalPaise: number;
   status: 'pending' | 'paid' | 'cancelled'; createdAt: string; paidAt: string | null; paymentRef: string | null; note: string | null;
 }
-const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 const STATUS_BADGE: Record<Order['status'], string> = { pending: 'warn', paid: 'ok', cancelled: 'grey' };
 
 export default function BillingPage() {

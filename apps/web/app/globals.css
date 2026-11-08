@@ -510,3 +510,4 @@ tr.selected td { background: var(--brand-50) !important; }
 .bubble.failed { background: var(--bad-bg); border-color: #f3c4bf; }
 .bubble-meta { font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; }
 .tick-read { color: #2a7de1; }
+.rule-h { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--brand); margin: 14px 0 6px; }

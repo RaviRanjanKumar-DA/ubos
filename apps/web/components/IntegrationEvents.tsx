@@ -48,7 +48,7 @@ export function IntegrationEvents({ integrationKey, canManage }: { integrationKe
             <span className={`badge ${TONE[e.status] ?? 'grey'}`}>{e.status}</span>
             <span className="small">{e.outcome ? OUTCOME[e.outcome] ?? e.outcome : ''}</span>
             {e.error && <span className="small event-err" style={{ color: 'var(--bad)' }} title={e.error}>{e.error}</span>}
-            <span className="small muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{new Date(e.receivedAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+            <span className="small muted" style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}>{new Date(e.receivedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</span>
           </button>
           {open === e.id && (
             <div className="event-body">

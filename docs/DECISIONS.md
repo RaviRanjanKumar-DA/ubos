@@ -25,3 +25,4 @@ Mark your choice next to each item. If left blank, the recommended default is us
 | 19 | WhatsApp for tenants | Meta Tech Provider / BSP partnership / tenants bring own | Tenants bring own; apply for Tech Provider | |
 | 20 | Free trial length & limits | 7 / 14 / 30 days | 14 days, 5 users | |
 | 21 | Your own business lines (workspaces for Tenant #1) | e.g. Course/Software, Logo Designing, Vastu Consultation/Audit | Needed in Phase 0 | |
+| 22 | Time zone | — | **Decided: every date is shown, filtered and exported in IST (Asia/Kolkata)** | ✓ |

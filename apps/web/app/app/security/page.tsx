@@ -106,7 +106,7 @@ function SecurityInner() {
               <tr key={s.id}>
                 <td>{device(s.userAgent)} {s.current && <span className="badge ok" style={{ marginLeft: 6 }}>This device</span>}</td>
                 <td className="muted">{s.ip}</td>
-                <td className="small">{new Date(s.lastUsedAt).toLocaleString('en-IN')}</td>
+                <td className="small">{new Date(s.lastUsedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</td>
                 <td style={{ textAlign: 'right' }}>
                   {!s.current && (
                     <button className="btn sm danger" onClick={() => act(() => api(`/api/v1/auth/sessions/${s.id}`, { method: 'DELETE', noWorkspace: true }).then(loadSessions), 'Device signed out.')}>

@@ -2,22 +2,22 @@
 
 import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
+import { fromIstInput, toIstInput } from '@/lib/ist';
 
 export interface TaskRow {
   id: string; type: 'task' | 'meeting' | 'call'; title: string; notes: string | null; dueAt: string; durationMin: number | null; location: string | null;
   leadId: string | null; leadName: string | null; assigneeId: string; assignee: string | null; createdBy: string | null; doneAt: string | null; overdue: boolean;
 }
 type Person = { id: string; name: string };
-const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 /** Create or edit a task / meeting / planned call, optionally on a lead, with @mentions. */
 export function TaskDialog({ task, leadId, leadName, people, canAssign, meId, defaultDate, onClose, onSaved }: {
   task?: TaskRow | null; leadId?: string; leadName?: string; people: Person[]; canAssign: boolean; meId: string; defaultDate?: Date;
   onClose: () => void; onSaved: () => void;
 }) {
-  const start = defaultDate ?? (() => { const d = new Date(Date.now() + 3_600_000); d.setMinutes(0, 0, 0); return d; })();
+  const start = defaultDate ?? fromIstInput(`${toIstInput(new Date(Date.now() + 3_600_000)).slice(0, 14)}00`);
   const [f, setF] = useState({
-    type: task?.type ?? 'task', title: task?.title ?? '', notes: task?.notes ?? '', dueAt: toLocal(task ? new Date(task.dueAt) : start),
+    type: task?.type ?? 'task', title: task?.title ?? '', notes: task?.notes ?? '', dueAt: toIstInput(task ? new Date(task.dueAt) : start),
     durationMin: String(task?.durationMin ?? 30), location: task?.location ?? '', assigneeId: task?.assigneeId ?? meId,
   });
   const [mentions, setMentions] = useState<string[]>([]);
@@ -29,7 +29,7 @@ export function TaskDialog({ task, leadId, leadName, people, canAssign, meId, de
     e.preventDefault();
     setBusy(true); setError('');
     const body = {
-      type: f.type, title: f.title, notes: f.notes || null, dueAt: new Date(f.dueAt).toISOString(),
+      type: f.type, title: f.title, notes: f.notes || null, dueAt: fromIstInput(f.dueAt).toISOString(),
       durationMin: f.type === 'task' ? null : Number(f.durationMin) || null, location: f.location || null, assigneeId: f.assigneeId,
       ...(task ? {} : { leadId: leadId ?? null, mentionIds: mentions }),
     };

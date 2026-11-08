@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { resolve } from 'path';
 import { config } from 'dotenv';
 config({ path: resolve(__dirname, '../../../.env') });
+process.env.TZ = 'Asia/Kolkata'; // every "today", due time and date filter is IST, whatever clock the server runs on
 
 import { randomUUID } from 'crypto';
 import { Logger } from '@nestjs/common';

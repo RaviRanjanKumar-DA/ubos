@@ -42,8 +42,8 @@ export default function QuotePrint() {
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: 1 }}>QUOTATION</div>
             <div><b>{q.number}</b></div>
-            <div className="small">Date: {new Date(q.createdAt).toLocaleDateString('en-IN')}</div>
-            {q.validUntil && <div className="small">Valid until: {new Date(q.validUntil).toLocaleDateString('en-IN')}</div>}
+            <div className="small">Date: {new Date(q.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
+            {q.validUntil && <div className="small">Valid until: {new Date(q.validUntil).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>}
           </div>
         </div>
         <div style={{ margin: '22px 0 16px' }}>

@@ -34,7 +34,7 @@ export default function ApprovalsPage() {
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <div>
                 <b>{a.title}</b> <span className={`badge ${a.status === 'approved' ? 'ok' : a.status === 'rejected' ? 'bad' : a.status === 'pending' ? 'warn' : 'grey'}`}>{a.status}</span>
-                <div className="small muted">{a.kind === 'quote_discount' ? 'Quote discount' : 'Process sign-off'} · {a.customerName ?? ''} · asked by {a.requestedByName} · {new Date(a.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                <div className="small muted">{a.kind === 'quote_discount' ? 'Quote discount' : 'Process sign-off'} · {a.customerName ?? ''} · asked by {a.requestedByName} · {new Date(a.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
                   {a.decidedByName ? ` · ${a.status} by ${a.decidedByName}${a.decisionNote ? `: ${a.decisionNote}` : ''}` : ''}</div>
                 {a.leadId && <Link className="small" href={`/app/leads/${a.leadId}?tab=${a.kind === 'quote_discount' ? 'quotes' : 'process'}`}>Open the lead →</Link>}
               </div>

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
 import { api, ApiError, session } from '@/lib/api';
+import { fromIstInput, istAt, toIstInput } from '@/lib/ist';
 import { FieldInput } from '@/components/FieldInput';
 import { LostDialog } from '@/components/LostDialog';
 import { useShell } from '@/components/AppShell';
@@ -28,15 +29,13 @@ interface LabelRow { id: string; name: string; color: string }
 interface Script { id: string; stageId: string | null; title: string; body: string }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥', message: '✉' };
-const at = (h: number, addDays: number) => { const d = new Date(); d.setDate(d.getDate() + addDays); d.setHours(h, 0, 0, 0); return d; };
+const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥', message: '✉', automation: '⚡' };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
-  { label: 'Tomorrow 11 am', date: () => at(11, 1) },
-  { label: 'In 3 days', date: () => at(11, 3) },
-  { label: 'Next week', date: () => at(11, 7) },
+  { label: 'Tomorrow 11 am', date: () => istAt(11, 1) },
+  { label: 'In 3 days', date: () => istAt(11, 3) },
+  { label: 'Next week', date: () => istAt(11, 7) },
 ];
-const toLocal = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
 function LeadPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,16 +101,17 @@ function LeadPage() {
       case 'status': return `Status → ${label('statuses', d.to as string) || 'none'}`;
       case 'assignment': return `Assigned to ${people.find((p) => p.id === d.to)?.name ?? 'a new owner'}`;
       case 'stage': return `Stage → ${stageName(d.to)}${d.lostReason ? ` (${d.lostReason})` : ''}`;
-      case 'follow_up': return `Follow-up planned for ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
+      case 'follow_up': return `Follow-up planned for ${new Date(String(d.dueAt)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}`;
       case 'import': return `Imported from ${String(d.file ?? 'file')}`;
       case 'action': return `${String(d.name ?? 'Custom action')}${d.score ? ` · ${Number(d.score) > 0 ? '+' : ''}${d.score} score` : ''}`;
-      case 'task': return `Planned ${d.kind === 'meeting' ? 'meeting' : d.kind === 'call' ? 'call' : 'task'}: ${String(d.title ?? '')} — ${new Date(String(d.dueAt)).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}`;
+      case 'task': return `Planned ${d.kind === 'meeting' ? 'meeting' : d.kind === 'call' ? 'call' : 'task'}: ${String(d.title ?? '')} — ${new Date(String(d.dueAt)).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}`;
       case 'labels': return 'Labels changed';
       case 'quote': return 'Quote';
       case 'payment': return 'Payment';
       case 'process': return 'Process';
       case 'team': return 'Lead team';
       case 'message': return 'Message';
+      case 'automation': return 'Automation';
       default: return a.type;
     }
   }
@@ -175,7 +175,7 @@ function LeadPage() {
           In <b>{current?.name}</b> for {inStage} day(s){sla && !current?.isWon && !current?.isLost ? (inStage >= sla ? <span className="badge bad" style={{ marginLeft: 6 }}>Over the {sla}-day SLA</span> : ` · SLA ${sla} days`) : ''}
         </div>
         <div className="grid cols-4 small" style={{ marginTop: 10 }}>
-          <div><span className="muted">Enquiry</span><br />{new Date(lead.createdAt).toLocaleDateString('en-IN')} · {label('sources', lead.source)}</div>
+          <div><span className="muted">Enquiry</span><br />{new Date(lead.createdAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })} · {label('sources', lead.source)}</div>
           <div><span className="muted">First response</span><br />{lead.firstResponseAt ? relTime(lead.firstResponseAt) : <span style={{ color: 'var(--warn)' }}>Not called yet</span>}</div>
           <div><span className="muted">Last call</span><br />{lead.lastDisposition ? `${label('dispositions', lead.lastDisposition)} · ${relTime(lead.lastActivityAt)}` : '—'}</div>
           <div><span className="muted">Next follow-up</span><br />{lead.nextFollowUpAt ? <span style={{ color: new Date(lead.nextFollowUpAt) < new Date() ? 'var(--bad)' : undefined }}>{relTime(lead.nextFollowUpAt)}</span> : '—'}</div>
@@ -206,7 +206,7 @@ function LeadPage() {
             {openFollowUps.map((f) => (
               <div key={f.id} className="row" style={{ justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--line)', flexWrap: 'nowrap' }}>
                 <div style={{ minWidth: 0 }}>
-                  <b style={{ color: new Date(f.dueAt) < new Date() ? 'var(--bad)' : undefined }}>{new Date(f.dueAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</b>
+                  <b style={{ color: new Date(f.dueAt) < new Date() ? 'var(--bad)' : undefined }}>{new Date(f.dueAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</b>
                   <span className="small muted"> · {relTime(f.dueAt)} · {f.user}</span>
                   {f.note && <div className="small">{f.note}</div>}
                 </div>
@@ -231,13 +231,13 @@ function LeadPage() {
                 {a.type === 'call' && a.recording && <div style={{ margin: '4px 0' }}><RecordingPlayer callId={String(a.data?.callId)} workspaceId={lead.workspace.id} /></div>}
                 {!!a.mentions?.length && <div className="small" style={{ color: 'var(--brand)' }}>{a.mentions.map((m) => `@${m}`).join(' ')}</div>}
                 {a.type === 'action' && a.data?.answers ? <Answers answers={a.data.answers as Record<string, unknown>} labels={a.data.labels as Record<string, string> | undefined} /> : null}
-                <div className="small muted">{a.user ?? 'System'} · {new Date(a.at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+                <div className="small muted">{a.user ?? 'System'} · {new Date(a.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</div>
               </div>
             ))}
             <div className="tl-item">
               <span className="tl-dot" aria-hidden="true">★</span>
               <b style={{ fontSize: 13.5 }}>Enquiry received</b>
-              <div className="small muted">{label('sources', lead.source)} · {new Date(lead.createdAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</div>
+              <div className="small muted">{label('sources', lead.source)} · {new Date(lead.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</div>
             </div>
           </div>
         </div>
@@ -268,7 +268,7 @@ function ActionPanel({ ws, lead, act, call, people }: {
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    const followUpAt = next ? new Date(next).toISOString() : undefined;
+    const followUpAt = next ? fromIstInput(next).toISOString() : undefined;
     let ok = false;
     if (tab === 'call') {
       ok = await act(() => call(`/api/v1/leads/${lead.id}/activities`, 'POST', {
@@ -325,7 +325,7 @@ function ActionPanel({ ws, lead, act, call, people }: {
       <div className="field">
         <label>{tab === 'follow_up' ? 'Follow-up on' : 'Next follow-up (optional)'}</label>
         <div className="chips" style={{ marginBottom: 6 }}>
-          {QUICK.map((q) => <button type="button" key={q.label} className="chip" onClick={() => setNext(toLocal(q.date()))}>{q.label}</button>)}
+          {QUICK.map((q) => <button type="button" key={q.label} className="chip" onClick={() => setNext(toIstInput(q.date()))}>{q.label}</button>)}
         </div>
         <input className="input" type="datetime-local" value={next} onChange={(e) => setNext(e.target.value)} required={tab === 'follow_up'} />
       </div>
@@ -473,7 +473,7 @@ function TasksCard({ lead, people, onChange }: { lead: LeadDetail; people: { id:
           <input type="checkbox" checked={!!t.doneAt} aria-label={`Done: ${t.title}`} onChange={() => api(`/api/v1/tasks/${t.id}`, { method: 'PATCH', body: { done: !t.doneAt }, workspace: lead.workspace.id }).then(() => { load(); onChange(); })} />
           <div style={{ minWidth: 0, flex: 1, opacity: t.doneAt ? 0.55 : 1 }}>
             <button className="link-btn" onClick={() => setDialog(t)} style={{ textDecoration: t.doneAt ? 'line-through' : undefined }}>{t.type === 'meeting' ? '👥' : t.type === 'call' ? '📞' : '✔'} {t.title}</button>
-            <div className="small muted"><span style={{ color: t.overdue ? 'var(--bad)' : undefined }}>{new Date(t.dueAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>{t.location ? ` · ${t.location}` : ''}{t.assigneeId !== me.user.id ? ` · ${t.assignee}` : ''}</div>
+            <div className="small muted"><span style={{ color: t.overdue ? 'var(--bad)' : undefined }}>{new Date(t.dueAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</span>{t.location ? ` · ${t.location}` : ''}{t.assigneeId !== me.user.id ? ` · ${t.assignee}` : ''}</div>
           </div>
         </div>
       ))}

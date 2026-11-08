@@ -104,7 +104,7 @@ export default function ProcessesPage() {
                         <tr key={r.id}>
                           <td><Link href={`/app/leads/${r.leadId}?tab=process`}><b>{r.customerName}</b></Link><div className="small muted">{r.customerCode}</div></td>
                           <td className="small">{r.templateName}</td>
-                          <td className="small">{r.currentStep ? <>{r.currentStep}{r.currentStatus === 'awaiting_approval' && <span className="badge warn" style={{ marginLeft: 4 }}>sign-off</span>}<div className="muted">{r.currentAssignee ?? ''}{r.currentDueAt ? ` · due ${new Date(r.currentDueAt).toLocaleDateString('en-IN')}` : ''}</div></> : <span className={`badge ${r.status === 'completed' ? 'ok' : 'bad'}`}>{r.status}</span>}</td>
+                          <td className="small">{r.currentStep ? <>{r.currentStep}{r.currentStatus === 'awaiting_approval' && <span className="badge warn" style={{ marginLeft: 4 }}>sign-off</span>}<div className="muted">{r.currentAssignee ?? ''}{r.currentDueAt ? ` · due ${new Date(r.currentDueAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</div></> : <span className={`badge ${r.status === 'completed' ? 'ok' : 'bad'}`}>{r.status}</span>}</td>
                           <td className="small">{r.doneSteps}/{r.totalSteps}</td>
                           <td style={{ textAlign: 'right' }} className="small">{inr(r.receivedPaise)} / {inr(r.dealValuePaise)}</td>
                           <td className="stars">{r.rating ? '★'.repeat(r.rating) : ''}</td>
@@ -137,7 +137,7 @@ function RunTile({ r, wide }: { r: RunRow; wide?: boolean }) {
     <Link href={`/app/leads/${r.leadId}?tab=process`} className={`run-tile ${r.overdue ? 'overdue' : ''}`}>
       <div className="row" style={{ justifyContent: 'space-between' }}><b>{r.customerName}</b><span className="small muted">{r.doneSteps}/{r.totalSteps}</span></div>
       {wide && <div className="small">{r.templateName} · <b>{r.currentStep}</b></div>}
-      <div className="small muted">{r.currentAssignee ?? 'Unassigned'}{r.currentDueAt ? ` · due ${new Date(r.currentDueAt).toLocaleDateString('en-IN')}` : ''}</div>
+      <div className="small muted">{r.currentAssignee ?? 'Unassigned'}{r.currentDueAt ? ` · due ${new Date(r.currentDueAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</div>
       <div className="small">{r.currentStatus === 'awaiting_approval' && <span className="badge warn">Waiting for sign-off</span>} {r.balancePaise > 0 && <span className="muted">Balance {inr(r.balancePaise)}</span>}</div>
     </Link>
   );

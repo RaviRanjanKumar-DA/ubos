@@ -28,8 +28,8 @@ export default function DataToolsPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
+  const [to, setTo] = useState(() => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }));
   const [types, setTypes] = useState<string[]>(['call', 'remark', 'action']);
 
   if (!me.currentWorkspaceId && mode !== 'export') {

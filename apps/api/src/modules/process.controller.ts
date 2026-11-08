@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Header, NotFoundException, Param, Post, Put, Query } from '@nestjs/common';
+import { istStamp } from '../common/ist';
 import { z } from 'zod';
 import { ADMIN_ROLE } from '@ubos/shared';
 import type { Tx } from '@ubos/database';
@@ -217,7 +218,7 @@ export class ProcessController {
       const lines = rows.map((r) => [
         r.templateName, r.customerName, r.customerCode, r.workspaceName, r.status, r.currentStep ?? '', `${r.doneSteps}/${r.totalSteps}`,
         (r.dealValuePaise / 100).toFixed(2), (r.receivedPaise / 100).toFixed(2), (r.balancePaise / 100).toFixed(2),
-        r.startedAt.toISOString(), r.completedAt?.toISOString() ?? '', r.rating ?? '', r.steps.map((s) => `${s.name}: ${s.status}`).join(' | '),
+        istStamp(r.startedAt), r.completedAt ? istStamp(r.completedAt) : '', r.rating ?? '', r.steps.map((s) => `${s.name}: ${s.status}`).join(' | '),
       ].map(csv).join(','));
       await this.db.audit(tx, { entity: 'process_run', entityId: 'report', action: 'process.report_exported', newValue: { rows: rows.length, status: q.status } });
       return [header.join(','), ...lines].join('\n');

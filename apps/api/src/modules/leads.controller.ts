@@ -1,4 +1,5 @@
 import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { istStamp } from '../common/ist';
 import type { Response } from 'express';
 import { z } from 'zod';
 import { normalizeMobile, toCsv, validateCustomFields } from '@ubos/shared';
@@ -260,7 +261,7 @@ export class LeadsController {
           return [
             l.customer.code, l.customer.name, contact(fa, 'mobile', l.customer.mobile) ?? '', contact(fa, 'email', l.customer.email) ?? '', l.workspace.name, l.pipeline.name,
             stages.get(l.stageId) ?? '', l.status ?? '', l.lostReason ?? '', l.source, l.ownerId ? owners.get(l.ownerId) ?? '' : '', l.score,
-            l.lastDisposition ?? '', l.nextFollowUpAt?.toISOString() ?? '', l.createdAt.toISOString(),
+            l.lastDisposition ?? '', l.nextFollowUpAt ? istStamp(l.nextFollowUpAt) : '', istStamp(l.createdAt),
             ...fields.map((f) => (Array.isArray(cf[f.key]) ? (cf[f.key] as string[]).join('; ') : String(cf[f.key] ?? ''))),
           ];
         }),
