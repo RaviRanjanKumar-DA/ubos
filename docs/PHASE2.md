@@ -14,3 +14,5 @@ until a real account is connected.
 | 2.6 Calling campaigns | Power dialer queue with required disposition, campaign reports, call coaching comments on recordings. | Planned |
 | 2.7 Help desk | Tickets linked to Customer 360, SLA, knowledge base. | Planned |
 | 2.8 Connected accounts | Native Facebook Lead Ads (Meta app review), Gmail / Outlook email sync and tracking, meeting booking links. | Planned |
+| 2.9 Lead routing and scoring | Property and other portals (99acres, MagicBricks, Housing, Sulekha), transfer between business lines, territory rules, lead scoring by rules. From the CRM comparison. | Planned |
+| 2.10 Chatbot and live chat | WhatsApp chatbot and button flows, scheduled messages, website chat, Instagram and Messenger inbox. From the CRM comparison. | Planned |

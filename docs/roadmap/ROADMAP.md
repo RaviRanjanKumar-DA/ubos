@@ -25,6 +25,12 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 | Marketing | UTM / source ROI, ad spend, AI content studio (copy, creatives, short videos) | Phase 4 |
 | Integrations with other CRMs & platforms | Catalogue now lists 93 integrations in 12 categories with brand icons (lead portals incl. LinkedIn / YouTube / Google Business / education & property portals, forms, 11 telephony providers, WhatsApp BSPs, Instagram / Messenger / Telegram, websites & e-commerce, 8 payment gateways, Tally / Zoho Books / QuickBooks, marketing & analytics, AI keys and automation tools, productivity, support desks, 10 other CRMs); adapters ship per phase | Catalogue: Phase 1.5 · adapters: Phases 1–5 |
 
+## Market coverage and UI (requested 9 Nov 2026)
+
+"Every feature of every CRM" is tracked as a feature-by-feature comparison with eight CRMs, India first: see `CRM-COMPARISON.md`. Each gap has a priority and a phase, and the Must items set the order of work.
+
+The UI is redone in three batches, alternating with feature slices: UI 1 (design foundation, navigation, small screens), slice 2.6, UI 2 (daily pages), slice 2.7, UI 3 (setup and admin pages), slice 2.8, then the Must gaps.
+
 ## Setup Guide & onboarding checklist (requested 17 Oct 2026)
 
 A **Setup Guide** page for organization admins (TeleCRM-style reference): a greeting, guide groups in a left menu, cards with a progress bar (e.g. 2/5), and steps marked **Basic** or **Advanced**. Steps tick themselves off from real data (a step is done when the thing exists, e.g. "Add team members" = at least 2 active users), so nobody ticks boxes by hand; a step can also be skipped. Each step links straight to the screen that does it. Steps whose feature is not built yet show "Coming in Phase N" instead of a link, so the guide grows with the product. Per organization, not per user; the Platform Console shows each tenant's setup progress (useful for onboarding paying customers). Resources block: Download app, Contact our team (support ticket), Help videos, Product updates (changelog).
