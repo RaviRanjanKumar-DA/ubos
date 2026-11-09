@@ -1,3 +1,5 @@
+import { ChatbotController, PublicChatController, ScheduledMessagesController } from './modules/chatbot/chatbot.controller';
+import { ChatbotService } from './modules/chatbot/chatbot.service';
 import { LeadRulesController } from './modules/lead-rules.controller';
 import { BookingLinksController, PublicBookingController } from './modules/connected/booking.controller';
 import { ConnectCallbackController, ConnectedController, TrackingController } from './modules/connected/connected.controller';
@@ -69,6 +71,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    ChatbotController, PublicChatController, ScheduledMessagesController,
     LeadRulesController,
     BookingLinksController, PublicBookingController, ConnectedController, ConnectCallbackController, TrackingController,
     HealthController, AuthController, WorkspacesController, LeadsController,
@@ -89,6 +92,7 @@ class HealthController {
     WhatsAppService,
     MessagingService,
     MailService,
+    ChatbotService,
     AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },

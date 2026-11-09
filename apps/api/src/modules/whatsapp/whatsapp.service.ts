@@ -24,6 +24,8 @@ interface WaStatus { id: string; status: string; errors?: { title?: string; mess
 /** WhatsApp Cloud API: incoming messages and delivery statuses, replies, templates, broadcasts, opt-out. */
 @Injectable()
 export class WhatsAppService {
+  /** Set by the chatbot, so it can follow each customer message. */
+  onCustomerMessage: ((conv: { id: string; tenantId: string; channel: string; waId: string; workspaceId: string | null; leadId: string | null; customerId: string | null; assigneeId: string | null }, text: string) => Promise<unknown>) | null = null;
   constructor(private db: DbService) {}
 
   async config(tx: Tx): Promise<IntegrationConfig | null> {
@@ -98,6 +100,7 @@ export class WhatsAppService {
     });
     if (!r) return false;
     live.publish(tenantId, { type: 'message.received', conversationId: r.conv.id, leadId: r.conv.leadId, userId: r.conv.assigneeId });
+    if (text && this.onCustomerMessage) await this.onCustomerMessage(r.conv, text);
     return true;
   }
 
@@ -129,9 +132,27 @@ export class WhatsAppService {
   /** A free-text reply: only inside the 24-hour window after the customer's last message (WhatsApp rule). */
   async sendText(tenantId: string, conversationId: string, userId: string, text: string) {
     const { cfg, conv } = await this.db.tenant(async (tx) => ({ cfg: await this.config(tx), conv: await tx.conversation.findUniqueOrThrow({ where: { id: conversationId } }) }));
+    if (conv.channel === 'webchat') {
+      const done = await this.db.tenant(async (tx) => {
+        await tx.conversation.update({ where: { id: conv.id }, data: { lastMessageAt: new Date(), unread: 0 } });
+        return tx.message.create({ data: { tenantId, conversationId: conv.id, direction: 'out', type: 'text', body: text, status: 'sent', userId } });
+      });
+      live.publish(tenantId, { type: 'message.updated', conversationId: conv.id });
+      return done;
+    }
     if (!cfg) throw new BadRequestException({ code: 'WHATSAPP_OFF', message: 'WhatsApp is not connected (Integrations → WhatsApp Cloud API)' });
     if (!windowOpen(conv.lastInboundAt)) throw new BadRequestException({ code: 'WINDOW_CLOSED', message: 'More than 24 hours since the customer’s last message — send an approved template instead' });
     return this.deliver(tenantId, conv.id, conv.waId, userId, { type: 'text', body: text }, () => this.graph(cfg, { to: conv.waId, type: 'text', text: { body: text, preview_url: true } }));
+  }
+
+  /** A chatbot message, with up to three reply buttons. Bots only answer customers, so the 24-hour window is open. */
+  async sendBot(tenantId: string, conversationId: string, waId: string, text: string, options: string[]) {
+    const cfg = await this.db.tenant((tx) => this.config(tx));
+    if (!cfg) return;
+    const payload = options.length
+      ? { to: waId, type: 'interactive', interactive: { type: 'button', body: { text }, action: { buttons: options.map((title, i) => ({ type: 'reply', reply: { id: `opt${i + 1}`, title } })) } } }
+      : { to: waId, type: 'text', text: { body: text, preview_url: false } };
+    return this.deliver(tenantId, conversationId, waId, null, { type: 'text', body: text, options, keepUnread: true }, () => this.graph(cfg, payload));
   }
 
   /** An approved template with {{n}} placeholders filled from the lead; refused for customers who opted out. */
@@ -158,12 +179,12 @@ export class WhatsAppService {
   }
 
   /** Stores the message as queued, sends it, then records sent (with WhatsApp's id) or failed (with the reason). */
-  private async deliver(tenantId: string, conversationId: string, _waId: string, userId: string, m: { type: string; body: string; templateName?: string; broadcastId?: string }, send: () => Promise<string>) {
-    const msg = await this.db.tenant((tx) => tx.message.create({ data: { tenantId, conversationId, direction: 'out', type: m.type, body: m.body, templateName: m.templateName ?? null, status: 'queued', userId, broadcastId: m.broadcastId ?? null } }));
+  private async deliver(tenantId: string, conversationId: string, _waId: string, userId: string | null, m: { type: string; body: string; templateName?: string; broadcastId?: string; options?: string[]; keepUnread?: boolean }, send: () => Promise<string>) {
+    const msg = await this.db.tenant((tx) => tx.message.create({ data: { tenantId, conversationId, direction: 'out', type: m.type, body: m.body, options: m.options ?? [], templateName: m.templateName ?? null, status: 'queued', userId, broadcastId: m.broadcastId ?? null } }));
     try {
       const waMessageId = await send();
       const done = await this.db.tenant(async (tx) => {
-        await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date(), unread: 0 } });
+        await tx.conversation.update({ where: { id: conversationId }, data: { lastMessageAt: new Date(), ...(m.keepUnread ? {} : { unread: 0 }) } });
         return tx.message.update({ where: { id: msg.id }, data: { status: 'sent', waMessageId } });
       });
       live.publish(tenantId, { type: 'message.updated', conversationId });

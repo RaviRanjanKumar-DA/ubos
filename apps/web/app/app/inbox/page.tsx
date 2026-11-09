@@ -8,7 +8,7 @@ import { useShell } from '@/components/AppShell';
 import { useLive } from '@/lib/live';
 import { ChatThread, type Template } from '@/components/whatsapp/Chat';
 
-interface Row { id: string; phone: string | null; name: string; leadId: string | null; assigneeId: string | null; assigneeName: string | null; status: string; unread: number; lastMessageAt: string; windowOpen: boolean; optedOut: boolean; last: { body: string | null; direction: string; status: string } | null }
+interface Row { id: string; channel: string; phone: string | null; name: string; leadId: string | null; assigneeId: string | null; assigneeName: string | null; status: string; unread: number; lastMessageAt: string; windowOpen: boolean; optedOut: boolean; last: { body: string | null; direction: string; status: string } | null }
 interface Broadcast { id: string; name: string; total: number; sent: number; skipped: number; failed: number; createdAt: string }
 type Tab = 'chats' | 'templates' | 'broadcasts';
 const relative = (d: string) => { const m = Math.floor((Date.now() - new Date(d).getTime()) / 60_000); return m < 1 ? 'now' : m < 60 ? `${m}m` : m < 1440 ? `${Math.floor(m / 60)}h` : `${Math.floor(m / 1440)}d`; };
@@ -20,7 +20,7 @@ function Inbox() {
   const canManage = can('crm.whatsapp.broadcast');
   return (
     <>
-      <div className="page-head"><div><h1>WhatsApp Inbox</h1><p className="muted small" style={{ margin: 0 }}>Every customer chat on your business number. New chats become leads and go to the lead’s owner.</p></div></div>
+      <div className="page-head"><div><h1>Inbox</h1><p className="muted small" style={{ margin: 0 }}>Customer chats from WhatsApp and your website. New chats become leads and go to the lead’s owner.</p></div></div>
       <div className="dash-tabs" role="tablist">
         {([['chats', 'Chats'], ['templates', 'Templates'], ...(canManage ? [['broadcasts', 'Broadcasts']] : [])] as [Tab, string][]).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`dash-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}
       </div>
@@ -53,7 +53,7 @@ function Chats({ first }: { first: string | null }) {
         {rows && !rows.length && <p className="small muted">No chats here yet.</p>}
         {rows?.map((r) => (
           <button key={r.id} className={`conv ${open === r.id ? 'on' : ''}`} onClick={() => { setOpen(r.id); setTimeout(load, 800); }}>
-            <span className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}><b className="conv-name">{r.name}</b><span className="small muted">{relative(r.lastMessageAt)}</span></span>
+            <span className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}><b className="conv-name">{r.name}{r.channel === 'webchat' && <span className="badge grey conv-web">Web</span>}</b><span className="small muted">{relative(r.lastMessageAt)}</span></span>
             <span className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}><span className="small muted conv-name">{r.last?.direction === 'out' ? 'You: ' : ''}{r.last?.body ?? ''}</span>{r.unread > 0 && <span className="tab-count">{r.unread}</span>}</span>
           </button>
         ))}

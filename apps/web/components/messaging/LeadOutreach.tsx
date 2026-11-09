@@ -1,5 +1,7 @@
 'use client';
 
+import { fromIstInput, toIstInput } from '@/lib/ist';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
@@ -35,6 +37,7 @@ export function LeadOutreach({ leadId, workspace, canUpdate }: { leadId: string;
         <button className="btn" disabled={busy || !tpl} onClick={send}>{busy ? 'Sending…' : 'Send'}</button>
       </div>
       {t && <p className="small muted" style={{ whiteSpace: 'pre-wrap', marginBottom: 0 }}>{t.subject ? `${t.subject}\n` : ''}{t.body}</p>}
+      <SendLater leadId={leadId} workspace={workspace} onMsg={setMsg} />
       <div className="row small" style={{ gap: 14, margin: '10px 0' }}>
         {!log.smsConnected && <span className="muted">SMS gateway not connected.</span>}
         {canUpdate && <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={log.smsOptOut} onChange={(e) => toggle('sms', e.target.checked)} /> Customer opted out of SMS</label>}
@@ -109,5 +112,51 @@ function MailboxEmail({ leadId, workspace, onSent, onMsg }: { leadId: string; wo
       <label className="row small" style={{ marginBottom: 10 }}><input type="checkbox" checked={f.track} onChange={(e) => setF({ ...f, track: e.target.checked })} /> Track opens and link clicks</label>
       <div className="row"><button className="btn sm" disabled={busy}>{busy ? 'Sending…' : 'Send'}</button><button type="button" className="btn sm ghost" onClick={() => setOpen(false)}>Go back</button></div>
     </form>
+  );
+}
+
+interface Later { id: string; sendAt: string; status: string; error: string | null; template: string; channel: string }
+
+/** Schedule a template for this lead, and see or cancel what is waiting. Times are IST. */
+function SendLater({ leadId, workspace, onMsg }: { leadId: string; workspace: string; onMsg: (m: { type: 'error' | 'notice'; text: string }) => void }) {
+  const [rows, setRows] = useState<Later[]>([]);
+  const [list, setList] = useState<{ id: string; name: string; channel: string }[]>([]);
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ templateId: '', sendAt: '' });
+  const load = useCallback(() => api<Later[]>(`/api/v1/leads/${leadId}/scheduled`, { workspace }).then(setRows).catch(() => setRows([])), [leadId, workspace]);
+  useEffect(() => {
+    load();
+    Promise.all([
+      api<{ templates: { id: string; name: string; channel: string }[] }>('/api/v1/outreach/templates', { workspace }).then((r) => r.templates).catch(() => []),
+      api<{ templates: { id: string; name: string }[] }>('/api/v1/message-templates', { workspace }).then((r) => r.templates.map((t) => ({ ...t, channel: 'whatsapp' }))).catch(() => []),
+    ]).then(([a, b]) => setList([...b, ...a]));
+  }, [load, workspace]);
+  const when = (d: string) => new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
+  const names: Record<string, string> = { whatsapp: 'WhatsApp', sms: 'SMS', email: 'Email' };
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    try { await api(`/api/v1/leads/${leadId}/scheduled`, { method: 'POST', body: { templateId: f.templateId, sendAt: fromIstInput(f.sendAt).toISOString() }, workspace }); onMsg({ type: 'notice', text: 'Message scheduled.' }); setF({ templateId: '', sendAt: '' }); setOpen(false); load(); }
+    catch (err) { onMsg({ type: 'error', text: err instanceof ApiError ? err.message : 'Failed' }); }
+  }
+  const pending = rows.filter((r) => r.status === 'pending');
+  const failed = rows.filter((r) => r.status === 'failed').slice(0, 3);
+  return (
+    <div style={{ margin: '10px 0' }}>
+      {!open && list.length > 0 && <button type="button" className="btn sm outline" onClick={() => { setF({ templateId: '', sendAt: toIstInput(new Date(Date.now() + 3_600_000)) }); setOpen(true); }}>Send later</button>}
+      {open && (
+        <form className="run-card" onSubmit={save}>
+          <div className="field"><label htmlFor="sl-t">Template</label><select id="sl-t" className="input" required value={f.templateId} onChange={(e) => setF({ ...f, templateId: e.target.value })}><option value="">Choose…</option>{list.map((t) => <option key={t.id} value={t.id}>{names[t.channel] ?? t.channel} · {t.name}</option>)}</select></div>
+          <div className="field"><label htmlFor="sl-w">When (IST)</label><input id="sl-w" className="input" type="datetime-local" required value={f.sendAt} onChange={(e) => setF({ ...f, sendAt: e.target.value })} /></div>
+          <div className="row"><button className="btn sm">Schedule</button><button type="button" className="btn sm ghost" onClick={() => setOpen(false)}>Go back</button></div>
+        </form>
+      )}
+      {pending.map((r) => (
+        <div key={r.id} className="row small" style={{ justifyContent: 'space-between', padding: '5px 0', borderBottom: '1px solid var(--line)' }}>
+          <span><b>{names[r.channel] ?? r.channel}</b> · {r.template} <span className="muted">· {when(r.sendAt)}</span></span>
+          <button className="btn sm ghost" onClick={async () => { if (await askConfirm('Remove this scheduled message? It will not be sent.', 'Remove')) api(`/api/v1/scheduled-messages/${r.id}/cancel`, { method: 'POST', workspace }).then(load).catch((e) => onMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' })); }}>Cancel</button>
+        </div>
+      ))}
+      {failed.map((r) => <div key={r.id} className="small" style={{ color: 'var(--bad)' }}>{r.template} was not sent: {r.error}</div>)}
+    </div>
   );
 }

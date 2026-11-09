@@ -38,7 +38,8 @@
     "verify:campaigns": "node scripts/verify-campaigns.mjs",
     "verify:helpdesk": "node scripts/verify-helpdesk.mjs",
     "verify:connected": "node scripts/verify-connected.mjs",
-    "verify:leadrules": "node scripts/verify-leadrules.mjs"
+    "verify:leadrules": "node scripts/verify-leadrules.mjs",
+    "verify:chatbot": "node scripts/verify-chatbot.mjs"
   },
   "engines": {
     "node": ">=20"

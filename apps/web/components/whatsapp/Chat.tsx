@@ -5,7 +5,7 @@ import { api, ApiError } from '@/lib/api';
 import { useLive } from '@/lib/live';
 
 export interface Template { id: string; name: string; language: string; category: string; body: string; variables: string[] }
-interface Msg { id: string; direction: string; type: string; body: string | null; templateName: string | null; status: string; error: string | null; at: string; by: string | null }
+interface Msg { id: string; options?: string[]; direction: string; type: string; body: string | null; templateName: string | null; status: string; error: string | null; at: string; by: string | null }
 export interface Thread {
   id: string; phone: string | null; name: string; leadId: string | null; workspaceId: string | null; assigneeId: string | null; assigneeName: string | null; status: string; unread: number;
   windowOpen: boolean; optedOut: boolean; messages: Msg[];
@@ -41,7 +41,8 @@ export function ChatThread({ id, workspace, onChange }: { id: string; workspace?
           <div key={m.id} className={`bubble ${m.direction === 'in' ? 'in' : 'out'} ${m.status === 'failed' ? 'failed' : ''}`}>
             {m.templateName && <div className="small muted">Template: {m.templateName}</div>}
             <div style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{m.body ?? `[${m.type}]`}</div>
-            <div className="bubble-meta">{m.by ? `${m.by} · ` : ''}{time(m.at)} {m.direction === 'out' && <span className={m.status === 'read' ? 'tick-read' : ''} title={m.status}>{TICK[m.status] ?? ''}</span>}</div>
+            {m.options && m.options.length > 0 && <div className="small muted">Buttons: {m.options.join(' · ')}</div>}
+            <div className="bubble-meta">{m.direction === 'out' && !m.by && !m.templateName ? 'Bot · ' : ''}{m.by ? `${m.by} · ` : ''}{time(m.at)} {m.direction === 'out' && <span className={m.status === 'read' ? 'tick-read' : ''} title={m.status}>{TICK[m.status] ?? ''}</span>}</div>
             {m.error && <div className="small" style={{ color: 'var(--bad)' }}>{m.error}</div>}
           </div>
         ))}

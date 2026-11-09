@@ -1402,6 +1402,7 @@ model Message {
   error          String?
   userId         String?
   broadcastId    String?
+  options        String[] @default([]) // buttons shown with a chatbot message
   subject        String?  // email only
   trackToken     String?  @unique // email open and click tracking
   openedAt       DateTime?
@@ -1810,4 +1811,74 @@ model LeadScoreHit {
 
   @@unique([leadId, ruleId])
   @@index([tenantId, ruleId])
+}
+
+/** A chatbot flow: steps of messages, buttons and questions, run on WhatsApp or website chat. */
+model ChatFlow {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  channel     String   @default("whatsapp") // whatsapp | webchat
+  trigger     String   @default("first_message") // first_message | keyword
+  keywords    String[] @default([])
+  steps       Json
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  runs        Int      @default(0)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, workspaceId, channel])
+}
+
+model ChatSession {
+  id             String   @id @default(uuid())
+  tenantId       String
+  conversationId String
+  flowId         String
+  stepId         String
+  status         String   @default("active") // active | done | handoff
+  retries        Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, conversationId])
+}
+
+/** A template to send to one lead at a chosen time. */
+model ScheduledMessage {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  leadId      String
+  templateId  String
+  sendAt      DateTime
+  status      String    @default("pending") // pending | sending | sent | failed | cancelled
+  error       String?
+  createdById String
+  sentAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([status, sendAt])
+  @@index([tenantId, leadId])
+}
+
+/** A chat button for a website. */
+model ChatWidget {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  publicKey   String
+  greeting    String
+  color       String   @default("#4a2bc2")
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, publicKey])
 }

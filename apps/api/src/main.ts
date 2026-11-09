@@ -27,7 +27,7 @@ async function bootstrap() {
   app.enableCors({
     origin: (process.env.WEB_ORIGIN ?? 'http://localhost:3030').split(','),
     credentials: true,
-    allowedHeaders: ['Authorization', 'Content-Type', 'X-Tenant', 'X-Workspace', 'X-UBOS-CSRF'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'X-Tenant', 'X-Workspace', 'X-UBOS-CSRF', 'X-Chat-Token'],
     exposedHeaders: ['X-Total-Count', 'X-Trace-Id'],
   });
   // CSRF: a browser request that relies on session cookies must also carry a custom header,

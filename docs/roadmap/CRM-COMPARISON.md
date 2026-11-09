@@ -21,7 +21,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Facebook / Instagram Lead Ads | T | Built (needs Meta app review) | Must | 2.8 |
 | Property and other portals (99acres, MagicBricks, Housing, Sulekha) | T | Built (webhook; portal must push) | Must | 2.9 |
 | Leads from WhatsApp messages | T | Built | Must | — |
-| Website chat and lead bot | F H | Gap | Should | 2.10 |
+| Website chat and lead bot | F H | Built | Should | 2.10 |
 | Landing page builder | F H | Gap | Should | Phase 4 |
 | Lead enrichment (fill company / profile data) | Z F M | Gap | Later | Phase 6 |
 | Website visitor tracking | P | Gap | Later | Phase 4 |
@@ -66,8 +66,8 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 |---|---|---|---|---|
 | WhatsApp Cloud API, shared inbox | T F P | Built | Must | — |
 | WhatsApp templates and broadcasts | T | Built | Must | — |
-| WhatsApp chatbot and button flows | T | Gap | Must | 2.10 |
-| Scheduled messages | T | Part | Must | 2.10 |
+| WhatsApp chatbot and button flows | T | Built | Must | 2.10 |
+| Scheduled messages | T | Built for one lead; broadcasts not yet | Must | 2.10 |
 | SMS with DLT, delivery reports | T F | Built | Must | — |
 | Email through company SMTP, opt-outs | T H S | Built | Must | — |
 | Gmail / Outlook sync and tracking | F H S P M | Built (needs Google and Microsoft setup) | Should | 2.8 |

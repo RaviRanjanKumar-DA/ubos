@@ -30,7 +30,7 @@ export class WhatsAppController {
       const me = auth().userId;
       const where: Prisma.ConversationWhereInput = {
         AND: [await this.visible(tx),
-          { channel: 'whatsapp' },
+          { channel: { in: ['whatsapp', 'webchat'] } },
           q.view === 'mine' ? { assigneeId: me } : q.view === 'unassigned' ? { assigneeId: null } : {},
           q.q ? { OR: [{ waId: { contains: q.q.replace(/\D/g, '') || '§' } }, { leadId: { in: (await tx.lead.findMany({ where: { customer: { name: { contains: q.q, mode: 'insensitive' } } }, select: { id: true }, take: 200 })).map((l) => l.id) } }] } : {}],
       };
@@ -48,7 +48,7 @@ export class WhatsAppController {
       if (conv.unread && conv.assigneeId === auth().userId) await tx.conversation.update({ where: { id }, data: { unread: 0 } });
       const users = new Map((await tx.user.findMany({ where: { id: { in: messages.map((m) => m.userId).filter(Boolean) as string[] } }, select: { id: true, name: true } })).map((u) => [u.id, u.name]));
       const [desc] = await this.describe(tx, [conv]);
-      return { ...desc, messages: messages.map((m) => ({ id: m.id, direction: m.direction, type: m.type, body: m.body, templateName: m.templateName, status: m.status, error: m.error, at: m.createdAt, by: m.userId ? users.get(m.userId) ?? null : null })) };
+      return { ...desc, messages: messages.map((m) => ({ id: m.id, options: m.options, direction: m.direction, type: m.type, body: m.body, templateName: m.templateName, status: m.status, error: m.error, at: m.createdAt, by: m.userId ? users.get(m.userId) ?? null : null })) };
     });
   }
 
@@ -188,7 +188,7 @@ export class WhatsAppController {
     return c;
   }
 
-  private async describe(tx: Tx, rows: { id: string; waId: string; leadId: string | null; customerId: string | null; assigneeId: string | null; status: string; lastMessageAt: Date; lastInboundAt: Date | null; unread: number; workspaceId: string | null }[]) {
+  private async describe(tx: Tx, rows: { id: string; channel: string; waId: string; leadId: string | null; customerId: string | null; assigneeId: string | null; status: string; lastMessageAt: Date; lastInboundAt: Date | null; unread: number; workspaceId: string | null }[]) {
     const fa = await fieldAccess(tx);
     const [customers, users, lasts] = await Promise.all([
       tx.customer.findMany({ where: { id: { in: rows.map((r) => r.customerId).filter(Boolean) as string[] } }, select: { id: true, name: true, whatsappOptOut: true } }),
@@ -198,9 +198,9 @@ export class WhatsAppController {
     return rows.map((r, i) => {
       const c = customers.find((x) => x.id === r.customerId);
       return {
-        id: r.id, phone: contact(fa, 'mobile', `+${r.waId}`), name: c?.name ?? `+${r.waId}`, leadId: r.leadId, workspaceId: r.workspaceId, assigneeId: r.assigneeId,
+        id: r.id, channel: r.channel, phone: r.channel === 'webchat' ? null : contact(fa, 'mobile', `+${r.waId}`), name: c?.name ?? (r.channel === 'webchat' ? 'Website visitor' : `+${r.waId}`), leadId: r.leadId, workspaceId: r.workspaceId, assigneeId: r.assigneeId,
         assigneeName: users.find((u) => u.id === r.assigneeId)?.name ?? null, status: r.status, unread: r.unread, lastMessageAt: r.lastMessageAt,
-        windowOpen: windowOpen(r.lastInboundAt), optedOut: !!c?.whatsappOptOut, last: lasts[i],
+        windowOpen: r.channel === 'webchat' || windowOpen(r.lastInboundAt), optedOut: !!c?.whatsappOptOut, last: lasts[i],
       };
     });
   }
