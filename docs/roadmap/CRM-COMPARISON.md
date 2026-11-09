@@ -111,8 +111,10 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 
 | Feature | Seen in | UBOS | Priority | Goes in |
 |---|---|---|---|---|
-| Tickets with SLA | L S | Planned | Must | 2.7 |
-| Knowledge base | L S | Planned | Should | 2.7 |
+| Tickets with SLA | L S | Built | Must | 2.7 |
+| Knowledge base (internal) | L S | Built | Should | 2.7 |
+| Customer-facing help pages and portal | L S | Gap | Later | Phase 4 |
+| SLA business hours and holidays | S | Gap | Later | Phase 4 |
 | Customer portal | L Z | Gap | Should | Phase 5 |
 
 ## Reports

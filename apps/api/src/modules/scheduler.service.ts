@@ -1,3 +1,4 @@
+import { notifyTicketBreaches } from './support/tickets.controller';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Tx } from '@ubos/database';
 import { accessibleWorkspaceIds, DASHBOARD_TEMPLATES, FeatureKey, METRICS, resolvePermissions, RoleAssignment, DataScope, WidgetConfig } from '@ubos/shared';
@@ -56,6 +57,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           totals.reminders += await this.reminders(t.timezone);
           totals.digests += await this.digests(info, t.timezone);
           totals.dashboards += await this.dashboardEmails(info);
+          await notifyTicketBreaches(this.db).catch((e) => this.log.error(e instanceof Error ? e.message : e));
         });
       }
       if (!onlyTenantId) await dueSheetSyncs(this.db, this.intake).catch((e) => this.log.error(e instanceof Error ? e.message : e));

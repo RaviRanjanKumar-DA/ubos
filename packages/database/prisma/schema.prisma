@@ -457,6 +457,7 @@ model Customer {
   packages     CustomerPackage[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @default(now()) @updatedAt
+  tickets      Ticket[]
 
   @@unique([tenantId, code])
   @@index([tenantId, mobile])
@@ -1584,4 +1585,82 @@ model CallComment {
   createdAt  DateTime @default(now())
 
   @@index([tenantId, callId])
+}
+
+/// A customer's support request, with first response and resolution targets.
+model Ticket {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  workspaceId        String
+  number             Int
+  customerId         String
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  leadId             String?
+  subject            String
+  description        String?
+  status             String    @default("open")   // open | pending (waiting on customer, clock stopped) | resolved | closed
+  priority           String    @default("normal") // low | normal | high | urgent
+  category           String?
+  source             String    @default("manual")
+  assigneeId         String?
+  createdById        String
+  firstResponseDueAt DateTime
+  resolutionDueAt    DateTime
+  firstRespondedAt   DateTime?
+  pausedAt           DateTime?
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  breachNotifiedAt   DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @default(now()) @updatedAt
+  messages           TicketMessage[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, workspaceId, status])
+  @@index([tenantId, customerId])
+  @@index([tenantId, assigneeId, status])
+}
+
+model TicketMessage {
+  id          String   @id @default(uuid())
+  tenantId    String
+  ticketId    String
+  ticket      Ticket   @relation(fields: [ticketId], references: [id])
+  authorId    String?
+  kind        String   // reply (to the customer) | note (internal) | event (status, owner changes)
+  body        String
+  emailStatus String   @default("none") // none | sending | sent | failed
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, ticketId, createdAt])
+}
+
+/// Targets of a business line per priority; built-in defaults apply until saved.
+model TicketSla {
+  id               String @id @default(uuid())
+  tenantId         String
+  workspaceId      String
+  priority         String
+  firstResponseMin Int
+  resolutionMin    Int
+
+  @@unique([workspaceId, priority])
+  @@index([tenantId])
+}
+
+model KbArticle {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  title       String
+  body        String
+  category    String?
+  status      String   @default("draft") // draft | published
+  isArchived  Boolean  @default(false)
+  createdById String
+  updatedById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([tenantId, workspaceId, status])
 }

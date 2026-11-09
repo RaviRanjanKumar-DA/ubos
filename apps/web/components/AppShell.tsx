@@ -51,6 +51,10 @@ const NAV: NavGroup[] = [
     { href: '/app/outreach', label: 'SMS & Email', icon: 'mail', perm: 'crm.message.send' },
     { href: '/app/automation', label: 'Automation', icon: 'bolt', perm: 'crm.automation.manage' },
   ] },
+  { id: 'support', title: 'Help desk', items: [
+    { href: '/app/tickets', label: 'Tickets', icon: 'chat', perm: 'support.ticket.view' },
+    { href: '/app/knowledge', label: 'Knowledge base', icon: 'form', perm: 'support.ticket.view' },
+  ] },
   { id: 'sales', title: 'Sales', items: [
     { href: '/app/products', label: 'Products & prices', icon: 'tag', perm: 'crm.lead.view' },
     { href: '/app/processes', label: 'Processes', icon: 'tree', perm: 'crm.lead.view' },

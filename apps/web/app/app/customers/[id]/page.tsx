@@ -1,5 +1,7 @@
 'use client';
 
+import { CustomerTickets } from '@/components/support/CustomerTickets';
+import { useShell } from '@/components/AppShell';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -40,14 +42,17 @@ export default function Customer360Page() {
   const [notice, setNotice] = useState('');
   const [editing, setEditing] = useState(false);
 
+  const { me } = useShell();
+  // People with an organization-wide role see every business line; the others read through their selected one.
+  const orgWide = me.roles.some((r) => r.workspaceId === null);
   const load = useCallback(() => {
-    api<Customer360>(`/api/v1/customers/${id}`, { noWorkspace: true })
+    api<Customer360>(`/api/v1/customers/${id}`, { noWorkspace: orgWide })
       .then(setC)
       .catch((e) => {
         if (e instanceof ApiError && e.code === 'CUSTOMER_MERGED') setError('This customer was merged into another record.');
         else setError(e.message);
       });
-  }, [id]);
+  }, [id, orgWide]);
   useEffect(() => { load(); }, [load]);
 
   if (!c) return error ? <div className="error">{error} <Link href="/app/customers">Back to customers</Link></div> : <div className="muted">Loading…</div>;
@@ -140,6 +145,8 @@ export default function Customer360Page() {
         </div>
       </div>
 
+      <CustomerTickets customerId={c.id} customerName={c.name} />
+
       <div className="card" style={{ marginTop: 14 }}>
         <h2>Timeline</h2>
         {c.timeline.map((e) => (
@@ -163,6 +170,7 @@ export default function Customer360Page() {
 }
 
 function EditCustomer({ c, onClose, onSaved }: { c: Customer360; onClose: () => void; onSaved: () => void }) {
+  const orgWide = useShell().me.roles.some((r) => r.workspaceId === null);
   const [f, setF] = useState({ name: c.name, mobile: c.mobile ?? '', alternateMobiles: c.alternateMobiles.join(', '), email: c.email ?? '', alternateEmails: (c.alternateEmails ?? []).join(', '), city: c.city ?? '', pan: '' });
   const [error, setError] = useState('');
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
@@ -172,7 +180,7 @@ function EditCustomer({ c, onClose, onSaved }: { c: Customer360; onClose: () => 
     setError('');
     try {
       await api(`/api/v1/customers/${c.id}`, {
-        method: 'PATCH', noWorkspace: true,
+        method: 'PATCH', noWorkspace: orgWide,
         body: {
           name: f.name, city: f.city,
           // Masked or unchanged contact details are not sent back.
