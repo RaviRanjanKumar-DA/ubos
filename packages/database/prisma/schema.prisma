@@ -458,6 +458,7 @@ model Customer {
   mergedAt     DateTime?
   leads        Lead[]
   packages     CustomerPackage[]
+  accessGrants CustomerAccess[]
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @default(now()) @updatedAt
   tickets      Ticket[]
@@ -476,6 +477,7 @@ model CustomerMerge {
   duplicateId     String
   movedLeadIds    String[]
   movedPackageIds String[]
+  movedAccessIds  String[] @default([])
   filledFields    Json      // fields copied from the duplicate onto the primary (reverted on undo)
   reason          String?
   mergedById      String
@@ -611,6 +613,16 @@ model Package {
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @default(now()) @updatedAt
   sales       CustomerPackage[]
+  accessGrants CustomerAccess[]
+  accessKind      String  @default("none") // none | course | software | service
+  validityDays    Int?
+  renewBeforeDays Int     @default(30)
+  remindCustomer  Boolean @default(false)
+  showInGallery   Boolean @default(false)
+  offerPaise      Int?
+  photoKey        String?
+  photoType       String?
+  brochureUrl     String?
   priceItems  PriceListItem[]
 }
 
@@ -2055,4 +2067,48 @@ model Expense {
 
   @@index([tenantId, spentAt])
   @@index([tenantId, workspaceId, spentAt])
+}
+
+/** The public catalogue of one business line. */
+model WorkspaceGallery {
+  id             String   @id @default(uuid())
+  tenantId       String
+  workspaceId    String   @unique
+  slug           String
+  title          String
+  intro          String?
+  whatsappNumber String?
+  isActive       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([tenantId, slug])
+}
+
+/** A customer's course, software or service access. expiresAt empty = no end date. Revoked, never deleted. */
+model CustomerAccess {
+  id               String    @id @default(uuid())
+  tenantId         String
+  workspaceId      String
+  customerId       String
+  customer         Customer  @relation(fields: [customerId], references: [id])
+  packageId        String
+  package          Package   @relation(fields: [packageId], references: [id])
+  leadId           String?
+  startsAt         DateTime
+  expiresAt        DateTime?
+  status           String    @default("active") // active | revoked
+  revokeReason     String?
+  licenceEncrypted String?
+  licenceLast4     String?
+  notes            String?
+  reminderStage    Int       @default(0)
+  renewalLeadId    String?
+  renewedAt        DateTime?
+  createdById      String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([tenantId, workspaceId, expiresAt])
+  @@index([tenantId, customerId])
 }

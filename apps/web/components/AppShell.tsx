@@ -61,6 +61,8 @@ const NAV: NavGroup[] = [
   ] },
   { id: 'sales', title: 'Sales', items: [
     { href: '/app/products', label: 'Products & prices', icon: 'tag', perm: 'crm.lead.view' },
+    { href: '/app/gallery', label: 'Gallery', icon: 'share', perm: 'crm.lead.view' },
+    { href: '/app/access', label: 'Access & renewals', icon: 'unlock', perm: 'crm.access.view' },
     { href: '/app/processes', label: 'Processes', icon: 'tree', perm: 'crm.lead.view' },
     { href: '/app/approvals', label: 'Approvals', icon: 'check', perm: 'crm.lead.view' },
     { href: '/app/goals', label: 'Goals', icon: 'flag', perm: 'dashboard.view' },

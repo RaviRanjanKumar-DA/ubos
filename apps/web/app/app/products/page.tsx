@@ -69,15 +69,16 @@ export default function ProductsPage() {
 }
 
 type Act = (fn: () => Promise<unknown>, text: string) => Promise<boolean>;
-const blank = { name: '', code: '', category: '', unit: 'unit', mrp: '', gstRate: '18', description: '' };
+const blank = { name: '', code: '', category: '', unit: 'unit', mrp: '', gstRate: '18', description: '', accessKind: 'none', validityDays: '', renewBeforeDays: '30', remindCustomer: false };
+type AccessFields = { accessKind?: string; validityDays?: number | null; renewBeforeDays?: number; remindCustomer?: boolean };
 
 function ProductsTab({ products, archived, manage, act }: { products: Product[]; archived: Product[]; manage: boolean; act: Act }) {
   const [form, setForm] = useState<typeof blank & { id?: string }>(blank);
   const [showArchived, setShowArchived] = useState(false);
-  const edit = (p: Product) => setForm({ id: p.id, name: p.name, code: p.code ?? '', category: p.category ?? '', unit: p.unit, mrp: String(p.mrpPaise / 100), gstRate: String(p.gstRate), description: p.description ?? '' });
+  const edit = (p: Product) => setForm({ id: p.id, name: p.name, code: p.code ?? '', category: p.category ?? '', unit: p.unit, mrp: String(p.mrpPaise / 100), gstRate: String(p.gstRate), description: p.description ?? '', accessKind: (p as Product & AccessFields).accessKind ?? 'none', validityDays: (p as Product & AccessFields).validityDays ? String((p as Product & AccessFields).validityDays) : '', renewBeforeDays: String((p as Product & AccessFields).renewBeforeDays ?? 30), remindCustomer: (p as Product & AccessFields).remindCustomer ?? false });
   const save = (e: React.FormEvent) => {
     e.preventDefault();
-    const body = { name: form.name, code: form.code || null, category: form.category || null, unit: form.unit || 'unit', mrpPaise: toPaise(form.mrp) ?? 0, gstRate: Number(form.gstRate), description: form.description || null };
+    const body = { name: form.name, code: form.code || null, category: form.category || null, unit: form.unit || 'unit', mrpPaise: toPaise(form.mrp) ?? 0, gstRate: Number(form.gstRate), description: form.description || null, accessKind: form.accessKind, validityDays: form.validityDays ? Number(form.validityDays) : null, renewBeforeDays: Number(form.renewBeforeDays) || 30, remindCustomer: form.remindCustomer };
     act(() => api(form.id ? `/api/v1/products/${form.id}` : '/api/v1/products', { method: form.id ? 'PATCH' : 'POST', body }), form.id ? 'Product saved.' : 'Product added.').then((ok) => ok && setForm(blank));
   };
   const rows = showArchived ? archived : products;
@@ -126,6 +127,16 @@ function ProductsTab({ products, archived, manage, act }: { products: Product[];
             <div className="field"><label>Unit</label><input className="input" value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} placeholder="unit / visit / month" /></div>
           </div>
           <div className="field"><label>Description</label><textarea className="input" style={{ height: 60, paddingTop: 8 }} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
+          <div className="field"><label htmlFor="p-ak">Gives access to</label><select id="p-ak" className="input" value={form.accessKind} onChange={(e) => setForm({ ...form, accessKind: e.target.value })}><option value="none">Nothing (one-off sale)</option><option value="course">A course</option><option value="software">Software</option><option value="service">A service plan</option></select></div>
+          {form.accessKind !== 'none' && (
+            <>
+              <div className="grid cols-2">
+                <div className="field"><label htmlFor="p-vd">Valid for (days)</label><input id="p-vd" className="input" type="number" min={1} max={3660} placeholder="No end date" value={form.validityDays} onChange={(e) => setForm({ ...form, validityDays: e.target.value })} /></div>
+                <div className="field"><label htmlFor="p-rb">Open renewal lead before end (days)</label><input id="p-rb" className="input" type="number" min={1} max={180} value={form.renewBeforeDays} onChange={(e) => setForm({ ...form, renewBeforeDays: e.target.value })} /></div>
+              </div>
+              <label className="row small" style={{ marginBottom: 12 }}><input type="checkbox" checked={form.remindCustomer} onChange={(e) => setForm({ ...form, remindCustomer: e.target.checked })} /> Email the customer before it ends</label>
+            </>
+          )}
           <div className="row end">
             {form.id && <button type="button" className="btn ghost" onClick={() => setForm(blank)}>Cancel</button>}
             <button className="btn">{form.id ? 'Save' : 'Add product'}</button>

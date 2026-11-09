@@ -270,6 +270,8 @@ export class CustomersController {
 
       const leads = await tx.lead.findMany({ where: { customerId: d.id }, select: { id: true } });
       const packages = await tx.customerPackage.findMany({ where: { customerId: d.id }, select: { id: true } });
+      const accessRows = await tx.customerAccess.findMany({ where: { customerId: d.id }, select: { id: true } });
+      await tx.customerAccess.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
       await tx.lead.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
       await tx.customerPackage.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
 
@@ -291,7 +293,7 @@ export class CustomersController {
       const record = await tx.customerMerge.create({
         data: {
           tenantId: tenantId(), primaryId: p.id, duplicateId: d.id, reason: reason ?? null, mergedById: auth().userId,
-          movedLeadIds: leads.map((l) => l.id), movedPackageIds: packages.map((x) => x.id), filledFields: filled as Prisma.InputJsonObject,
+          movedLeadIds: leads.map((l) => l.id), movedPackageIds: packages.map((x) => x.id), movedAccessIds: accessRows.map((x) => x.id), filledFields: filled as Prisma.InputJsonObject,
         },
       });
       await this.db.audit(tx, {
@@ -332,6 +334,7 @@ export class CustomersController {
       await tx.customer.update({ where: { id: d.id }, data: { mergedIntoId: null, mergedAt: null } });
       await tx.lead.updateMany({ where: { id: { in: m.movedLeadIds }, customerId: p.id }, data: { customerId: d.id } });
       await tx.customerPackage.updateMany({ where: { id: { in: m.movedPackageIds }, customerId: p.id }, data: { customerId: d.id } });
+      await tx.customerAccess.updateMany({ where: { id: { in: m.movedAccessIds }, customerId: p.id }, data: { customerId: d.id } });
       await tx.customerMerge.update({ where: { id: m.id }, data: { undoneAt: new Date(), undoneById: auth().userId } });
       await this.db.audit(tx, { entity: 'customer', entityId: p.id, action: 'customer.merge_undone', newValue: { restored: { id: d.id, code: d.code, name: d.name } } });
       return { ok: true, restoredId: d.id };

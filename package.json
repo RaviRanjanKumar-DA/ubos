@@ -43,7 +43,8 @@
     "verify:invoices": "node scripts/verify-invoices.mjs",
     "verify:paylinks": "node scripts/verify-paylinks.mjs",
     "verify:collections": "node scripts/verify-collections.mjs",
-    "verify:expenses": "node scripts/verify-expenses.mjs"
+    "verify:expenses": "node scripts/verify-expenses.mjs",
+    "verify:packages": "node scripts/verify-packages.mjs"
   },
   "engines": {
     "node": ">=20"

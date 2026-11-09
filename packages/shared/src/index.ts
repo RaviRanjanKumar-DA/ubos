@@ -10,3 +10,4 @@ export * from './developer';
 export * from './automation';
 export * from './gst';
 export * from './collections';
+export * from './access';

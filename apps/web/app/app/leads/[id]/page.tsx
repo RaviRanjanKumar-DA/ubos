@@ -14,6 +14,7 @@ import { TaskDialog, TaskRow } from '@/components/TaskDialog';
 import { Field, relTime, showValue, STATUS_TONE, WorkspaceSettings } from '@/lib/workspace';
 import type { CustomAction } from '@/components/CustomActions';
 import { DealsPanel } from '@/components/deals/DealsPanel';
+import { AccessPanel } from '@/components/access/AccessPanel';
 import { RecordingPlayer, CHANNEL } from '@/components/calls/Player';
 import { useLive } from '@/lib/live';
 
@@ -247,6 +248,7 @@ function LeadPage() {
         </div>
       </div>
       <LeadMove leadId={lead.id} workspace={lead.workspace.id} />
+      <AccessPanel customerId={lead.customerId} leadId={lead.id} workspace={lead.workspace.id} mobile={lead.mobile} name={lead.name} />
       {!tabParam && <div className="lead-deals">{deals}</div>}
       {losing && ws && <LostDialog ws={ws} name={lead.name} onClose={() => setLosing(null)} onPick={(r) => moveTo(losing, r)} />}
       <style>{`@media (max-width: 960px) { .lead-grid { grid-template-columns: 1fr !important; } }`}</style>

@@ -1,6 +1,7 @@
 'use client';
 
 import { LedgerLink } from '@/components/finance/LedgerLink';
+import { AccessPanel } from '@/components/access/AccessPanel';
 import { askConfirm } from '@/components/Dialogs';
 import { CustomerTickets } from '@/components/support/CustomerTickets';
 import { useShell } from '@/components/AppShell';
@@ -148,6 +149,7 @@ export default function Customer360Page() {
       </div>
 
       <LedgerLink customerId={c.id} />
+      <AccessPanel customerId={c.id} mobile={c.mobile} name={c.name} />
       <CustomerTickets customerId={c.id} customerName={c.name} />
 
       <div className="card" style={{ marginTop: 14 }}>

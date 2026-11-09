@@ -67,7 +67,7 @@ function refreshOnce(path: string, headers: Record<string, string>) {
   return refreshing;
 }
 
-async function request<T>(path: string, init: { method: string; headers: Record<string, string>; body?: string }, refreshPath: string, onHeaders?: (h: Headers) => void): Promise<T> {
+async function request<T>(path: string, init: { method: string; headers: Record<string, string>; body?: BodyInit }, refreshPath: string, onHeaders?: (h: Headers) => void): Promise<T> {
   let { res, body } = await raw(API_URL + path, init);
   // Access tokens live 15 minutes, and the browser then drops the cookie (UNAUTHENTICATED); refresh silently and retry once.
   const code = (body as { code?: string }).code;
@@ -91,6 +91,15 @@ export function api<T = any>(path: string, opts: Opts = {}) {
   const wsId = opts.workspace !== undefined ? opts.workspace : s?.workspaceId;
   if (wsId && !opts.noWorkspace && !opts.tenant) headers['X-Workspace'] = wsId;
   return request<T>(path, { method: opts.method ?? 'GET', headers, body: opts.body ? JSON.stringify(opts.body) : undefined }, '/api/v1/auth/refresh', opts.onHeaders);
+}
+
+/** Sends a file as the raw request body. */
+export function apiUpload<T = any>(path: string, file: Blob) {
+  const s = session.get();
+  const headers: Record<string, string> = { 'Content-Type': file.type || 'application/octet-stream', 'X-UBOS-CSRF': '1' };
+  if (s?.tenant) headers['X-Tenant'] = s.tenant;
+  if (s?.workspaceId) headers['X-Workspace'] = s.workspaceId;
+  return request<T>(path, { method: 'POST', headers, body: file }, '/api/v1/auth/refresh');
 }
 
 /** Platform Console API call. */

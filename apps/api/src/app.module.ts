@@ -1,3 +1,5 @@
+import { AccessController, AccessReminders } from './modules/packages/access';
+import { GalleryController, PublicGalleryController } from './modules/packages/gallery';
 import { ExpensesController } from './modules/finance/expenses.controller';
 import { CollectionsController, CollectionsReminders } from './modules/finance/collections';
 import { PaymentLinksController, RazorpayWebhooks } from './modules/finance/payment-links';
@@ -75,6 +77,9 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    AccessController,
+    GalleryController,
+    PublicGalleryController,
     ExpensesController,
     CollectionsController,
     PaymentLinksController,
@@ -103,6 +108,7 @@ class HealthController {
     ChatbotService,
     RazorpayWebhooks,
     CollectionsReminders,
+    AccessReminders,
     AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },

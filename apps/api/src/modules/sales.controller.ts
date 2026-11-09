@@ -16,6 +16,7 @@ const ProductBody = z.object({
   name: z.string().trim().min(2).max(80), code: z.string().trim().max(30).nullable().optional(), description: z.string().trim().max(1000).nullable().optional(),
   category: z.string().trim().max(40).nullable().optional(), unit: z.string().trim().min(1).max(20).default('unit'),
   mrpPaise: Paise, gstRate: z.number().min(0).max(28).default(18),
+  accessKind: z.enum(['none', 'course', 'software', 'service']).default('none'), validityDays: z.number().int().min(1).max(3660).nullable().optional(), renewBeforeDays: z.number().int().min(1).max(180).default(30), remindCustomer: z.boolean().default(false),
 });
 const ProductPatch = ProductBody.partial().extend({ isArchived: z.boolean().optional() });
 const PriceListBody = z.object({
