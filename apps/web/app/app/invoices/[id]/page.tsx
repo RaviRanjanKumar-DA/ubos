@@ -1,5 +1,6 @@
 'use client';
 
+import { PaymentLinks } from '@/components/finance/PaymentLinks';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -11,11 +12,11 @@ import { fromIstInput, toIstInput } from '@/lib/ist';
 import { inr, toPaise } from '@/lib/money';
 
 interface Item { description: string; hsnSac: string | null; qty: number; unitPaise: number; discountPaise: number; gstBp: number }
-interface Pay { id: string; amountPaise: number; mode: string; reference: string | null; receivedAt: string; isVoided: boolean; voidReason: string | null }
+interface Pay { id: string; receiptNumber: string | null; amountPaise: number; mode: string; reference: string | null; receivedAt: string; isVoided: boolean; voidReason: string | null }
 interface Inv {
   id: string; number: string | null; status: string; leadId: string; dueAt: string | null; placeOfSupply: string; customerName: string; customerGstin: string | null; customerAddress: string | null; notes: string | null; terms: string | null;
   subtotalPaise: number; discountPaise: number; taxablePaise: number; cgstPaise: number; sgstPaise: number; igstPaise: number; roundOffPaise: number; totalPaise: number; paidPaise: number; cancelReason: string | null;
-  items: Item[]; payments: Pay[]; sellerNow: { stateCode: string; gstin: string | null; legalName: string } | null; states: Record<string, string>; rates: number[]; canEdit: boolean; canIssue: boolean;
+  items: Item[]; payments: Pay[]; customer: { mobile: string | null }; sellerNow: { stateCode: string; gstin: string | null; legalName: string } | null; states: Record<string, string>; rates: number[]; canEdit: boolean; canIssue: boolean;
 }
 type Line = { description: string; hsnSac: string; qty: string; unit: string; discount: string; gstBp: number };
 const when = (d: string) => new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium' });
@@ -111,13 +112,15 @@ export default function InvoiceDetail() {
           <div className="field" style={{ marginBottom: 0 }}><label htmlFor="i-t">Terms</label><textarea id="i-t" className="input" rows={2} disabled={!draft} value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} /></div>
         </div>
       </div>
+      {inv.status === 'issued' && <PaymentLinks invoiceId={inv.id} duePaise={due} canEdit={inv.canEdit} mobile={inv.customer.mobile} number={inv.number ?? ''} onPaid={() => undefined} />}
       {inv.payments.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>
           <h2>Payments</h2>
           {inv.payments.map((p) => (
             <div key={p.id} className="org-head" style={{ padding: '6px 0', borderBottom: '1px solid var(--line)', opacity: p.isVoided ? 0.55 : 1 }}>
               <span><b>{inr(p.amountPaise, 2)}</b> <span className="small muted">{p.mode}{p.reference ? ` · ${p.reference}` : ''} · {when(p.receivedAt)}{p.isVoided ? ` · voided: ${p.voidReason}` : ''}</span></span>
-              {!p.isVoided && inv.canEdit && <button className="btn sm ghost" onClick={async () => { const reason = await askText('Why is this payment being voided?'); if (reason) run(() => api(`/api/v1/payments/${p.id}/void`, { method: 'POST', body: { reason } }), 'Payment voided.'); }}>Void</button>}
+              <span className="row">{p.receiptNumber && <Link className="btn sm ghost" href={`/print/receipt/${p.id}`} target="_blank">Receipt</Link>}
+              {!p.isVoided && inv.canEdit && <button className="btn sm ghost" onClick={async () => { const reason = await askText('Why is this payment being voided?'); if (reason) run(() => api(`/api/v1/payments/${p.id}/void`, { method: 'POST', body: { reason } }), 'Payment voided.'); }}>Void</button>}</span>
             </div>
           ))}
         </div>

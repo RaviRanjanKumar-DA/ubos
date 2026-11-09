@@ -6,9 +6,9 @@ import { DbService } from '../../common/db.service';
 import { RequireFeature, RequirePermission } from '../../common/auth.guard';
 import { auth, ctx, tenantId } from '../../common/context';
 import { parse } from '../../common/errors';
-import { emitEvent } from '../../common/events';
 import { istDate } from '../../common/ist';
 import { activity } from '../../common/lead-ops';
+import { recordInvoicePayment } from './invoice-payments';
 import { scopeFilter } from '../../common/scope';
 
 const VIEW = 'finance.invoice.view', WORK = 'finance.invoice.manage', ISSUE = 'finance.invoice.issue', SETUP = 'finance.settings';
@@ -182,6 +182,7 @@ export class InvoicesController {
       const inv = await this.find(tx, id, ISSUE);
       if (inv.status === 'cancelled') throw new BadRequestException({ code: 'ALREADY_CANCELLED', message: 'This invoice is already cancelled' });
       if (inv.paidPaise > 0) throw new BadRequestException({ code: 'HAS_PAYMENTS', message: 'Void the payments on this invoice first' });
+      if (await tx.paymentLink.count({ where: { invoiceId: id, status: 'created' } })) throw new BadRequestException({ code: 'OPEN_LINK', message: 'Cancel the open payment link first, so the customer cannot pay a cancelled invoice' });
       await tx.invoice.update({ where: { id }, data: { status: 'cancelled', cancelReason: reason, cancelledAt: new Date() } });
       await this.db.audit(tx, { workspaceId: inv.workspaceId, entity: 'invoice', entityId: id, action: 'invoice.cancelled', newValue: { number: inv.number, reason } });
       return { ok: true };
@@ -199,14 +200,8 @@ export class InvoicesController {
       if (inv.status !== 'issued') throw new BadRequestException({ code: 'NOT_ISSUED', message: 'Payments can only be recorded on an issued invoice' });
       const due = inv.totalPaise - inv.paidPaise;
       if (input.amountPaise > due) throw new BadRequestException({ code: 'TOO_MUCH', message: `Only ${money(due)} is due on this invoice` });
-      const lead = await tx.lead.findUniqueOrThrow({ where: { id: inv.leadId } });
-      const run = await tx.processRun.findFirst({ where: { leadId: lead.id, status: 'active' }, orderBy: { startedAt: 'desc' }, select: { id: true } });
-      const full = input.amountPaise === due;
-      const p = await tx.payment.create({ data: { tenantId: tenantId(), workspaceId: inv.workspaceId, customerId: inv.customerId, leadId: lead.id, runId: run?.id ?? null, invoiceId: id, amountPaise: input.amountPaise, kind: full && !inv.paidPaise ? 'full' : full ? 'balance' : 'instalment', mode: input.mode, reference: input.reference ?? null, receivedAt: input.receivedAt ?? new Date(), createdById: auth().userId, source: 'invoice' } });
-      await tx.invoice.update({ where: { id }, data: { paidPaise: { increment: input.amountPaise } } });
-      await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'payment', remark: `${money(p.amountPaise)} received on invoice ${inv.number} (${p.mode})`, data: { paymentId: p.id, invoiceId: id, runId: run?.id ?? null } }) });
+      const p = await recordInvoicePayment(tx, inv, { amountPaise: input.amountPaise, mode: input.mode, reference: input.reference ?? null, receivedAt: input.receivedAt ?? new Date(), userId: auth().userId, source: 'invoice' });
       await this.db.audit(tx, { workspaceId: inv.workspaceId, entity: 'payment', entityId: p.id, action: 'payment.recorded', newValue: { invoice: inv.number, amountPaise: p.amountPaise, mode: p.mode, reference: p.reference } });
-      await emitEvent(tx, tenantId(), inv.workspaceId, 'payment.received', { paymentId: p.id, leadId: lead.id, customerId: p.customerId, runId: run?.id ?? null, amountPaise: p.amountPaise, kind: p.kind, mode: p.mode, reference: p.reference });
       return p;
     });
   }
@@ -257,7 +252,7 @@ export class InvoicesController {
       const inv = await this.find(tx, id, VIEW);
       const [draftSeller, payments, c] = await Promise.all([
         this.profile(tx, inv.workspaceId),
-        tx.payment.findMany({ where: { invoiceId: id }, orderBy: { receivedAt: 'asc' }, select: { id: true, amountPaise: true, mode: true, reference: true, receivedAt: true, isVoided: true, voidReason: true } }),
+        tx.payment.findMany({ where: { invoiceId: id }, orderBy: { receivedAt: 'asc' }, select: { id: true, amountPaise: true, mode: true, reference: true, receivedAt: true, isVoided: true, voidReason: true, receiptNumber: true } }),
         tx.customer.findUniqueOrThrow({ where: { id: inv.customerId }, select: { code: true, mobile: true, email: true, stateCode: true } }),
       ]);
       return { ...inv, sellerNow: inv.seller ?? draftSeller, payments, customer: c, organization: ctx().tenant?.name, states: GST_STATES, rates: GST_RATES_BP, canEdit: !!auth().permissions[WORK], canIssue: !!auth().permissions[ISSUE] };

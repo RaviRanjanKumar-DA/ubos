@@ -130,8 +130,8 @@ const SPECIFIC: Record<string, SetupDef> = {
     webhook: true,
   },
   razorpay: {
-    steps: ['In Razorpay Dashboard → Settings → API keys, generate keys (start in TEST mode).', 'Paste the key ID and secret below.', 'Add the webhook URL in Settings → Webhooks for payment.captured and payment_link.paid.'],
-    fields: [{ key: 'keyId', label: 'Key ID', type: 'text', required: true, placeholder: 'rzp_test_…' }, secret('Key secret'), { key: 'mode', label: 'Mode', type: 'select', options: ['test', 'live'], required: true }], webhook: true,
+    steps: ['In Razorpay Dashboard → Settings → API keys, generate keys (start in TEST mode).', 'Paste the key ID and secret below, and make up a long webhook secret.', 'In Settings → Webhooks add the webhook URL below with that secret, for payment_link.paid, payment_link.cancelled and payment_link.expired.'],
+    fields: [{ key: 'keyId', label: 'Key ID', type: 'text', required: true, placeholder: 'rzp_test_…' }, secret('Key secret'), { key: 'webhookSecret', label: 'Webhook secret', type: 'secret', required: true }, { key: 'mode', label: 'Mode', type: 'select', options: ['test', 'live'], required: true }, { key: 'apiBase', label: 'API address', type: 'url', placeholder: 'https://api.razorpay.com', help: 'Leave empty for Razorpay itself.' }], webhook: true,
   },
   google_meet: { steps: ['Sign in with Google (arrives with the live connection) to create Meet links and sync calendars.'], fields: [{ key: 'account', label: 'Google Workspace email', type: 'text', required: true }] },
   zapier: { steps: ['Copy the webhook URL into a Zapier “Webhooks by Zapier” step to send leads in.', 'For leads going out, use the outgoing webhooks setting (slice 1.7).'], fields: [workspaceField], webhook: true },

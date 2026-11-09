@@ -119,7 +119,7 @@ export const GUIDES: GuideDef[] = [
         { id: 'woocommerce', title: 'Connect WooCommerce', level: 'basic', phase: '3' },
       ] },
       { id: 'payments', title: 'Payments', hint: 'Send payment links and track them on leads.', tone: '#d5efe9', steps: [
-        { id: 'razorpay', title: 'Connect Razorpay', level: 'basic', phase: '3' },
+        { id: 'razorpay', title: 'Connect Razorpay', level: 'basic', href: '/app/integrations', done: async (c) => (await c.db.integrationConnection.count({ where: { tenantId: c.tenantId, key: 'razorpay', status: 'active' } })) > 0 },
       ] },
     ],
   },

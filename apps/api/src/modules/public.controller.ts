@@ -1,3 +1,4 @@
+import { RazorpayWebhooks } from './finance/payment-links';
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, HttpCode, Ip, NotFoundException, Param, Patch, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
@@ -23,7 +24,7 @@ const pickHeaders = (h: Record<string, unknown>) => Object.fromEntries(['content
  */
 @Controller('hooks')
 export class HooksController {
-  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService, private wa: WhatsAppService, private messaging: MessagingService) {}
+  constructor(private db: DbService, private intake: IntakeService, private calling: CallingService, private wa: WhatsAppService, private messaging: MessagingService, private razorpay: RazorpayWebhooks) {}
 
   /** Meta's webhook check: echoes hub.challenge when the verify token is this integration's token. */
   @Get(':slug/:key/:token')
@@ -52,6 +53,12 @@ export class HooksController {
       if (key === 'whatsapp') {
         if (!this.wa.verifySignature(cfg, (req as { rawBody?: Buffer }).rawBody, headers['x-hub-signature-256'] as string | undefined)) throw new UnauthorizedException({ code: 'BAD_SIGNATURE', message: 'Signature does not match' });
         return this.wa.receive(t.id, cfg, body);
+      }
+      if (key === 'razorpay') {
+        if (!this.razorpay.verify(cfg, (req as { rawBody?: Buffer }).rawBody, headers['x-razorpay-signature'] as string | undefined)) throw new UnauthorizedException({ code: 'BAD_SIGNATURE', message: 'Signature does not match' });
+        const out = await this.razorpay.receive(body as never);
+        await this.db.tenant((tx) => tx.integrationConnection.update({ where: { id: conn.id }, data: { lastEventAt: new Date() } }));
+        return out;
       }
       const records = this.intake.records(body);
       // SMS gateways post delivery reports here.

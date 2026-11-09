@@ -1,3 +1,4 @@
+import { PaymentLinksController, RazorpayWebhooks } from './modules/finance/payment-links';
 import { InvoicesController } from './modules/finance/invoices.controller';
 import { ChatbotController, PublicChatController, ScheduledMessagesController } from './modules/chatbot/chatbot.controller';
 import { ChatbotService } from './modules/chatbot/chatbot.service';
@@ -72,6 +73,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    PaymentLinksController,
     InvoicesController,
     ChatbotController, PublicChatController, ScheduledMessagesController,
     LeadRulesController,
@@ -95,6 +97,7 @@ class HealthController {
     MessagingService,
     MailService,
     ChatbotService,
+    RazorpayWebhooks,
     AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },

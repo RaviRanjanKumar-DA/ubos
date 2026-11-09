@@ -808,12 +808,14 @@ model Payment {
   note        String?
   source      String    @default("manual")     // manual | rule (payment rules) | gateway (1.7) | invoice
   invoiceId   String?
+  receiptNumber String?
   isVoided    Boolean   @default(false)
   voidReason  String?
   voidedById  String?
   createdById String?
   createdAt   DateTime  @default(now())
 
+  @@unique([tenantId, receiptNumber])
   @@index([tenantId, runId])
   @@index([tenantId, customerId])
 }
@@ -1954,6 +1956,7 @@ model Invoice {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   items           InvoiceItem[]
+  paymentLinks    PaymentLink[]
 
   @@unique([tenantId, number])
   @@index([tenantId, workspaceId, status])
@@ -1979,5 +1982,26 @@ model InvoiceItem {
   igstPaise     Int     @default(0)
   totalPaise    Int     @default(0)
 
+  @@index([tenantId, invoiceId])
+}
+
+/** A link the customer pays an invoice with (Razorpay). */
+model PaymentLink {
+  id          String    @id @default(uuid())
+  tenantId    String
+  invoiceId   String
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id])
+  provider    String    @default("razorpay")
+  providerId  String
+  url         String
+  amountPaise Int
+  status      String    @default("created") // created | paid | cancelled | expired
+  expiresAt   DateTime?
+  paidAt      DateTime?
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, provider, providerId])
   @@index([tenantId, invoiceId])
 }

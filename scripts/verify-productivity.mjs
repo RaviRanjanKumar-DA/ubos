@@ -256,7 +256,7 @@ const rz = (await call('/api/v1/integrations/razorpay/setup', { token: admin }))
 check('setup panel lists steps, fields and the webhook need', rz.steps.length >= 2 && rz.fields.some((f) => f.key === 'apiSecret' && f.type === 'secret') && rz.needsWebhook && rz.webhookUrl === null, rz);
 const missing = await call('/api/v1/integrations/razorpay/setup', { token: admin, method: 'PUT', body: { values: { keyId: 'rzp_test_abc' } } });
 check('required settings are enforced', missing.status === 400 && missing.body.code === 'FIELD_REQUIRED', missing.body);
-const saved = await call('/api/v1/integrations/razorpay/setup', { token: admin, method: 'PUT', body: { values: { keyId: 'rzp_test_abc', apiSecret: 'supersecretvalue1234', mode: 'test' }, activate: true } });
+const saved = await call('/api/v1/integrations/razorpay/setup', { token: admin, method: 'PUT', body: { values: { keyId: 'rzp_test_abc', apiSecret: 'supersecretvalue1234', webhookSecret: 'whsec-for-tests', mode: 'test' }, activate: true } });
 const rz2 = (await call('/api/v1/integrations/razorpay/setup', { token: admin })).body;
 check('saving activates it; secrets come back masked; a private webhook URL is issued', saved.body.status === 'active' && rz2.values.apiSecret === '••••1234' && rz2.values.keyId === 'rzp_test_abc' && /\/hooks\/mycompany\/razorpay\/[A-Za-z0-9]{12,}/.test(rz2.webhookUrl ?? ''), rz2);
 await call('/api/v1/integrations/razorpay/setup', { token: admin, method: 'PUT', body: { values: { keyId: 'rzp_test_xyz', apiSecret: '••••1234', mode: 'test' } } });

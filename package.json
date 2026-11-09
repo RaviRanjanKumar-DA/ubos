@@ -40,7 +40,8 @@
     "verify:connected": "node scripts/verify-connected.mjs",
     "verify:leadrules": "node scripts/verify-leadrules.mjs",
     "verify:chatbot": "node scripts/verify-chatbot.mjs",
-    "verify:invoices": "node scripts/verify-invoices.mjs"
+    "verify:invoices": "node scripts/verify-invoices.mjs",
+    "verify:paylinks": "node scripts/verify-paylinks.mjs"
   },
   "engines": {
     "node": ">=20"
