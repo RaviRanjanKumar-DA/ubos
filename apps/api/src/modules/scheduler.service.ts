@@ -1,3 +1,4 @@
+import { CollectionsReminders } from './finance/collections';
 import { ChatbotService } from './chatbot/chatbot.service';
 import { MailService } from './connected/mail.service';
 import { notifyTicketBreaches } from './support/tickets.controller';
@@ -36,7 +37,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   private lastPurge = 0;
-  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService) {}
+  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService, private collections: CollectionsReminders) {}
 
   onModuleInit() {
     if (process.env.SCHEDULER_DISABLED === 'true') return;
@@ -61,6 +62,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           totals.dashboards += await this.dashboardEmails(info);
           await notifyTicketBreaches(this.db).catch((e) => this.log.error(e instanceof Error ? e.message : e));
           await this.chatbot.sendDue(t.id).catch((e) => this.log.error(e instanceof Error ? e.message : e));
+          await this.collections.run(t.name, !!onlyTenantId).catch((e) => this.log.error(e instanceof Error ? e.message : e));
         });
       }
       if (!onlyTenantId) await dueSheetSyncs(this.db, this.intake).catch((e) => this.log.error(e instanceof Error ? e.message : e));

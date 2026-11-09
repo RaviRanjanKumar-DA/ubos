@@ -41,7 +41,8 @@
     "verify:leadrules": "node scripts/verify-leadrules.mjs",
     "verify:chatbot": "node scripts/verify-chatbot.mjs",
     "verify:invoices": "node scripts/verify-invoices.mjs",
-    "verify:paylinks": "node scripts/verify-paylinks.mjs"
+    "verify:paylinks": "node scripts/verify-paylinks.mjs",
+    "verify:collections": "node scripts/verify-collections.mjs"
   },
   "engines": {
     "node": ">=20"

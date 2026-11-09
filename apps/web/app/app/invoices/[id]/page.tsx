@@ -1,5 +1,6 @@
 'use client';
 
+import { Instalments } from '@/components/finance/Instalments';
 import { PaymentLinks } from '@/components/finance/PaymentLinks';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -64,6 +65,7 @@ export default function InvoiceDetail() {
           {inv.status !== 'draft' && <Link className="btn outline" href={`/print/invoice/${id}`} target="_blank">Print / PDF</Link>}
           {draft && <button className="btn outline" disabled={busy} onClick={save}>Save draft</button>}
           {draft && inv.canIssue && <button className="btn" disabled={busy} onClick={issue}>Issue invoice</button>}
+          {inv.status === 'issued' && inv.canEdit && due > 0 && <button className="btn outline" disabled={busy} onClick={() => run(() => api(`/api/v1/invoices/${id}/remind`, { method: 'POST' }), 'Reminder emailed.')}>Remind</button>}
           {inv.status === 'issued' && inv.canEdit && due > 0 && <button className="btn" onClick={() => setPay({ amount: String(due / 100), mode: 'upi', reference: '' })}>Record payment</button>}
           {inv.status !== 'cancelled' && inv.canIssue && inv.paidPaise === 0 && <button className="btn ghost" disabled={busy} onClick={cancel}>Cancel invoice</button>}
         </div>
@@ -112,6 +114,7 @@ export default function InvoiceDetail() {
           <div className="field" style={{ marginBottom: 0 }}><label htmlFor="i-t">Terms</label><textarea id="i-t" className="input" rows={2} disabled={!draft} value={f.terms} onChange={(e) => setF({ ...f, terms: e.target.value })} /></div>
         </div>
       </div>
+      {inv.status === 'issued' && <Instalments invoiceId={inv.id} totalPaise={inv.totalPaise} paidPaise={inv.paidPaise} canEdit={inv.canEdit} onChange={load} />}
       {inv.status === 'issued' && <PaymentLinks invoiceId={inv.id} duePaise={due} canEdit={inv.canEdit} mobile={inv.customer.mobile} number={inv.number ?? ''} onPaid={() => undefined} />}
       {inv.payments.length > 0 && (
         <div className="card" style={{ marginTop: 16 }}>

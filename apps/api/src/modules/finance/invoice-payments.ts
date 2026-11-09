@@ -1,3 +1,4 @@
+import { refreshInvoiceDue } from './collections';
 import { financialYear } from '@ubos/shared';
 import type { Tx } from '@ubos/database';
 import { activity } from '../../common/lead-ops';
@@ -24,6 +25,7 @@ export async function recordInvoicePayment(
   const receiptNumber = await nextReceipt(tx, inv.tenantId, o.receivedAt);
   const p = await tx.payment.create({ data: { tenantId: inv.tenantId, workspaceId: inv.workspaceId, customerId: inv.customerId, leadId: lead.id, runId: run?.id ?? null, invoiceId: inv.id, amountPaise: o.amountPaise, kind: o.amountPaise >= due && !inv.paidPaise ? 'full' : o.amountPaise >= due ? 'balance' : 'instalment', mode: o.mode, reference: o.reference, receivedAt: o.receivedAt, createdById: o.userId, source: o.source, receiptNumber } });
   await tx.invoice.update({ where: { id: inv.id }, data: { paidPaise: { increment: o.amountPaise } } });
+  await refreshInvoiceDue(tx, inv.id);
   await tx.leadActivity.create({ data: activity(lead, o.userId, { type: 'payment', remark: `${money(p.amountPaise)} received on invoice ${inv.number} (${p.mode})`, data: { paymentId: p.id, invoiceId: inv.id, runId: run?.id ?? null } }) });
   await emitEvent(tx, inv.tenantId, inv.workspaceId, 'payment.received', { paymentId: p.id, leadId: lead.id, customerId: p.customerId, runId: run?.id ?? null, amountPaise: p.amountPaise, kind: p.kind, mode: p.mode, reference: p.reference });
   return p;

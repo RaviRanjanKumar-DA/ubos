@@ -1902,6 +1902,7 @@ model BillingProfile {
   email         String?
   phone         String?
   invoicePrefix String   @default("INV")
+  autoRemind    Boolean  @default(false)
   terms         String?
   bankDetails   String?
   createdAt     DateTime @default(now())
@@ -1957,6 +1958,9 @@ model Invoice {
   updatedAt       DateTime      @updatedAt
   items           InvoiceItem[]
   paymentLinks    PaymentLink[]
+  instalments     InvoiceInstalment[]
+  reminderStage   Int           @default(0)
+  lastReminderAt  DateTime?
 
   @@unique([tenantId, number])
   @@index([tenantId, workspaceId, status])
@@ -2003,5 +2007,17 @@ model PaymentLink {
   updatedAt   DateTime  @updatedAt
 
   @@unique([tenantId, provider, providerId])
+  @@index([tenantId, invoiceId])
+}
+
+model InvoiceInstalment {
+  id          String   @id @default(uuid())
+  tenantId    String
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  position    Int
+  dueAt       DateTime
+  amountPaise Int
+
   @@index([tenantId, invoiceId])
 }

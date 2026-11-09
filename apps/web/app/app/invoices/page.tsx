@@ -9,7 +9,7 @@ import { inr } from '@/lib/money';
 
 interface Row { id: string; number: string | null; status: string; customerName: string; issuedAt: string | null; dueAt: string | null; totalPaise: number; paidPaise: number; createdAt: string }
 interface Data { rows: Row[]; summary: { billedPaise: number; collectedPaise: number; overduePaise: number; overdueCount: number } }
-interface Profile { legalName: string; gstin: string | null; stateCode: string; address: string; email: string | null; phone: string | null; invoicePrefix: string; terms: string | null; bankDetails: string | null }
+interface Profile { legalName: string; gstin: string | null; stateCode: string; address: string; email: string | null; phone: string | null; invoicePrefix: string; autoRemind: boolean; terms: string | null; bankDetails: string | null }
 interface ProfileRes { states: Record<string, string>; canEdit: boolean; profile: Profile | null }
 
 const VIEWS: [string, string][] = [['all', 'All'], ['unpaid', 'Unpaid'], ['overdue', 'Overdue'], ['paid', 'Paid'], ['draft', 'Drafts'], ['cancelled', 'Cancelled']];
@@ -43,7 +43,7 @@ export default function InvoicesPage() {
   useEffect(() => { if (ws) api<ProfileRes>('/api/v1/billing-profile').then(setSetup).catch(() => setSetup(null)); }, [ws, version]);
   if (!ws) return <><div className="page-head"><h1>Invoices</h1></div><PickWorkspace text="Invoices belong to a business line." /></>;
 
-  const open = () => { const p = setup?.profile; setEdit({ legalName: p?.legalName ?? '', gstin: p?.gstin ?? '', stateCode: p?.stateCode ?? '', address: p?.address ?? '', email: p?.email ?? '', phone: p?.phone ?? '', invoicePrefix: p?.invoicePrefix ?? 'INV', terms: p?.terms ?? '', bankDetails: p?.bankDetails ?? '' }); };
+  const open = () => { const p = setup?.profile; setEdit({ legalName: p?.legalName ?? '', gstin: p?.gstin ?? '', stateCode: p?.stateCode ?? '', address: p?.address ?? '', email: p?.email ?? '', phone: p?.phone ?? '', invoicePrefix: p?.invoicePrefix ?? 'INV', autoRemind: p?.autoRemind ?? false, terms: p?.terms ?? '', bankDetails: p?.bankDetails ?? '' }); };
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!edit) return;
@@ -126,6 +126,7 @@ export default function InvoicesPage() {
             <div className="field" style={{ maxWidth: 200 }}><label htmlFor="b-x">Invoice prefix</label><input id="b-x" className="input" required maxLength={6} style={{ textTransform: 'uppercase' }} value={edit.invoicePrefix} onChange={(e) => setEdit({ ...edit, invoicePrefix: e.target.value.toUpperCase() })} /></div>
             <div className="field"><label htmlFor="b-b">Bank details (optional)</label><textarea id="b-b" className="input" rows={2} value={edit.bankDetails} onChange={(e) => setEdit({ ...edit, bankDetails: e.target.value })} /></div>
             <div className="field"><label htmlFor="b-t">Standard terms (optional)</label><textarea id="b-t" className="input" rows={2} value={edit.terms} onChange={(e) => setEdit({ ...edit, terms: e.target.value })} /></div>
+            <label className="row small" style={{ marginBottom: 14 }}><input type="checkbox" checked={edit.autoRemind} onChange={(e) => setEdit({ ...edit, autoRemind: e.target.checked })} /> Email customers payment reminders automatically (3 days before, on the day, then 3, 7 and 15 days after)</label>
             <div className="row end"><button type="button" className="btn ghost" onClick={() => setEdit(null)}>Go back</button><button className="btn">Save</button></div>
           </form>
         </div>

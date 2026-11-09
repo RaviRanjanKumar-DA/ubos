@@ -16,7 +16,7 @@ const Gstin = z.string().trim().toUpperCase().refine(validGstin, 'That GSTIN is 
 const State = z.string().refine((s) => !!GST_STATES[s], 'Choose a state');
 const Profile = z.object({
   legalName: z.string().trim().min(2).max(160), gstin: Gstin.nullable().optional(), stateCode: State, address: z.string().trim().min(5).max(500), email: z.string().trim().email().max(160).nullable().optional(), phone: z.string().trim().max(30).nullable().optional(),
-  invoicePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, 'Use up to 6 letters or digits').default('INV'), terms: z.string().trim().max(2000).nullable().optional(), bankDetails: z.string().trim().max(1000).nullable().optional(),
+  invoicePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, 'Use up to 6 letters or digits').default('INV'), autoRemind: z.boolean().default(false), terms: z.string().trim().max(2000).nullable().optional(), bankDetails: z.string().trim().max(1000).nullable().optional(),
 }).refine((p) => !p.gstin || p.gstin.slice(0, 2) === p.stateCode, { message: 'The GSTIN belongs to a different state', path: ['gstin'] });
 const Item = z.object({ description: z.string().trim().min(1).max(300), hsnSac: z.string().trim().regex(/^\d{4,8}$/, 'HSN or SAC is 4 to 8 digits').nullable().optional(), qty: z.number().int().min(1).max(100_000), unitPaise: z.number().int().min(0).max(1_000_000_000), discountPaise: z.number().int().min(0).default(0), gstBp: z.number().int().refine((n) => (GST_RATES_BP as readonly number[]).includes(n), 'Choose a GST rate') })
   .refine((i) => i.discountPaise <= i.qty * i.unitPaise, 'A discount cannot be more than the amount');
@@ -66,7 +66,7 @@ export class InvoicesController {
     const input = parse(Profile, body);
     const ws = this.ws();
     return this.db.tenant(async (tx) => {
-      const data = { legalName: input.legalName, gstin: input.gstin ?? null, stateCode: input.stateCode, address: input.address, email: input.email ?? null, phone: input.phone ?? null, invoicePrefix: input.invoicePrefix, terms: input.terms ?? null, bankDetails: input.bankDetails ?? null };
+      const data = { legalName: input.legalName, gstin: input.gstin ?? null, stateCode: input.stateCode, address: input.address, email: input.email ?? null, phone: input.phone ?? null, invoicePrefix: input.invoicePrefix, autoRemind: input.autoRemind, terms: input.terms ?? null, bankDetails: input.bankDetails ?? null };
       const p = await tx.billingProfile.upsert({ where: { workspaceId: ws }, create: { ...data, tenantId: tenantId(), workspaceId: ws }, update: data });
       await this.db.audit(tx, { workspaceId: ws, entity: 'billing_profile', entityId: p.id, action: 'billing_profile.saved', newValue: { legalName: p.legalName, gstin: p.gstin, stateCode: p.stateCode } });
       return p;

@@ -67,6 +67,7 @@ const NAV: NavGroup[] = [
   ] },
   { id: 'finance', title: 'Finance', items: [
     { href: '/app/invoices', label: 'Invoices', icon: 'receipt', perm: 'finance.invoice.view' },
+    { href: '/app/collections', label: 'Collections', icon: 'finance', perm: 'finance.invoice.view' },
   ] },
   { id: 'org', title: 'Organization', startClosed: true, items: [
     { href: '/app/setup', label: 'Setup Guide', icon: 'checklist', perm: 'org.workspace.manage' },
