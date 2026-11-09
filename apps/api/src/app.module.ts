@@ -1,3 +1,4 @@
+import { InvoicesController } from './modules/finance/invoices.controller';
 import { ChatbotController, PublicChatController, ScheduledMessagesController } from './modules/chatbot/chatbot.controller';
 import { ChatbotService } from './modules/chatbot/chatbot.service';
 import { LeadRulesController } from './modules/lead-rules.controller';
@@ -71,6 +72,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    InvoicesController,
     ChatbotController, PublicChatController, ScheduledMessagesController,
     LeadRulesController,
     BookingLinksController, PublicBookingController, ConnectedController, ConnectCallbackController, TrackingController,

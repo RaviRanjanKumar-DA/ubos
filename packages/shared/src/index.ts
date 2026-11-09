@@ -8,3 +8,4 @@ export * from './catalog';
 export * from './integration-setup';
 export * from './developer';
 export * from './automation';
+export * from './gst';

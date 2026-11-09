@@ -1,5 +1,6 @@
 'use client';
 
+import { InvoiceFromQuote, NewInvoice } from '@/components/finance/InvoiceFromQuote';
 import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -270,13 +271,14 @@ function Rating({ run, act, call }: { run: Run; act: Act; call: Call }) {
 // ── Quotes ──
 
 function QuotesTab({ quotes, lead, canQuote, act, call }: { quotes: Quote[]; lead: { id: string; name: string; workspace: { id: string } }; canQuote: boolean; act: Act; call: Call }) {
+  const { can } = useShell();
   const [editing, setEditing] = useState<Quote | 'new' | null>(null);
   const [declining, setDeclining] = useState<Quote | null>(null);
   return (
     <>
       <div className="row" style={{ justifyContent: 'space-between', marginBottom: 8 }}>
         <span className="small muted">{quotes.length ? 'Quotes made for this lead. A discount beyond the business line’s limit goes to a manager first.' : 'No quote yet.'}</span>
-        {canQuote && <button className="btn sm" onClick={() => setEditing('new')}>+ New quote</button>}
+        <span className="row">{can('finance.invoice.manage') && lead && <NewInvoice leadId={lead.id} workspace={lead.workspace.id} />}{canQuote && <button className="btn sm" onClick={() => setEditing('new')}>+ New quote</button>}</span>
       </div>
       {quotes.length > 0 && (
         <div className="table-wrap">
@@ -293,6 +295,7 @@ function QuotesTab({ quotes, lead, canQuote, act, call }: { quotes: Quote[]; lea
                     <td><span className={`badge ${st.tone}`}>{st.label}</span>{q.approval?.status === 'rejected' && q.status === 'draft' && <div className="small" style={{ color: 'var(--bad)' }}>Discount rejected: {q.approval.decisionNote}</div>}</td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                       <Link className="btn sm ghost" href={`/print/quote/${q.id}`} target="_blank">Print / PDF</Link>
+                      {can('finance.invoice.manage') && ['approved', 'sent', 'accepted'].includes(q.status) && <InvoiceFromQuote quoteId={q.id} />}
                       {canQuote && ['draft', 'approved'].includes(q.status) && <button className="btn sm ghost" onClick={() => setEditing(q)}>Edit</button>}
                       {canQuote && ['draft', 'approved'].includes(q.status) && (
                         <button className="btn sm outline" onClick={() => act(async () => {

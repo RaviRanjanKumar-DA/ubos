@@ -445,6 +445,9 @@ model Customer {
   smsOptOut       Boolean        @default(false)
   emailOptOut     Boolean        @default(false) // used the unsubscribe link
   city         String?
+  gstin          String?
+  billingAddress String?
+  stateCode      String?
   panEncrypted String?
   panLast4     String?
   panHash      String?           // keyed hash, lets us find the same PAN without decrypting
@@ -532,6 +535,7 @@ model Lead {
   @@index([tenantId, workspaceId, pipelineId, stageId])
   @@index([tenantId, ownerId])
   @@index([tenantId, nextFollowUpAt])
+  invoices        Invoice[]
 }
 
 model FollowUp {
@@ -802,7 +806,8 @@ model Payment {
   reference   String?
   receivedAt  DateTime  @default(now())
   note        String?
-  source      String    @default("manual")     // manual | rule (payment rules) | gateway (1.7)
+  source      String    @default("manual")     // manual | rule (payment rules) | gateway (1.7) | invoice
+  invoiceId   String?
   isVoided    Boolean   @default(false)
   voidReason  String?
   voidedById  String?
@@ -1881,4 +1886,98 @@ model ChatWidget {
   updatedAt   DateTime @updatedAt
 
   @@unique([tenantId, publicKey])
+}
+
+/** The seller's details on invoices, per business line. */
+model BillingProfile {
+  id            String   @id @default(uuid())
+  tenantId      String
+  workspaceId   String   @unique
+  legalName     String
+  gstin         String?  // empty = not registered, no GST is charged
+  stateCode     String
+  address       String
+  email         String?
+  phone         String?
+  invoicePrefix String   @default("INV")
+  terms         String?
+  bankDetails   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+/** Next invoice number per prefix and financial year. */
+model InvoiceSeries {
+  id       String @id @default(uuid())
+  tenantId String
+  prefix   String
+  fy       String
+  next     Int    @default(1)
+
+  @@unique([tenantId, prefix, fy])
+}
+
+model Invoice {
+  id              String        @id @default(uuid())
+  tenantId        String
+  workspaceId     String
+  leadId          String
+  lead            Lead          @relation(fields: [leadId], references: [id])
+  customerId      String
+  quoteId         String?
+  number          String?       // set when issued
+  fy              String?
+  status          String        @default("draft") // draft | issued | cancelled
+  issuedAt        DateTime?
+  dueAt           DateTime?
+  placeOfSupply   String
+  seller          Json?         // frozen when issued
+  customerName    String
+  customerGstin   String?
+  customerAddress String?
+  subtotalPaise   Int           @default(0)
+  discountPaise   Int           @default(0)
+  taxablePaise    Int           @default(0)
+  cgstPaise       Int           @default(0)
+  sgstPaise       Int           @default(0)
+  igstPaise       Int           @default(0)
+  roundOffPaise   Int           @default(0)
+  totalPaise      Int           @default(0)
+  paidPaise       Int           @default(0)
+  notes           String?
+  terms           String?
+  cancelReason    String?
+  cancelledAt     DateTime?
+  createdById     String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  items           InvoiceItem[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId, workspaceId, status])
+  @@index([tenantId, leadId])
+  @@index([tenantId, quoteId])
+}
+
+model InvoiceItem {
+  id            String  @id @default(uuid())
+  tenantId      String
+  invoiceId     String
+  invoice       Invoice @relation(fields: [invoiceId], references: [id])
+  position      Int     @default(0)
+  description   String
+  hsnSac        String?
+  qty           Int
+  unitPaise     Int
+  discountPaise Int     @default(0)
+  gstBp         Int     @default(0) // 18% = 1800
+  taxablePaise  Int     @default(0)
+  cgstPaise     Int     @default(0)
+  sgstPaise     Int     @default(0)
+  igstPaise     Int     @default(0)
+  totalPaise    Int     @default(0)
+
+  @@index([tenantId, invoiceId])
 }

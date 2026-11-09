@@ -83,6 +83,7 @@ export class DealsController {
       if (p.leadId) await this.lead(tx, p.leadId, 'process.payment');
       if (p.isVoided) throw new BadRequestException({ code: 'ALREADY_VOIDED', message: 'This payment is already voided' });
       await tx.payment.update({ where: { id }, data: { isVoided: true, voidReason: input.reason, voidedById: auth().userId } });
+      if (p.invoiceId) await tx.invoice.update({ where: { id: p.invoiceId }, data: { paidPaise: { decrement: p.amountPaise } } });
       const lead = p.leadId ? await tx.lead.findUnique({ where: { id: p.leadId } }) : null;
       if (lead) await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'payment', remark: `Payment of ${rupees(p.amountPaise)} voided: ${input.reason}`, data: { paymentId: id } }) });
       await this.db.audit(tx, { workspaceId: p.workspaceId, entity: 'payment', entityId: id, action: 'payment.voided', oldValue: { amountPaise: p.amountPaise }, newValue: input });

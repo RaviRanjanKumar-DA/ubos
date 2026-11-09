@@ -825,3 +825,18 @@ tr.selected td { background: var(--brand-50) !important; }
 .wchat-foot { display: flex; gap: 8px; padding: 10px; border-top: 1px solid var(--line); background: #fff; }
 .wchat-form { padding: 16px; overflow-y: auto; flex: 1; }
 @media (max-width: 560px) { .flow-top { grid-template-columns: minmax(0, 1fr) auto; } .flow-top > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; } .flow-opt { grid-template-columns: minmax(0, 1fr) auto; } .flow-opt > :nth-child(2) { grid-column: 1 / -1; grid-row: 2; } }
+
+/* Invoices */
+.inv-sum { margin-bottom: 14px; }
+.inv-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.inv-tools .input { flex: 1 1 220px; width: auto; }
+.inv-items { width: 100%; border-collapse: collapse; }
+.inv-items th { font-size: 12px; text-align: left; color: var(--muted); padding: 0 4px 6px; white-space: nowrap; }
+.inv-items td { padding: 3px 4px; vertical-align: middle; }
+.inv-totals { margin-left: auto; max-width: 340px; font-size: 14px; }
+.inv-totals div { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+.inv-totals .grand { border-top: 2px solid var(--ink); margin-top: 4px; padding-top: 7px; font-size: 16px; font-weight: 700; }
+.inv-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.print-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+@media (max-width: 860px) { .inv-grid { grid-template-columns: minmax(0, 1fr); } }
+@media print { .print-sheet .table-wrap { overflow: visible; } }

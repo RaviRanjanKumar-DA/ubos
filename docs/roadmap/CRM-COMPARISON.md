@@ -103,7 +103,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Quotes | Z H S M | Built | Must | — |
 | Payment tracking and pending alerts | T | Built | Must | — |
 | Payment links (Razorpay and others) | H | Planned | Must | Phase 3 |
-| Invoices, GST | M | Planned | Must | Phase 3 |
+| Invoices, GST | M | Built | Must | 3.1 |
 | Contracts and e-signature | S P | Gap | Should | Phase 3 |
 | Multi-currency | F | Gap | Later | Phase 5 |
 
