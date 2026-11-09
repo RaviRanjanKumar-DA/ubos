@@ -1,3 +1,4 @@
+import { ExpensesController } from './modules/finance/expenses.controller';
 import { CollectionsController, CollectionsReminders } from './modules/finance/collections';
 import { PaymentLinksController, RazorpayWebhooks } from './modules/finance/payment-links';
 import { InvoicesController } from './modules/finance/invoices.controller';
@@ -74,6 +75,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    ExpensesController,
     CollectionsController,
     PaymentLinksController,
     InvoicesController,

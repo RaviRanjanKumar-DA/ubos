@@ -2021,3 +2021,38 @@ model InvoiceInstalment {
 
   @@index([tenantId, invoiceId])
 }
+
+model ExpenseCategory {
+  id         String    @id @default(uuid())
+  tenantId   String
+  name       String
+  isArchived Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  expenses   Expense[]
+
+  @@unique([tenantId, name])
+}
+
+/** A cost. workspaceId empty = organization-wide. A wrong entry is voided, never deleted. */
+model Expense {
+  id          String          @id @default(uuid())
+  tenantId    String
+  workspaceId String?
+  categoryId  String
+  category    ExpenseCategory @relation(fields: [categoryId], references: [id])
+  spentAt     DateTime
+  amountPaise Int
+  gstPaise    Int             @default(0)
+  vendor      String?
+  description String
+  mode        String          @default("bank")
+  reference   String?
+  isVoided    Boolean         @default(false)
+  voidReason  String?
+  createdById String
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tenantId, spentAt])
+  @@index([tenantId, workspaceId, spentAt])
+}
