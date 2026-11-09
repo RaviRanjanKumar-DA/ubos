@@ -7,11 +7,12 @@ import { istDay, istDayStart } from '@/lib/ist';
 import { useShell } from '@/components/AppShell';
 import { useLive } from '@/lib/live';
 import { CHANNEL, dur, RecordingPlayer } from '@/components/calls/Player';
+import { CoachingDialog } from '@/components/calls/Coaching';
 
 interface CallRow {
   id: string; channel: string; provider: string | null; direction: string; phone: string | null; startedAt: string; ringSec: number; talkSec: number; answered: boolean;
   disposition: string | null; dispositionLabel: string | null; remark: string | null; leadId: string | null; customerName: string | null; userId: string | null; userName: string | null;
-  recording: string; canListen: boolean;
+  recording: string; canListen: boolean; canComment: boolean; comments: number;
 }
 interface Device { id: string; userId: string; userName: string; name: string; platform: string; appVersion: string | null; lastSeenAt: string | null; lastSyncAt: string | null; pendingCalls: number; revokedAt: string | null; createdAt: string }
 type Tab = 'log' | 'unmatched' | 'phones';
@@ -32,6 +33,14 @@ export default function CallsPage() {
   const [people, setPeople] = useState<{ id: string; name: string }[]>([]);
   const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
   const [fresh, setFresh] = useState(0);
+  const [coach, setCoach] = useState<{ id: string; title: string; canListen: boolean } | null>(null);
+  // A notification links here with ?coach=<call id>.
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('coach');
+    if (id) setCoach({ id, title: 'this call', canListen: can('crm.call.recording') });
+    // Only when the page opens: closing the dialog must not bring it back.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const load = useCallback(async () => {
     const p = new URLSearchParams({ view: tab === 'unmatched' ? 'unmatched' : 'all', ...RANGES[f.range](), ...(f.channel ? { channel: f.channel } : {}), ...(f.direction ? { direction: f.direction } : {}), ...(f.answered ? { answered: f.answered } : {}), ...(f.userId ? { userId: f.userId } : {}) });
@@ -87,7 +96,7 @@ export default function CallsPage() {
                         <td className="small">{CHANNEL[r.channel] ?? r.channel}{r.provider ? ` · ${r.provider}` : ''}</td>
                         <td className="small">{r.answered ? dur(r.talkSec) : <span style={{ color: 'var(--bad)' }}>Missed / no answer</span>}</td>
                         <td className="small">{r.dispositionLabel ?? '—'}{r.remark && <div className="muted" style={{ maxWidth: 260 }}>{r.remark}</div>}</td>
-                        <td>{r.canListen ? <RecordingPlayer callId={r.id} /> : <span className="small muted">{r.recording === 'uploading' ? 'Uploading…' : r.recording === 'deleted' ? 'Deleted (retention)' : r.recording === 'none' ? '—' : 'No access'}</span>}</td>
+                        <td>{r.canListen ? <RecordingPlayer callId={r.id} /> : <span className="small muted">{r.recording === 'uploading' ? 'Uploading…' : r.recording === 'deleted' ? 'Deleted (retention)' : r.recording === 'none' ? '—' : 'No access'}</span>}{r.canComment && <button className="link-btn small coach-open" onClick={() => setCoach({ id: r.id, title: r.customerName ?? r.phone ?? 'this call', canListen: r.canListen })}>{r.comments ? `Comments (${r.comments})` : 'Comment'}</button>}</td>
                         {tab === 'unmatched' && <td><LinkCall call={r} onDone={(t) => { setMsg({ type: 'notice', text: t }); load(); }} onError={(t) => setMsg({ type: 'error', text: t })} /></td>}
                       </tr>
                     ))}
@@ -99,6 +108,7 @@ export default function CallsPage() {
         </>
       )}
       {tab === 'phones' && <Phones all={can('org.user.manage')} />}
+      {coach && <CoachingDialog callId={coach.id} title={coach.title} canListen={coach.canListen} canRemoveAny={can('crm.lead.assign')} onClose={() => { setCoach(null); window.history.replaceState(null, '', '/app/calls'); load(); }} />}
     </>
   );
 }

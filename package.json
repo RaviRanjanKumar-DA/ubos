@@ -34,7 +34,8 @@
     "verify:calling": "node scripts/verify-calling.mjs",
     "verify:whatsapp": "node scripts/verify-whatsapp.mjs",
     "verify:messaging": "node scripts/verify-messaging.mjs",
-    "verify:automation": "node scripts/verify-automation.mjs"
+    "verify:automation": "node scripts/verify-automation.mjs",
+    "verify:campaigns": "node scripts/verify-campaigns.mjs"
   },
   "engines": {
     "node": ">=20"

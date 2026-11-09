@@ -83,6 +83,13 @@ export async function syncNextFollowUp(tx: Tx, leadId: string) {
   await tx.lead.update({ where: { id: leadId }, data: { nextFollowUpAt: next?.dueAt ?? null } });
 }
 
+/** Adds a follow-up to a lead and puts it on the lead's journey. */
+export async function addLeadFollowUp(tx: Tx, lead: { id: string; tenantId: string; workspaceId: string; ownerId: string | null }, userId: string, dueAt: Date, note?: string | null) {
+  const f = await tx.followUp.create({ data: { tenantId: lead.tenantId, leadId: lead.id, dueAt, note: note ?? null, userId: lead.ownerId ?? userId, createdById: userId } });
+  await tx.leadActivity.create({ data: activity(lead, userId, { type: 'follow_up', remark: note ?? null, data: { dueAt: dueAt.toISOString() } }) });
+  return f;
+}
+
 export function activity(
   lead: { id: string; tenantId: string; workspaceId: string },
   userId: string | null,

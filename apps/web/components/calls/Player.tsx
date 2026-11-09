@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react';
 import { recordingUrl } from '@/lib/live';
 
 /** Loads a recording only when asked (each play is audited) and frees it afterwards. */
-export function RecordingPlayer({ callId, workspaceId }: { callId: string; workspaceId?: string | null }) {
+export function RecordingPlayer({ callId, workspaceId, onAudio }: { callId: string; workspaceId?: string | null; onAudio?: (el: HTMLAudioElement | null) => void }) {
   const [src, setSrc] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => () => { if (src?.startsWith('blob:')) URL.revokeObjectURL(src); }, [src]);
-  if (src) return src.startsWith('blob:') ? <audio src={src} controls autoPlay style={{ height: 32, maxWidth: 260 }} /> : <a className="btn sm ghost" href={src} target="_blank" rel="noreferrer">▶ Open at provider</a>;
+  if (src) return src.startsWith('blob:') ? <audio ref={onAudio} src={src} controls autoPlay style={{ height: 32, maxWidth: 260 }} /> : <a className="btn sm ghost" href={src} target="_blank" rel="noreferrer">▶ Open at provider</a>;
   return (
     <span>
       <button className="btn sm ghost" disabled={busy} title="Play recording" onClick={async () => {

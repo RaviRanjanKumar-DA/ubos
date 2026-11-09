@@ -8,7 +8,8 @@ import { parse } from '../common/errors';
 import { scopeFilter } from '../common/scope';
 import { emitEvent } from '../common/events';
 import { live } from '../common/live';
-import { activity, applyStageChange, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
+import { activity, addLeadFollowUp, applyStageChange, eligibleOwners, syncNextFollowUp } from '../common/lead-ops';
+import { createManualCall } from './calling/call-pipeline';
 import { contact, contacts, customFields as visibleFields, fieldAccess } from '../common/field-access';
 import { notify, validMentions } from '../common/notify';
 
@@ -143,17 +144,7 @@ export class LeadWorkController {
       }
       // Calls logged by hand also go into the call log (all channels in one place).
       if (input.type === 'call') {
-        const cust = await tx.customer.findUnique({ where: { id: lead.customerId }, select: { mobile: true } });
-        const call = await tx.call.create({
-          data: {
-            tenantId: lead.tenantId, externalId: `manual:${act.id}`, channel: 'manual', direction: 'outbound', phone: cust?.mobile ?? '', userId: auth().userId,
-            workspaceId: lead.workspaceId, leadId: lead.id, customerId: lead.customerId, activityId: act.id, startedAt: now, talkSec: input.durationSec ?? 0,
-            answered: !!connected, disposition: input.disposition ?? null, remark: input.remark ?? null,
-          },
-        });
-        await tx.leadActivity.update({ where: { id: act.id }, data: { data: { ...(mentions.length ? { mentions } : {}), callId: call.id, channel: 'manual' } } });
-        await emitEvent(tx, lead.tenantId, lead.workspaceId, 'call.logged', { callId: call.id, leadId: lead.id, customerId: lead.customerId, userId: auth().userId, channel: 'manual', direction: 'outbound', startedAt: now, talkSec: call.talkSec, answered: call.answered, disposition: call.disposition });
-        live.publish(lead.tenantId, { type: 'call.logged', leadId: lead.id, userId: auth().userId, callId: call.id });
+        await createManualCall(tx, lead, act.id, auth().userId, { disposition: input.disposition ?? null, connected: !!connected, durationSec: input.durationSec ?? 0, remark: input.remark ?? null, extraData: mentions.length ? { mentions } : {} });
       }
       // A logged call completes the follow-ups that were due for this lead.
       if (input.type === 'call') {
@@ -359,11 +350,7 @@ export class LeadWorkController {
   }
 
   private async addFollowUp(tx: Tx, lead: { id: string; tenantId: string; workspaceId: string; ownerId: string | null }, dueAt: Date, note?: string | null) {
-    const f = await tx.followUp.create({
-      data: { tenantId: lead.tenantId, leadId: lead.id, dueAt, note: note ?? null, userId: lead.ownerId ?? auth().userId, createdById: auth().userId },
-    });
-    await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'follow_up', remark: note ?? null, data: { dueAt: dueAt.toISOString() } }) });
-    return f;
+    return addLeadFollowUp(tx, lead, auth().userId, dueAt, note);
   }
 
   private async visibleLead(tx: Tx, id: string, perm: 'crm.lead.view' | 'crm.lead.update') {

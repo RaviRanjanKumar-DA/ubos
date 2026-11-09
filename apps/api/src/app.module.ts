@@ -40,6 +40,7 @@ import { DeveloperController } from './modules/developer.controller';
 import { HooksController, PublicApiController, PublicFormsController } from './modules/public.controller';
 import { IntakeService, WebhookDispatcher } from './modules/integration-runtime';
 import { CallsController } from './modules/calling/calls.controller';
+import { CampaignsController } from './modules/calling/campaigns.controller';
 import { MobileController } from './modules/calling/mobile.controller';
 import { CallingService } from './modules/calling/calling.service';
 import { WhatsAppController } from './modules/whatsapp/whatsapp.controller';
@@ -66,7 +67,7 @@ class HealthController {
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
     WorkspaceSettingsController, CustomersController, LeadImportController, SetupGuideController, AnalyticsController, LabelsScriptsController, ViewsTasksController, NotificationsSettingsController, DataToolsController, LeadWorkController,
-    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController, CallsController, MobileController, WhatsAppController, MessagingController, UnsubscribeController, AutomationController,
+    CustomActionsController, BillingController, SalesController, ProcessController, DealsController, DeveloperController, HooksController, PublicFormsController, PublicApiController, CallsController, CampaignsController, MobileController, WhatsAppController, MessagingController, UnsubscribeController, AutomationController,
   ],
   providers: [
     DbService,

@@ -1,9 +1,9 @@
 import { normalizeMobile } from '@ubos/shared';
-import type { Tx } from '@ubos/database';
+import type { Prisma, Tx } from '@ubos/database';
 import { activity, syncNextFollowUp } from '../../common/lead-ops';
 import { intakeLead } from '../../common/lead-intake';
 import { emitEvent } from '../../common/events';
-import type { LiveEvent } from '../../common/live';
+import { live as liveHub, type LiveEvent } from '../../common/live';
 
 /** One call as sent by the phone app, a cloud provider, or logged by hand. */
 export interface CallInput {
@@ -75,6 +75,19 @@ export async function ingestCall(tx: Tx, c: CallContext, input: CallInput): Prom
     if (r.leadId) { lead = await tx.lead.findUnique({ where: { id: r.leadId } }); live.push({ type: 'lead.created', leadId: r.leadId, userId: lead?.ownerId ?? null }); }
   }
   const userId = c.userId ?? lead?.ownerId ?? null;
+  // A campaign outcome saved before the phone or provider reported the call: that row becomes the real call, so it is not counted twice.
+  if (lead && userId && c.channel !== 'manual' && input.direction === 'outbound') {
+    const hand = await tx.call.findFirst({ where: { leadId: lead.id, userId, channel: 'manual', campaignId: { not: null }, startedAt: { gte: input.startedAt, lte: new Date(input.startedAt.getTime() + 2 * 3_600_000) } }, orderBy: { startedAt: 'asc' } });
+    if (hand) {
+      const talkSec = Math.max(0, Math.round(input.talkSec ?? 0));
+      await tx.call.update({ where: { id: hand.id }, data: { externalId: input.externalId, channel: c.channel, provider: c.provider ?? null, deviceId: c.deviceId ?? null, phone, startedAt: input.startedAt, ringSec: Math.max(0, Math.round(input.ringSec ?? 0)), talkSec, answered: input.answered, clientUpdatedAt: input.clientUpdatedAt ?? null } });
+      if (hand.activityId) {
+        const act = await tx.leadActivity.findUnique({ where: { id: hand.activityId } });
+        await tx.leadActivity.update({ where: { id: hand.activityId }, data: { durationSec: talkSec, data: { ...((act?.data ?? {}) as object), channel: c.channel } } });
+      }
+      return { externalId: input.externalId, status: 'updated', callId: hand.id, leadId: lead.id, live: [{ type: 'call.updated', leadId: lead.id, userId, callId: hand.id }] };
+    }
+  }
   const call = await tx.call.create({
     data: {
       tenantId: c.tenantId, externalId: input.externalId, channel: c.channel, provider: c.provider ?? null, direction: input.direction, phone, userId, deviceId: c.deviceId ?? null,
@@ -87,6 +100,22 @@ export async function ingestCall(tx: Tx, c: CallContext, input: CallInput): Prom
   await attachToLead(tx, call.id, lead, userId, input);
   live.push({ type: 'call.logged', leadId: lead.id, userId, callId: call.id });
   return { externalId: input.externalId, status: 'created', callId: call.id, leadId: lead.id, live };
+}
+
+/** A call logged by hand: goes into the call log (all channels in one place) and tells automation and open browsers. */
+export async function createManualCall(tx: Tx, lead: { id: string; tenantId: string; workspaceId: string; customerId: string }, activityId: string, userId: string, c: { disposition: string | null; connected: boolean; durationSec: number; remark: string | null; campaignId?: string; extraData?: Record<string, unknown> }) {
+  const now = new Date();
+  const cust = await tx.customer.findUnique({ where: { id: lead.customerId }, select: { mobile: true } });
+  const call = await tx.call.create({
+    data: {
+      tenantId: lead.tenantId, externalId: `manual:${activityId}`, channel: 'manual', direction: 'outbound', phone: cust?.mobile ?? '', userId, workspaceId: lead.workspaceId, leadId: lead.id, customerId: lead.customerId,
+      activityId, startedAt: now, talkSec: c.durationSec, answered: c.connected, disposition: c.disposition, remark: c.remark, campaignId: c.campaignId ?? null,
+    },
+  });
+  await tx.leadActivity.update({ where: { id: activityId }, data: { data: { ...(c.extraData ?? {}), callId: call.id, channel: 'manual' } as Prisma.InputJsonValue } });
+  await emitEvent(tx, lead.tenantId, lead.workspaceId, 'call.logged', { callId: call.id, leadId: lead.id, customerId: lead.customerId, userId, channel: 'manual', direction: 'outbound', startedAt: now, talkSec: call.talkSec, answered: call.answered, disposition: call.disposition });
+  liveHub.publish(lead.tenantId, { type: 'call.logged', leadId: lead.id, userId, callId: call.id });
+  return call;
 }
 
 type LeadRow = { id: string; tenantId: string; workspaceId: string; customerId: string; firstResponseAt: Date | null; lastActivityAt: Date | null; ownerId: string | null };

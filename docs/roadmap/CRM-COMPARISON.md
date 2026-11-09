@@ -51,8 +51,8 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Click-to-call, call log | T F H P | Built | Must | — |
 | Call recording | T F H P | Built | Must | — |
 | Missed and hourly call reports | T | Built | Must | — |
-| Auto / power dialer | T H | Planned | Must | 2.6 |
-| Coaching comments on recordings | H | Planned | Should | 2.6 |
+| Auto / power dialer | T H | Built | Must | 2.6 |
+| Coaching comments on recordings | H | Built | Should | 2.6 |
 | SIM calling from an Android app | T P | Planned | Must | 2.2 |
 | IVR | H | Gap | Should | Phase 3 |
 | Voicemail drop | H | Gap | Later | Phase 5 |

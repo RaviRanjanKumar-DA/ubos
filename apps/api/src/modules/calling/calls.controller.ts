@@ -10,6 +10,7 @@ import { parse } from '../../common/errors';
 import { scopeFilter } from '../../common/scope';
 import { contact, fieldAccess } from '../../common/field-access';
 import { live } from '../../common/live';
+import { notify } from '../../common/notify';
 import { randomCode, sha256 } from '../../auth/crypto';
 import { readConfig } from '../integration-runtime';
 import { attachToLead } from './call-pipeline';
@@ -21,6 +22,7 @@ const ListQuery = z.object({
   view: z.enum(['all', 'unmatched']).default('all'), limit: z.coerce.number().int().min(1).max(500).default(200),
 });
 const Dial = z.object({ via: z.enum(['phone', 'cloud']).optional() });
+const Comment = z.object({ body: z.string().trim().min(1).max(1000), atSec: z.number().int().min(0).max(36_000).nullable().optional() });
 
 /** Calls of every channel: log with filters, recordings (permission + audit), unmatched calls, dialing, paired phones, live stream. */
 @Controller('api/v1')
@@ -48,6 +50,7 @@ export class CallsController {
         rows = await tx.call.findMany({ where: { ...where, OR: [{ leadId: { in: leads.map((l) => l.id) } }, { leadId: null, userId: a.userId }] }, orderBy: { startedAt: 'desc' }, take: q.limit });
       }
       const fa = await fieldAccess(tx);
+      const notes = await tx.callComment.groupBy({ by: ['callId'], where: { callId: { in: rows.map((r) => r.id) }, isArchived: false }, _count: true });
       const [users, leadRows, opts] = await Promise.all([
         tx.user.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.userId).filter(Boolean) as string[])] } }, select: { id: true, name: true } }),
         tx.lead.findMany({ where: { id: { in: rows.map((r) => r.leadId).filter(Boolean) as string[] } }, select: { id: true, workspaceId: true, customer: { select: { name: true } } } }),
@@ -58,7 +61,7 @@ export class CallsController {
         id: r.id, channel: r.channel, provider: r.provider, direction: r.direction, phone: contact(fa, 'mobile', r.phone), startedAt: r.startedAt, ringSec: r.ringSec, talkSec: r.talkSec,
         answered: r.answered, disposition: r.disposition, dispositionLabel: opts.find((o) => o.workspaceId === r.workspaceId && o.value === r.disposition)?.label ?? r.disposition,
         remark: r.remark, leadId: r.leadId, customerName: leadRows.find((l) => l.id === r.leadId)?.customer.name ?? null, userId: r.userId,
-        userName: users.find((u) => u.id === r.userId)?.name ?? null, recording: r.recordingStatus, canListen: canListen && ['ready', 'link'].includes(r.recordingStatus),
+        userName: users.find((u) => u.id === r.userId)?.name ?? null, recording: r.recordingStatus, canListen: canListen && ['ready', 'link'].includes(r.recordingStatus), canComment: canListen, comments: notes.find((n) => n.callId === r.id)?._count ?? 0,
       }));
     });
   }
@@ -81,6 +84,48 @@ export class CallsController {
     res.setHeader('Cache-Control', 'private, no-store');
     res.setHeader('Content-Disposition', 'inline');
     return res.end(r.data);
+  }
+
+  // ── Coaching comments ──
+
+  @Get('calls/:id/comments')
+  @RequirePermission('crm.call.recording')
+  comments(@Param('id') id: string) {
+    return this.db.tenant(async (tx) => {
+      await this.visibleCall(tx, id, 'crm.call.recording');
+      const rows = await tx.callComment.findMany({ where: { callId: id, isArchived: false }, orderBy: [{ atSec: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }], take: 200 });
+      const people = await tx.user.findMany({ where: { id: { in: rows.map((r) => r.authorId) } }, select: { id: true, name: true } });
+      return rows.map((r) => ({ id: r.id, body: r.body, atSec: r.atSec, createdAt: r.createdAt, authorName: people.find((p) => p.id === r.authorId)?.name ?? '', mine: r.authorId === auth().userId }));
+    });
+  }
+
+  /** A coaching note on a call; the person who made the call is told. */
+  @Post('calls/:id/comments')
+  @RequirePermission('crm.call.recording')
+  addComment(@Param('id') id: string, @Body() body: unknown) {
+    const input = parse(Comment, body);
+    return this.db.tenant(async (tx) => {
+      const c = await this.visibleCall(tx, id, 'crm.call.recording');
+      const row = await tx.callComment.create({ data: { tenantId: tenantId(), callId: id, authorId: auth().userId, atSec: input.atSec ?? null, body: input.body } });
+      await this.db.audit(tx, { workspaceId: c.workspaceId, entity: 'call', entityId: id, action: 'call.comment_added', newValue: { commentId: row.id, atSec: row.atSec } });
+      if (c.userId && c.userId !== auth().userId) await notify(tx, [c.userId], { type: 'coaching', title: `${auth().name} commented on your call`, body: input.body, link: `/app/calls?coach=${id}` });
+      return { id: row.id };
+    });
+  }
+
+  /** Removes a comment from view (kept in the database). Its author or someone who can assign leads. */
+  @Post('calls/comments/:id/archive')
+  @RequirePermission('crm.call.recording')
+  archiveComment(@Param('id') id: string) {
+    return this.db.tenant(async (tx) => {
+      const row = await tx.callComment.findUnique({ where: { id } });
+      if (!row) throw new NotFoundException({ code: 'COMMENT_NOT_FOUND', message: 'Comment not found' });
+      const c = await this.visibleCall(tx, row.callId, 'crm.call.recording');
+      if (row.authorId !== auth().userId && !auth().permissions['crm.lead.assign']) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'You can remove only your own comments' });
+      await tx.callComment.update({ where: { id }, data: { isArchived: true } });
+      await this.db.audit(tx, { workspaceId: c.workspaceId, entity: 'call', entityId: row.callId, action: 'call.comment_removed', oldValue: { commentId: id } });
+      return { ok: true };
+    });
   }
 
   /** Puts an unmatched call on a lead. */

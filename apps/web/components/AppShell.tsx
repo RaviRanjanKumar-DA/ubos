@@ -46,6 +46,7 @@ const NAV: NavGroup[] = [
   ] },
   { id: 'comm', title: 'Communication', items: [
     { href: '/app/calls', label: 'Calls', icon: 'calls', perm: 'crm.lead.view' },
+    { href: '/app/campaigns', label: 'Call campaigns', icon: 'checklist', perm: 'crm.lead.update' },
     { href: '/app/inbox', label: 'WhatsApp Inbox', icon: 'forum', perm: 'crm.whatsapp.chat' },
     { href: '/app/outreach', label: 'SMS & Email', icon: 'mail', perm: 'crm.message.send' },
     { href: '/app/automation', label: 'Automation', icon: 'bolt', perm: 'crm.automation.manage' },

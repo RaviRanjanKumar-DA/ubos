@@ -526,6 +526,7 @@ model Lead {
   importId        String?
   followUps       FollowUp[]
   activities      LeadActivity[]
+  campaignItems   CallCampaignItem[]
 
   @@index([tenantId, workspaceId, pipelineId, stageId])
   @@index([tenantId, ownerId])
@@ -1309,8 +1310,10 @@ model Call {
   clientUpdatedAt  DateTime? // edit time on the phone (latest edit wins)
   receivedAt       DateTime  @default(now())
   updatedAt        DateTime  @default(now()) @updatedAt
+  campaignId       String?   // set when the call was made from a calling campaign
 
   @@unique([tenantId, externalId])
+  @@index([tenantId, campaignId])
   @@index([tenantId, startedAt])
   @@index([tenantId, leadId])
   @@index([tenantId, userId, startedAt])
@@ -1522,4 +1525,63 @@ model SequenceEnrollment {
 
   @@index([status, nextAt])
   @@index([tenantId, leadId])
+}
+
+/// A calling campaign: a list of leads worked one by one by the chosen callers (power dialer).
+model CallCampaign {
+  id            String   @id @default(uuid())
+  tenantId      String
+  workspaceId   String
+  name          String
+  status        String   @default("active") // active | paused | completed
+  agentIds      String[] @default([])
+  maxAttempts   Int      @default(3)
+  retryAfterMin Int      @default(60)
+  filter        Json     // how the list was chosen
+  isArchived    Boolean  @default(false)
+  createdById   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now()) @updatedAt
+  items         CallCampaignItem[]
+
+  @@index([tenantId, workspaceId])
+}
+
+/// One lead in a campaign queue. The partial unique index "one open per agent" lives in the migration.
+model CallCampaignItem {
+  id              String       @id @default(uuid())
+  tenantId        String
+  campaignId      String
+  campaign        CallCampaign @relation(fields: [campaignId], references: [id])
+  leadId          String
+  lead            Lead         @relation(fields: [leadId], references: [id])
+  position        Int
+  status          String       @default("pending") // pending | active | done | closed (lead won or lost)
+  agentId         String?
+  claimedAt       DateTime?
+  lockedUntil     DateTime?    // a claimed lead that was not dialed returns to the queue after this
+  dialedAt        DateTime?    // once dialed, the outcome must be saved before moving on
+  attempts        Int          @default(0)
+  nextAt          DateTime     @default(now())
+  callId          String?
+  lastDisposition String?
+  connected       Boolean?
+  lastAt          DateTime?
+
+  @@unique([campaignId, leadId])
+  @@index([tenantId, campaignId, status, nextAt])
+}
+
+/// Coaching comment on a call, optionally at a moment in its recording.
+model CallComment {
+  id         String   @id @default(uuid())
+  tenantId   String
+  callId     String
+  authorId   String
+  atSec      Int?
+  body       String
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, callId])
 }

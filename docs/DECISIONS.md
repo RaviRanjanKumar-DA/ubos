@@ -26,3 +26,4 @@ Mark your choice next to each item. If left blank, the recommended default is us
 | 20 | Free trial length & limits | 7 / 14 / 30 days | 14 days, 5 users | |
 | 21 | Your own business lines (workspaces for Tenant #1) | e.g. Course/Software, Logo Designing, Vastu Consultation/Audit | Needed in Phase 0 | |
 | 22 | Time zone | — | **Decided: every date is shown, filtered and exported in IST (Asia/Kolkata)** | ✓ |
+| 23 | Calling campaign access | — | **Decided: a campaign never widens access. Callers get only leads already in their own scope; to share others' leads, assign them or add the person to the lead team** | ✓ |
