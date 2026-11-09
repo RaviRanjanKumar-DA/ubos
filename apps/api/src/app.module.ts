@@ -1,3 +1,6 @@
+import { BookingLinksController, PublicBookingController } from './modules/connected/booking.controller';
+import { ConnectCallbackController, ConnectedController, TrackingController } from './modules/connected/connected.controller';
+import { MailService } from './modules/connected/mail.service';
 import { Controller, Get, MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
@@ -65,6 +68,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    BookingLinksController, PublicBookingController, ConnectedController, ConnectCallbackController, TrackingController,
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,
     SecurityController, OAuthController, UsersController, RolesController, OrgController,
@@ -82,6 +86,7 @@ class HealthController {
     CallingService,
     WhatsAppService,
     MessagingService,
+    MailService,
     AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },

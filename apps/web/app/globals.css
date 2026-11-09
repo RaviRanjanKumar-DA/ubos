@@ -762,3 +762,36 @@ tr.selected td { background: var(--brand-50) !important; }
   .org-ws { width: auto; flex: 1 1 140px; }
   .org-team .org-tools { width: 100%; }
 }
+
+/* Booking links and connected accounts */
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap: 16px; align-items: start; }
+.book-card h2 { margin: 0; }
+.book-count { margin-top: 8px; }
+.book-url { margin-top: 8px; padding: 7px 10px; background: var(--bg); border-radius: 8px; color: var(--ink-2); overflow-wrap: anywhere; }
+.book-actions { margin-top: 12px; }
+.book-modal { max-width: 560px; }
+.book-modal h2 { margin: 0; }
+.book-nums { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 12px; }
+.book-hours-title { font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 4px; }
+.book-day { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.book-times { flex-wrap: nowrap; }
+.book-times .input { width: 120px; height: 36px; }
+.book-pub { max-width: 560px; }
+.book-label { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 16px 0 8px; }
+.book-days { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+.book-days .chip { flex: none; white-space: nowrap; }
+.book-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; }
+.book-chosen { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 14px; }
+.book-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+.book-done { text-align: center; padding: 16px 0; }
+.conn-section { margin-bottom: 16px; }
+.conn-section h2 { margin: 0 0 4px; }
+.conn-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid var(--line); }
+.conn-main { min-width: 0; flex: 1 1 240px; }
+.conn-err { color: var(--bad); overflow-wrap: anywhere; }
+.conn-page { padding: 14px 0; border-top: 1px solid var(--line); margin-top: 12px; }
+.conn-route { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.conn-route .input { flex: 1 1 220px; width: auto; height: 36px; padding-top: 0; padding-bottom: 0; }
+.conn-form { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0 0 12px; }
+.conn-form .input { flex: 0 1 240px; height: 36px; padding-top: 0; padding-bottom: 0; }
+@media (max-width: 480px) { .book-nums { grid-template-columns: 1fr; } .book-times .input { width: 104px; } }

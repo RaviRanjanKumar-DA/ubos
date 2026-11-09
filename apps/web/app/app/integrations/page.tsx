@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { Icon } from '@/components/Icon';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
@@ -25,6 +26,8 @@ export default function IntegrationsPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [openKey, setOpenKey] = useState<string | null>(null);
+  const router = useRouter();
+  const openSetup = (key: string) => { if (key === 'facebook_leads') router.push('/app/connected'); else setOpenKey(key); };
   const canManage = me.permissions['integrations.manage'] === 'ORGANIZATION';
 
   const load = () => api<Integration[]>('/api/v1/integrations', { noWorkspace: true }).then(setList).catch((e) => setError(e.message));
@@ -75,7 +78,7 @@ export default function IntegrationsPage() {
           <h2 style={{ marginBottom: 10 }}>{c} <span className="muted" style={{ fontWeight: 500, fontSize: 13 }}>({shown.filter((i) => i.category === c).length})</span></h2>
           <div className="int-grid">
             {shown.filter((i) => i.category === c).map((i) => (
-              <div key={i.key} className={`card int-card ${i.status === 'active' ? 'on' : ''}`} role="button" tabIndex={0} onClick={() => setOpenKey(i.key)} onKeyDown={(e) => { if (e.key === 'Enter') setOpenKey(i.key); }} title={`Set up ${i.name}`}>
+              <div key={i.key} className={`card int-card ${i.status === 'active' ? 'on' : ''}`} role="button" tabIndex={0} onClick={() => openSetup(i.key)} onKeyDown={(e) => { if (e.key === 'Enter') openSetup(i.key); }} title={`Set up ${i.name}`}>
                 <div className="row" style={{ flexWrap: 'nowrap', alignItems: 'flex-start', gap: 12 }}>
                   <IntegrationIcon id={i.key} name={i.name} />
                   <div style={{ minWidth: 0, flex: 1 }}>
@@ -91,9 +94,9 @@ export default function IntegrationsPage() {
                       : <span className="badge" style={{ fontWeight: 500 }} title="When the live connection ships">{i.phase}</span>}
                   </span>
                   {canManage && (
-                    <button className={`btn sm ${i.status === 'active' ? 'ghost' : 'outline'}`} disabled={busy === i.key} onClick={(e) => { e.stopPropagation(); if (i.status === 'active') toggle(i); else setOpenKey(i.key); }}
+                    <button className={`btn sm ${i.status === 'active' ? 'ghost' : 'outline'}`} disabled={busy === i.key} onClick={(e) => { e.stopPropagation(); if (i.key === 'facebook_leads') openSetup(i.key); else if (i.status === 'active') toggle(i); else setOpenKey(i.key); }}
                       style={i.status === 'active' ? { color: 'var(--bad)' } : undefined}>
-                      {i.status === 'active' ? 'Deactivate' : 'Set up'}
+                      {i.key === 'facebook_leads' ? 'Manage' : i.status === 'active' ? 'Deactivate' : 'Set up'}
                     </button>
                   )}
                 </div>

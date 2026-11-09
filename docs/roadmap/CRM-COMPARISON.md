@@ -18,7 +18,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Excel / CSV import | T | Built | Must | — |
 | IndiaMART, Justdial | T | Built | Must | — |
 | Google Ads, Google Forms, Sheets | T | Built | Must | — |
-| Facebook / Instagram Lead Ads | T | Planned | Must | 2.8 |
+| Facebook / Instagram Lead Ads | T | Built (needs Meta app review) | Must | 2.8 |
 | Property and other portals (99acres, MagicBricks, Housing, Sulekha) | T | Gap | Must | 2.9 |
 | Leads from WhatsApp messages | T | Built | Must | — |
 | Website chat and lead bot | F H | Gap | Should | 2.10 |
@@ -42,7 +42,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Guided process per stage | Z H | Built | Should | — |
 | Deal splits between sellers | H S | Part | Later | Phase 3 |
 | Partner / dealer portal and channel sales | L Z S | Gap | Later | Phase 5 |
-| Meeting booking links | H S | Planned | Should | 2.8 |
+| Meeting booking links | H S | Built | Should | 2.8 |
 
 ## Calling
 
@@ -70,7 +70,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Scheduled messages | T | Part | Must | 2.10 |
 | SMS with DLT, delivery reports | T F | Built | Must | — |
 | Email through company SMTP, opt-outs | T H S | Built | Must | — |
-| Gmail / Outlook sync and tracking | F H S P M | Planned | Should | 2.8 |
+| Gmail / Outlook sync and tracking | F H S P M | Built (needs Google and Microsoft setup) | Should | 2.8 |
 | Instagram / Messenger inbox | H | Planned | Should | 2.10 |
 
 ## Automation

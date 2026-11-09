@@ -73,7 +73,7 @@ export class MessagingController {
       const sms = await tx.integrationConnection.findFirst({ where: { key: 'sms_dlt', workspaceId: null, status: 'active' }, select: { id: true } });
       return {
         smsConnected: !!sms, smsOptOut: lead.customer.smsOptOut, emailOptOut: lead.customer.emailOptOut, hasMobile: !!lead.customer.mobile, hasEmail: !!lead.customer.email,
-        messages: rows.map((m) => ({ id: m.id, channel: m.type, templateName: m.templateName, body: m.body, status: m.status, error: m.error, at: m.createdAt, by: m.userId ? users.get(m.userId) ?? null : null })),
+        messages: rows.map((m) => ({ id: m.id, channel: m.type, direction: m.direction, subject: m.subject, tracked: !!m.trackToken, openedAt: m.openedAt, openCount: m.openCount, clickCount: m.clickCount, templateName: m.templateName, body: m.body, status: m.status, error: m.error, at: m.createdAt, by: m.userId ? users.get(m.userId) ?? null : null })),
       };
     });
   }

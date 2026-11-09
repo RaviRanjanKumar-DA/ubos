@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
 interface Template { id: string; channel: string; name: string; subject: string | null; body: string }
-interface Log { smsConnected: boolean; smsOptOut: boolean; emailOptOut: boolean; hasMobile: boolean; hasEmail: boolean; messages: { id: string; channel: string; templateName: string | null; body: string | null; status: string; error: string | null; at: string; by: string | null }[] }
+interface Log { smsConnected: boolean; smsOptOut: boolean; emailOptOut: boolean; hasMobile: boolean; hasEmail: boolean; messages: { id: string; channel: string; direction: string; subject: string | null; tracked: boolean; openedAt: string | null; openCount: number; clickCount: number; templateName: string | null; body: string | null; status: string; error: string | null; at: string; by: string | null }[] }
 const TONE: Record<string, string> = { delivered: 'ok', sent: '', queued: 'grey', failed: 'bad' };
 
 /** SMS & email on a lead: send an approved template, see what was sent, record opt-outs. */
@@ -40,12 +40,14 @@ export function LeadOutreach({ leadId, workspace, canUpdate }: { leadId: string;
         {canUpdate && <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={log.smsOptOut} onChange={(e) => toggle('sms', e.target.checked)} /> Customer opted out of SMS</label>}
         {canUpdate && <label className="row" style={{ gap: 4 }}><input type="checkbox" checked={log.emailOptOut} onChange={(e) => toggle('email', e.target.checked)} /> Customer opted out of email</label>}
       </div>
+      {log.hasEmail && !log.emailOptOut && <MailboxEmail leadId={leadId} workspace={workspace} onSent={load} onMsg={setMsg} />}
       <LeadSequences leadId={leadId} workspace={workspace} onMsg={setMsg} />
       {!log.messages.length ? <p className="small muted">Nothing sent yet.</p> : log.messages.map((m) => (
         <div key={m.id} className="run-card">
-          <div className="row" style={{ justifyContent: 'space-between' }}><span className="small"><b>{m.channel === 'sms' ? 'SMS' : 'Email'}</b> · {m.templateName}{m.by ? ` · ${m.by}` : ''} · {new Date(m.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</span><span className={`badge ${TONE[m.status] ?? 'grey'}`}>{m.status}</span></div>
+          <div className="row" style={{ justifyContent: 'space-between' }}><span className="small"><b>{m.channel === 'sms' ? 'SMS' : m.direction === 'in' ? 'Email received' : 'Email'}</b> · {m.templateName ?? m.subject ?? '(no subject)'}{m.by ? ` · ${m.by}` : ''} · {new Date(m.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</span><span className={`badge ${TONE[m.status] ?? 'grey'}`}>{m.status}</span></div>
           <div className="small" style={{ whiteSpace: 'pre-wrap', marginTop: 4 }}>{m.body}</div>
           {m.error && <div className="small" style={{ color: 'var(--bad)' }}>{m.error}</div>}
+          {m.tracked && <div className="small muted" style={{ marginTop: 4 }}>{m.openedAt ? `Opened ${m.openCount} ${m.openCount === 1 ? 'time' : 'times'}, first on ${new Date(m.openedAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}` : 'Not opened yet'}{m.clickCount ? ` · ${m.clickCount} link ${m.clickCount === 1 ? 'click' : 'clicks'}` : ''}</div>}
         </div>
       ))}
     </>
@@ -78,5 +80,34 @@ function LeadSequences({ leadId, workspace, onMsg }: { leadId: string; workspace
         </div>
       ))}
     </div>
+  );
+}
+
+/** A one-to-one email from the person's own connected mailbox. Hidden until a mailbox is connected. */
+function MailboxEmail({ leadId, workspace, onSent, onMsg }: { leadId: string; workspace: string; onSent: () => void; onMsg: (m: { type: 'error' | 'notice'; text: string }) => void }) {
+  const [from, setFrom] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [f, setF] = useState({ subject: '', body: '', track: true });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api<{ accounts: { email: string; status: string }[] }>('/api/v1/connected/mail', { workspace }).then((r) => setFrom(r.accounts.find((a) => a.status === 'active')?.email ?? null)).catch(() => setFrom(null)); }, [workspace]);
+  if (!from) return null;
+  if (!open) return <button className="btn sm outline" style={{ marginBottom: 10 }} onClick={() => setOpen(true)}>Write an email</button>;
+  async function send(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      await api(`/api/v1/connected/leads/${leadId}/email`, { method: 'POST', body: f, workspace });
+      onMsg({ type: 'notice', text: 'Email sent.' }); setF({ subject: '', body: '', track: true }); setOpen(false); onSent();
+    } catch (err) { onMsg({ type: 'error', text: err instanceof ApiError ? err.message : 'Failed' }); }
+    setBusy(false);
+  }
+  return (
+    <form className="run-card" onSubmit={send}>
+      <div className="small muted" style={{ marginBottom: 8 }}>From {from}</div>
+      <div className="field"><label htmlFor="em-s">Subject</label><input id="em-s" className="input" required maxLength={300} value={f.subject} onChange={(e) => setF({ ...f, subject: e.target.value })} /></div>
+      <div className="field"><label htmlFor="em-b">Message</label><textarea id="em-b" className="input" required rows={6} maxLength={20000} value={f.body} onChange={(e) => setF({ ...f, body: e.target.value })} /></div>
+      <label className="row small" style={{ marginBottom: 10 }}><input type="checkbox" checked={f.track} onChange={(e) => setF({ ...f, track: e.target.checked })} /> Track opens and link clicks</label>
+      <div className="row"><button className="btn sm" disabled={busy}>{busy ? 'Sending…' : 'Send'}</button><button type="button" className="btn sm ghost" onClick={() => setOpen(false)}>Go back</button></div>
+    </form>
   );
 }

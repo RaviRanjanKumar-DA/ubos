@@ -44,6 +44,7 @@ const NAV: NavGroup[] = [
     { href: '/app/leads', label: 'Leads', icon: 'funnel', perm: 'crm.lead.view' },
     { href: '/app/customers', label: 'Customers', icon: 'hr', perm: 'crm.customer.view' },
     { href: '/app/calendar', label: 'Calendar & Tasks', icon: 'calendar', perm: 'crm.lead.view' },
+    { href: '/app/booking', label: 'Booking links', icon: 'clock', perm: 'crm.booking.manage' },
   ] },
   { id: 'comm', title: 'Communication', items: [
     { href: '/app/calls', label: 'Calls', icon: 'calls', perm: 'crm.lead.view' },
@@ -69,6 +70,7 @@ const NAV: NavGroup[] = [
     { href: '/app/roles', label: 'Roles & Permissions', icon: 'audit', perm: 'org.user.view' },
     { href: '/app/org', label: 'Org Structure', icon: 'tenants', perm: 'org.user.view' },
     { href: '/app/integrations', label: 'Integrations', icon: 'integrations', perm: 'integrations.view' },
+    { href: '/app/connected', label: 'Connected accounts', icon: 'share', perm: 'crm.message.send' },
     { href: '/app/forms', label: 'Web forms', icon: 'form', perm: 'crm.lead.view' },
     { href: '/app/developer', label: 'Developer (API)', icon: 'code', perm: 'integrations.developer' },
     { href: '/app/audit', label: 'Audit Log', icon: 'history', perm: 'audit.view' },

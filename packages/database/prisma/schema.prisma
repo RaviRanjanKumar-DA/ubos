@@ -1402,6 +1402,12 @@ model Message {
   error          String?
   userId         String?
   broadcastId    String?
+  subject        String?  // email only
+  trackToken     String?  @unique // email open and click tracking
+  openedAt       DateTime?
+  openCount      Int      @default(0)
+  clickedAt      DateTime?
+  clickCount     Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now()) @updatedAt
 
@@ -1663,4 +1669,96 @@ model KbArticle {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@index([tenantId, workspaceId, status])
+}
+
+/** A public page where a customer books a meeting with one person. Hours are per IST weekday (0 = Sunday), in minutes from midnight. */
+model BookingLink {
+  id          String    @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  hostId      String
+  slug        String
+  title       String
+  description String?
+  durationMin Int       @default(30)
+  bufferMin   Int       @default(0)
+  noticeHours Int       @default(4)
+  horizonDays Int       @default(30)
+  hours       Json
+  location    String?
+  isActive    Boolean   @default(true)
+  isArchived  Boolean   @default(false)
+  bookings    Int       @default(0)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  entries     Booking[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, workspaceId])
+}
+
+model Booking {
+  id              String      @id @default(uuid())
+  tenantId        String
+  linkId          String
+  link            BookingLink @relation(fields: [linkId], references: [id])
+  hostId          String
+  leadId          String?
+  taskId          String?
+  name            String
+  mobile          String?
+  email           String?
+  note            String?
+  startAt         DateTime
+  endAt           DateTime
+  status          String      @default("booked") // booked | cancelled | failed
+  cancelTokenHash String
+  cancelledAt     DateTime?
+  createdAt       DateTime    @default(now())
+
+  @@index([tenantId, hostId, startAt])
+  @@index([tenantId, linkId, startAt])
+  @@index([tenantId, cancelTokenHash])
+}
+
+/** A Facebook page connected for Lead Ads. The page token is encrypted. */
+model MetaPage {
+  id             String    @id @default(uuid())
+  tenantId       String
+  pageId         String
+  name           String
+  tokenEncrypted String?
+  status         String    @default("pending") // pending | active | disconnected
+  workspaceId    String?
+  formRoutes     Json      @default("{}") // form id -> business line
+  leads          Int       @default(0)
+  lastLeadAt     DateTime?
+  lastError      String?
+  connectedById  String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([tenantId, pageId])
+}
+
+/** One person's connected Gmail or Outlook. Tokens are encrypted. */
+model MailAccount {
+  id              String    @id @default(uuid())
+  tenantId        String
+  userId          String
+  provider        String    // google | microsoft
+  email           String
+  tokensEncrypted String?
+  status          String    @default("active") // active | error | disconnected
+  connectedAt     DateTime  @default(now())
+  syncedTo        DateTime?
+  lastSyncAt      DateTime?
+  lastError       String?
+  stored          Int       @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([tenantId, userId, provider])
+  @@index([status, lastSyncAt])
 }
