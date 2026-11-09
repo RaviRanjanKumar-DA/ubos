@@ -1762,3 +1762,52 @@ model MailAccount {
   @@unique([tenantId, userId, provider])
   @@index([status, lastSyncAt])
 }
+
+/** Territory and field rules: the first match picks the owner, in turn among its people. */
+model RoutingRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  position    Int      @default(0)
+  conditions  Json
+  userIds     String[] @default([])
+  cursor      Int      @default(0)
+  hits        Int      @default(0)
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, workspaceId, position])
+}
+
+model ScoreRule {
+  id          String   @id @default(uuid())
+  tenantId    String
+  workspaceId String
+  name        String
+  conditions  Json
+  points      Int
+  isActive    Boolean  @default(true)
+  isArchived  Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId, workspaceId])
+}
+
+/** Rules currently counted in a lead's score. */
+model LeadScoreHit {
+  id        String   @id @default(uuid())
+  tenantId  String
+  leadId    String
+  ruleId    String
+  points    Int
+  createdAt DateTime @default(now())
+
+  @@unique([leadId, ruleId])
+  @@index([tenantId, ruleId])
+}

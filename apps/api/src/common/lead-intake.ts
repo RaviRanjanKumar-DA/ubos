@@ -2,6 +2,7 @@ import type { Tx } from '@ubos/database';
 import { normalizeMobile, validateCustomFields, type DuplicateMode, type FieldDef } from '@ubos/shared';
 import { findCustomer, nextCustomerCode } from './customers';
 import { activity, assignmentAvailability, defaultStatus, eligibleOwners, makeAssigner } from './lead-ops';
+import { routedOwner, routingValues } from './lead-rules';
 import { notify } from './notify';
 import { emitEvent } from './events';
 
@@ -79,8 +80,10 @@ export async function intakeLead(tx: Tx, tenantId: string, workspaceId: string, 
   if (!pipeline?.stages[0]) return { outcome: 'rejected', leadId: null, customerId: customer.id, errors: ['This business line has no pipeline'] };
   const ws = await tx.workspace.findUniqueOrThrow({ where: { id: workspaceId } });
   const eligible = (await eligibleOwners(tx, workspaceId)).map((u) => u.id);
-  const assigner = makeAssigner(ws.assignmentMode === 'creator' ? { ...ws, assignmentMode: 'round_robin' } : ws, eligible, eligible[0] ?? '', await assignmentAvailability(tx));
-  const ownerId = eligible.length ? assigner.pick(customer.primaryRmId) || null : null;
+  const avail = await assignmentAvailability(tx);
+  const routed = await routedOwner(tx, ws, routingValues({ source, city: customer.city ?? (input.city ? String(input.city) : null), customFields: custom }), customer.primaryRmId, eligible, avail);
+  const assigner = makeAssigner(ws.assignmentMode === 'creator' ? { ...ws, assignmentMode: 'round_robin' } : ws, eligible, eligible[0] ?? '', avail);
+  const ownerId = routed ?? (eligible.length ? assigner.pick(customer.primaryRmId) || null : null);
   await tx.workspace.update({ where: { id: workspaceId }, data: { assignmentCursor: assigner.state.cursor } });
   const lead = await tx.lead.create({
     data: {

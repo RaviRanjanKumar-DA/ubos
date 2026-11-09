@@ -1,3 +1,4 @@
+import { routedOwner, routingValues } from '../common/lead-rules';
 import { BadRequestException, Body, Controller, Get, HttpCode, NotFoundException, Post } from '@nestjs/common';
 import { z } from 'zod';
 import { Prisma } from '@ubos/database';
@@ -61,11 +62,12 @@ export class LeadImportController {
       const byEmail = (await tx.organizationSetting.findUnique({ where: { tenantId: tenantId() } }))?.leadIdentifier === 'email';
       const initialStatus = await defaultStatus(tx, ws.id);
       const eligible = (await eligibleOwners(tx, ws.id)).map((u) => u.id);
+      const avail = await assignmentAvailability(tx);
       const assigner = makeAssigner(
         input.assign.mode === 'users'
           ? { assignmentMode: 'round_robin', assignmentUserIds: input.assign.userIds, assignmentCursor: 0, stickyOwner: false }
           : ws,
-        eligible, a.userId, await assignmentAvailability(tx),
+        eligible, a.userId, avail,
       );
       const imp = await tx.leadImport.create({
         data: { tenantId: tenantId(), workspaceId: ws.id, fileName: input.fileName, total: rows.length, created: 0, linked: 0, skipped: 0, failed: 0, errors: [], createdById: a.userId },
@@ -87,7 +89,8 @@ export class LeadImportController {
             data: { tenantId: tenantId(), name: d.name, mobile: d.mobile, email: d.email, city: d.city, code: await nextCustomerCode(tx) },
           })).id;
         } else linked++;
-        const ownerId = d.ownerId ?? (input.assign.mode === 'me' ? a.userId : assigner.pick(d.customerRm));
+        const routed = !d.ownerId && input.assign.mode !== 'me' && input.assign.mode !== 'users' ? await routedOwner(tx, ws, routingValues({ source: d.source, city: d.city, customFields: d.customFields as Record<string, unknown> }), d.customerRm, eligible, avail) : null;
+        const ownerId = d.ownerId ?? routed ?? (input.assign.mode === 'me' ? a.userId : assigner.pick(d.customerRm));
         const lead = await tx.lead.create({
           data: {
             tenantId: tenantId(), workspaceId: ws.id, pipelineId: input.pipelineId, stageId: d.stageId, customerId,

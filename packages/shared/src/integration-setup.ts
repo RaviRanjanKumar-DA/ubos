@@ -75,6 +75,12 @@ const BY_CATEGORY: Record<string, SetupDef> = {
   },
 };
 
+const PORTAL_FIELDS = ['name', 'mobile', 'email', 'city', 'project', 'locality', 'budget', 'message'];
+const portal = (name: string) => ({
+  steps: [`Choose the business line below and save, then map the fields in step 2 and switch the integration on.`, `Ask your ${name} account manager to push leads to the webhook URL below. If they only send leads by email or file, use bulk upload or Google Sheets instead.`, 'Each enquiry then becomes a lead and follows your routing rules.'],
+  fields: [workspaceField], webhook: true,
+});
+
 const SPECIFIC: Record<string, SetupDef> = {
   website_api: {
     steps: ['Copy the webhook URL below (or use the public API with an API key from Settings → API keys).', 'Send form submissions to it as JSON: name, mobile, email, source and any custom field.', 'Each submission becomes a lead in the chosen business line.'],
@@ -93,6 +99,10 @@ const SPECIFIC: Record<string, SetupDef> = {
     steps: ['Choose the business line below and save; then map the IndiaMART fields in step 2 and switch the integration on.', 'In IndiaMART Seller Panel open Lead Manager → Settings → CRM Integration → Push API and paste the webhook URL below.', 'Every new buyer enquiry is pushed to UBOS at once; the same enquiry (UNIQUE_QUERY_ID) is never added twice.'],
     fields: [workspaceField], webhook: true, where: 'IndiaMART Seller Panel → Lead Manager → Settings → CRM Integration',
   },
+  acres99: portal('99acres'),
+  magicbricks: portal('MagicBricks'),
+  housing: portal('Housing.com'),
+  sulekha: portal('Sulekha'),
   justdial: {
     steps: ['Ask your JustDial account manager for the lead API / webhook option.', 'Give them the webhook URL below.'],
     fields: [workspaceField], webhook: true,
@@ -297,6 +307,7 @@ export const MAP_TARGETS: Record<string, string> = {
 
 const SOURCE_FIELDS: Record<string, string[]> = {
   indiamart: ['SENDER_NAME', 'SENDER_MOBILE', 'SENDER_EMAIL', 'SENDER_CITY', 'SENDER_COMPANY', 'QUERY_PRODUCT_NAME', 'QUERY_MESSAGE'],
+  sulekha: PORTAL_FIELDS,
   justdial: ['name', 'mobile', 'email', 'city', 'category', 'area'],
   tradeindia: ['sender_name', 'sender_mobile', 'sender_email', 'sender_city', 'product_name', 'message'],
   facebook_leads: ['full_name', 'phone_number', 'email', 'city', 'form_name', 'campaign_name'],

@@ -19,7 +19,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | IndiaMART, Justdial | T | Built | Must | — |
 | Google Ads, Google Forms, Sheets | T | Built | Must | — |
 | Facebook / Instagram Lead Ads | T | Built (needs Meta app review) | Must | 2.8 |
-| Property and other portals (99acres, MagicBricks, Housing, Sulekha) | T | Gap | Must | 2.9 |
+| Property and other portals (99acres, MagicBricks, Housing, Sulekha) | T | Built (webhook; portal must push) | Must | 2.9 |
 | Leads from WhatsApp messages | T | Built | Must | — |
 | Website chat and lead bot | F H | Gap | Should | 2.10 |
 | Landing page builder | F H | Gap | Should | Phase 4 |
@@ -35,8 +35,8 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Kanban board | F | Built | Must | — |
 | Custom fields, conditional required fields | T Z F | Built | Must | — |
 | Stuck / ageing deal flags | F M | Built | Must | — |
-| Transfer between departments or business lines | T | Part | Must | 2.9 |
-| Territory management and routing | Z F S | Gap | Should | 2.9 |
+| Transfer between departments or business lines | T | Built | Must | 2.9 |
+| Territory management and routing | Z F S | Built | Should | 2.9 |
 | Sales goals | F H P | Built | Must | — |
 | Forecasting (weighted, commit, best case) | T Z F H S P M | Part | Should | Phase 4 |
 | Guided process per stage | Z H | Built | Should | — |
@@ -82,7 +82,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Follow-up sequences that stop on reply | T Z F H S | Built | Must | — |
 | Approvals | H S | Built | Should | — |
 | Visual flow builder | Z F H S M | Planned | Should | Phase 3 |
-| Lead scoring by rules | F H S | Part | Must | 2.9 |
+| Lead scoring by rules | F H S | Built (fields; not yet calls or email opens) | Must | 2.9 |
 | Webhooks and open API | F P | Built | Must | — |
 
 ## Marketing

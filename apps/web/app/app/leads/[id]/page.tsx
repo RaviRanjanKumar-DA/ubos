@@ -1,5 +1,6 @@
 'use client';
 
+import { LeadMove, ScoreBadge } from '@/components/LeadMove';
 import { Icon } from '@/components/Icon';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -125,7 +126,7 @@ function LeadPage() {
         <div>
           <div className="small muted"><Link href="/app/leads">Leads</Link> / {lead.workspace.name} · {lead.pipeline.name}</div>
           <h1>{lead.name} {lead.status && <span className={`badge ${STATUS_TONE[lead.status] ?? ''}`} style={{ verticalAlign: 'middle' }}>{label('statuses', lead.status)}</span>}
-            {' '}<span className={`badge ${lead.score >= 30 ? 'ok' : 'grey'}`} style={{ verticalAlign: 'middle' }} title="Lead score from custom actions">Score {lead.score}</span>
+            {' '}<ScoreBadge leadId={lead.id} workspace={lead.workspace.id} score={lead.score} />
             {lead.rating ? <span className="stars" style={{ marginLeft: 8, fontSize: 16, verticalAlign: 'middle' }} title="Customer rating">{'★'.repeat(lead.rating)}</span> : null}</h1>
           <div className="small muted">
             {lead.mobile && (lead.mobile.includes('•') ? <span title="Masked for your role">{lead.mobile}</span> : <a href={`tel:${lead.mobile}`}>{lead.mobile}</a>)}{lead.email ? ` · ${lead.email}` : ''}{lead.alternateEmails?.length ? ` (+${lead.alternateEmails.length} email)` : ''}{lead.city ? ` · ${lead.city}` : ''}
@@ -245,6 +246,7 @@ function LeadPage() {
           </div>
         </div>
       </div>
+      <LeadMove leadId={lead.id} workspace={lead.workspace.id} />
       {!tabParam && <div className="lead-deals">{deals}</div>}
       {losing && ws && <LostDialog ws={ws} name={lead.name} onClose={() => setLosing(null)} onPick={(r) => moveTo(losing, r)} />}
       <style>{`@media (max-width: 960px) { .lead-grid { grid-template-columns: 1fr !important; } }`}</style>

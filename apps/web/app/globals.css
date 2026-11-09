@@ -795,3 +795,14 @@ tr.selected td { background: var(--brand-50) !important; }
 .conn-form { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0 0 12px; }
 .conn-form .input { flex: 0 1 240px; height: 36px; padding-top: 0; padding-bottom: 0; }
 @media (max-width: 480px) { .book-nums { grid-template-columns: 1fr; } .book-times .input { width: 104px; } }
+
+/* Lead rules */
+.rule-card { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.rule-card.off { opacity: .62; }
+.rule-main { min-width: 0; flex: 1 1 280px; overflow-wrap: anywhere; }
+.rule-tools { gap: 4px; }
+.rule-cond { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 130px) minmax(0, 1fr) auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+.lead-move { margin-top: 10px; }
+.score-btn { border: 0; cursor: pointer; font-family: inherit; vertical-align: middle; }
+.score-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 560px) { .rule-cond { grid-template-columns: minmax(0, 1fr) auto; } .rule-cond > :nth-child(2), .rule-cond > :nth-child(3) { grid-column: 1 / 2; } .rule-cond > :last-child { grid-column: 2; grid-row: 1; } }

@@ -52,6 +52,7 @@ const NAV: NavGroup[] = [
     { href: '/app/inbox', label: 'WhatsApp Inbox', icon: 'forum', perm: 'crm.whatsapp.chat' },
     { href: '/app/outreach', label: 'SMS & Email', icon: 'mail', perm: 'crm.message.send' },
     { href: '/app/automation', label: 'Automation', icon: 'bolt', perm: 'crm.automation.manage' },
+    { href: '/app/lead-rules', label: 'Lead rules', icon: 'funnel', perm: 'crm.routing.manage' },
   ] },
   { id: 'support', title: 'Help desk', items: [
     { href: '/app/tickets', label: 'Tickets', icon: 'chat', perm: 'support.ticket.view' },

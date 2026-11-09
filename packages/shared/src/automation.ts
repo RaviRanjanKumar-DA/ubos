@@ -28,7 +28,7 @@ export const AUTOMATION_ACTIONS = {
 } as const;
 export type AutomationAction = keyof typeof AUTOMATION_ACTIONS;
 
-export const CONDITION_OPS = { eq: 'is', neq: 'is not', contains: 'contains', gt: 'more than', lt: 'less than', empty: 'is empty', not_empty: 'is filled' } as const;
+export const CONDITION_OPS = { eq: 'is', neq: 'is not', contains: 'contains', in: 'is one of', gt: 'more than', lt: 'less than', empty: 'is empty', not_empty: 'is filled' } as const;
 export type ConditionOp = keyof typeof CONDITION_OPS;
 /** Built-in condition fields; custom lead fields are "cf:<key>". */
 export const CONDITION_FIELDS: Record<string, string> = { source: 'Source', status: 'Status', stage: 'Stage', owner: 'Owner', score: 'Score', city: 'City' };
@@ -47,6 +47,7 @@ export function matchesConditions(conditions: RuleCondition[], values: Record<st
     if (c.op === 'eq') return a === b;
     if (c.op === 'neq') return a !== b;
     if (c.op === 'contains') return a.includes(b);
+    if (c.op === 'in') return b.split(',').map((x) => x.trim()).filter(Boolean).includes(a);
     return c.op === 'gt' ? Number(raw) > Number(c.value) : Number(raw) < Number(c.value);
   });
 }

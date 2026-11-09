@@ -1,3 +1,4 @@
+import { LeadRulesController } from './modules/lead-rules.controller';
 import { BookingLinksController, PublicBookingController } from './modules/connected/booking.controller';
 import { ConnectCallbackController, ConnectedController, TrackingController } from './modules/connected/connected.controller';
 import { MailService } from './modules/connected/mail.service';
@@ -68,6 +69,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    LeadRulesController,
     BookingLinksController, PublicBookingController, ConnectedController, ConnectCallbackController, TrackingController,
     HealthController, AuthController, WorkspacesController, LeadsController,
     IntegrationsController, AuditController, DashboardController, PlatformController,

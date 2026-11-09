@@ -1,3 +1,4 @@
+import { queueRescore } from '../common/lead-rules';
 import { BadRequestException, Body, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { z } from 'zod';
 import type { Tx } from '@ubos/database';
@@ -319,6 +320,7 @@ export class LeadWorkController {
       }
       if (lead.status === status) return null;
       await tx.lead.update({ where: { id: lead.id }, data: { status } });
+      await queueRescore(tx, lead);
       await tx.leadActivity.create({ data: activity(lead, auth().userId, { type: 'status', data: { from: lead.status, to: status } }) });
       return null;
     });

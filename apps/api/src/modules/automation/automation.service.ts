@@ -1,3 +1,4 @@
+import { rescoreLead } from '../../common/lead-rules';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { matchesConditions, type RuleCondition } from '@ubos/shared';
 import { DbService } from '../../common/db.service';
@@ -54,6 +55,8 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
   private async handle(ev: { tenantId: string; event: string; workspaceId: string | null; data: unknown }) {
     const data = (ev.data ?? {}) as Record<string, unknown>;
     if (typeof data.leadId !== 'string' || !ev.workspaceId) return;
+    const leadId = data.leadId;
+    await this.db.tenant((tx) => rescoreLead(tx, leadId)); // first, so rules can test the new score
     const rules = await this.db.tenant((tx) => tx.automationRule.findMany({ where: { trigger: ev.event, isActive: true, isArchived: false, workspaceId: ev.workspaceId! }, orderBy: { createdAt: 'asc' } }));
     for (const r of rules) await this.apply(r, data.leadId, ev.event, data);
   }

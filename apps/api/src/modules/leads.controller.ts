@@ -1,3 +1,4 @@
+import { queueRescore } from '../common/lead-rules';
 import { BadRequestException, Body, Controller, ForbiddenException, Get, NotFoundException, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { istStamp } from '../common/ist';
 import type { Response } from 'express';
@@ -231,7 +232,8 @@ export class LeadsController {
       const changes = await this.checkFields(tx, lead.workspaceId, customFields, true);
       const before = (lead.customFields ?? {}) as Record<string, unknown>;
       const merged = { ...before, ...changes } as Prisma.InputJsonObject;
-      await tx.lead.update({ where: { id }, data: { customFields: merged } });
+      const scoredLead = await tx.lead.update({ where: { id }, data: { customFields: merged } });
+      await queueRescore(tx, scoredLead);
       await this.db.audit(tx, {
         workspaceId: lead.workspaceId, entity: 'lead', entityId: id, action: 'lead.fields_changed',
         oldValue: Object.fromEntries(Object.keys(changes).map((k) => [k, before[k] ?? null])), newValue: changes,
