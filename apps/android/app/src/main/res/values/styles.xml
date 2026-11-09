@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Ubos" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:colorPrimary">#4A2BC2</item>
+        <item name="android:colorAccent">#4A2BC2</item>
+        <item name="android:statusBarColor">#4A2BC2</item>
+        <item name="android:windowBackground">#F5F4FA</item>
+    </style>
+</resources>

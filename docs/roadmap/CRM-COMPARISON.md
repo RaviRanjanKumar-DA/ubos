@@ -53,7 +53,7 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 | Missed and hourly call reports | T | Built | Must | — |
 | Auto / power dialer | T H | Built | Must | 2.6 |
 | Coaching comments on recordings | H | Built | Should | 2.6 |
-| SIM calling from an Android app | T P | Planned | Must | 2.2 |
+| SIM calling from an Android app | T P | Built (checked on an emulator) | Must | 2.2 |
 | IVR | H | Gap | Should | Phase 3 |
 | Voicemail drop | H | Gap | Later | Phase 5 |
 | Call transcription and summary | H S P M | Planned | Should | Phase 4 |
@@ -143,8 +143,8 @@ Checked 9 Nov 2026 against the public feature and pricing pages of eight CRMs. I
 
 | Feature | Seen in | UBOS | Priority | Goes in |
 |---|---|---|---|---|
-| Android app with follow-ups and push | T L H P M | Planned | Must | 2.2 |
-| Offline mode | F S P M | Planned | Must | 2.2 |
+| Android app with follow-ups and push | T L H P M | Part: follow-ups built, push not yet | Must | 2.2 |
+| Offline mode | F S P M | Part: calls and outcomes queue offline | Must | 2.2 |
 | Field check-in, nearby customers, voice notes | L F P | Gap | Should | Phase 5 |
 | iPhone app | L H P M | Gap | Later | Phase 6 |
 

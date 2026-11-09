@@ -20,7 +20,7 @@ duplicates and nothing missing.
 Pairing, the mobile API below, idempotent calls (`Call.externalId` unique per organization), edits (latest wins),
 reconciliation, resumable recording upload (encrypted at rest), dial requests from the web, live updates to open
 browsers, phones admin, retention purge — tested end to end with a simulated phone (`npm run verify:calling`).
-The Android app itself is slice 2.2.
+The Android app (slice 2.2) is in `apps/android`. Each call key uses an install id rather than the device id, so pairing the same phone again can never send a call twice, and only calls made after pairing are read. A call requested from the website rings while the app is open; with the app closed it arrives as a notification at the next background sync (up to 15 minutes), until push notifications are added.
 
 ## The phone app (Android first)
 

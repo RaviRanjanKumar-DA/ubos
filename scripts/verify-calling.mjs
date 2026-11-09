@@ -87,6 +87,11 @@ try {
   const actA = leadA.activities.find((x) => x.type === 'call' && x.durationSec === 125);
   check('an edit made later on the phone updates the call; an older edit does not', edited.body.results[0].status === 'updated' && stale.body.results[0].status === 'duplicate' && actA?.remark === 'Audit booked for Tuesday' && actA.disposition === 'call_back', [edited.body, stale.body, actA]);
   check('the call sits on the journey at the time it happened (not when it synced)', actA && Math.abs(new Date(actA.at).getTime() - new Date(A.startedAt).getTime()) < 2000 && leadA.lastDisposition === 'call_back', actA);
+  const fuAt = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  const withFu = await call('/mobile/v1/calls', { ...DEV(T), method: 'POST', body: { calls: [{ ...A, remark: 'Audit booked for Tuesday', disposition: 'call_back', followUpAt: fuAt, updatedAt: ago(2) }] } });
+  const withFu2 = await call('/mobile/v1/calls', { ...DEV(T), method: 'POST', body: { calls: [{ ...A, remark: 'Audit booked for Tuesday', disposition: 'call_back', followUpAt: fuAt, updatedAt: ago(1) }] } });
+  const leadFu = (await call(`/api/v1/leads/${arjunLead.id}`, { token: rm, workspace: VASTU })).body;
+  check('a follow-up saved after the call was sent reaches the lead, once', withFu.body.results[0].status === 'updated' && withFu2.body.results[0].status === 'duplicate' && new Date(leadFu.nextFollowUpAt).toISOString() === fuAt, [withFu.body, withFu2.body, leadFu.nextFollowUpAt]);
   const future = await call('/mobile/v1/calls', { ...DEV(T), method: 'POST', body: { calls: [{ ...A, externalId: 'dev1:9999:future', startedAt: new Date(Date.now() + 86_400_000).toISOString() }] } });
   check('calls dated in the future are refused (phone clock wrong)', future.body.results[0].status === 'rejected', future.body);
 

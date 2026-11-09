@@ -86,6 +86,8 @@ export class MobileController {
       await tx.device.update({ where: { id: d.id }, data: { lastSyncAt: now, lastSeenAt: now } });
       return {
         serverTime: now, dispositionRequired: !!settings?.dispositionRequired,
+        // Personal calls stay on the phone unless the organization has chosen to capture unknown callers.
+        captureUnknown: !!settings?.unknownCallerWorkspaceId,
         leads: leads.map((l) => ({
           id: l.id, workspaceId: l.workspaceId, name: l.customer.name, customerCode: l.customer.code,
           // The number the phone dials; the app shows only phoneDisplay (masked when the person's role hides numbers).

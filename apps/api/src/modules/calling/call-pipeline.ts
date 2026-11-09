@@ -56,13 +56,20 @@ export async function ingestCall(tx: Tx, c: CallContext, input: CallInput): Prom
   const existing = await tx.call.findUnique({ where: { tenantId_externalId: { tenantId: c.tenantId, externalId: input.externalId } } });
   if (existing) {
     const newer = input.clientUpdatedAt && (!existing.clientUpdatedAt || input.clientUpdatedAt > existing.clientUpdatedAt);
-    const changed = (input.disposition ?? null) !== existing.disposition || (input.remark ?? null) !== existing.remark;
+    // The phone sends a call the moment it ends, and the outcome and next follow-up a little later.
+    const newFollowUp = !!input.followUpAt && !!existing.leadId && !(await tx.followUp.findFirst({ where: { leadId: existing.leadId, dueAt: input.followUpAt, doneAt: null }, select: { id: true } }));
+    const changed = (input.disposition ?? null) !== existing.disposition || (input.remark ?? null) !== existing.remark || newFollowUp;
     if (!newer || !changed) return { externalId: input.externalId, status: 'duplicate', callId: existing.id, leadId: existing.leadId, live: [] };
     let disposition = input.disposition ?? existing.disposition;
     if (existing.workspaceId) disposition = (await outcome(tx, existing.workspaceId, input.disposition, existing.answered)).value;
     await tx.call.update({ where: { id: existing.id }, data: { disposition, remark: input.remark ?? existing.remark, clientUpdatedAt: input.clientUpdatedAt } });
     if (existing.activityId) await tx.leadActivity.update({ where: { id: existing.activityId }, data: { disposition, remark: input.remark ?? existing.remark } });
     if (existing.leadId && disposition) await tx.lead.update({ where: { id: existing.leadId }, data: { lastDisposition: disposition } });
+    if (newFollowUp) {
+      const l = await tx.lead.findUniqueOrThrow({ where: { id: existing.leadId! } });
+      const fuUser = existing.userId ?? l.ownerId;
+      if (fuUser) { await tx.followUp.create({ data: { tenantId: l.tenantId, leadId: l.id, dueAt: input.followUpAt!, userId: fuUser, createdById: existing.userId, note: 'Planned after a call' } }); await syncNextFollowUp(tx, l.id); }
+    }
     return { externalId: input.externalId, status: 'updated', callId: existing.id, leadId: existing.leadId, live: [{ type: 'call.updated', leadId: existing.leadId, userId: existing.userId, callId: existing.id }] };
   }
 
