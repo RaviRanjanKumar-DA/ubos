@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { Menu } from '@/components/Menu';
 import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -377,8 +378,8 @@ export default function DashboardPage() {
 
       {dash && !dash.isTemplate && !editing && (dash.isMine || list?.canShare) && (
         <div className="row end" style={{ marginTop: 14 }}>
-          <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={() => {
-            if (confirm(`Delete the dashboard “${dash.name}”?`)) run(() => api(`/api/v1/dashboards/${dash.id}`, { method: 'DELETE' }), 'Dashboard deleted.').then(async (ok) => { if (ok) { const { l } = await loadList(); open(l.defaultId); } });
+          <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={async () => {
+            if (await askConfirm(`Delete the dashboard “${dash.name}”?`)) run(() => api(`/api/v1/dashboards/${dash.id}`, { method: 'DELETE' }), 'Dashboard deleted.').then(async (ok) => { if (ok) { const { l } = await loadList(); open(l.defaultId); } });
           }}>Delete this dashboard</button>
         </div>
       )}

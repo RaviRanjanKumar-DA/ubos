@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { PickWorkspace } from '@/components/PickWorkspace';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -60,7 +62,7 @@ export default function ProcessesPage() {
           <h1>Processes</h1>
           <p className="muted small" style={{ margin: 0 }}>What happens after a sale: each step has an owner, a form and rules. Completed steps lock; payments and sign-offs gate the next step.</p>
         </div>
-        {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}>⬇ Process report</button>}
+        {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}><Icon name="download" className="ic" />Process report</button>}
       </div>
       <div className="dash-tabs" role="tablist">
         {([['board', 'Board'], ['mine', `My steps${mine.length ? ` (${mine.length})` : ''}`], ['templates', `Templates (${templates.length})`]] as [Tab, string][]).map(([k, l]) => (
@@ -127,7 +129,7 @@ export default function ProcessesPage() {
 
       {tab === 'templates' && (ws
         ? <Templates ws={ws} templates={templates} reload={load} setMsg={setMsg} canManage={can('process.manage')} />
-        : <div className="card"><p className="muted" style={{ margin: 0 }}>Process templates belong to a business line. Choose one in the switcher at the top.</p></div>)}
+        : <PickWorkspace text="Process templates belong to a business line." />)}
     </>
   );
 }
@@ -198,9 +200,9 @@ function Templates({ ws, templates, reload, setMsg, canManage }: { ws: string; t
           <div className="tpl-step-head">
             <span className="step-num">{i + 1}</span>
             <input className="input" value={s.name} onChange={(e) => setStep(i, { name: e.target.value })} required minLength={2} placeholder="Step name, e.g. Kick-off call" aria-label="Step name" />
-            <button type="button" className="btn sm ghost" disabled={i === 0} onClick={() => moveStep(i, -1)} aria-label="Move up">↑</button>
-            <button type="button" className="btn sm ghost" disabled={i === edit.steps.length - 1} onClick={() => moveStep(i, 1)} aria-label="Move down">↓</button>
-            <button type="button" className="btn sm ghost" disabled={edit.steps.length === 1} onClick={() => setEdit({ ...edit, steps: edit.steps.filter((_, j) => j !== i) })} aria-label="Remove step">✕</button>
+            <button type="button" className="btn sm ghost" disabled={i === 0} onClick={() => moveStep(i, -1)} aria-label="Move up"><Icon name="up" className="ic" /></button>
+            <button type="button" className="btn sm ghost" disabled={i === edit.steps.length - 1} onClick={() => moveStep(i, 1)} aria-label="Move down"><Icon name="down" className="ic" /></button>
+            <button type="button" className="btn sm ghost" disabled={edit.steps.length === 1} onClick={() => setEdit({ ...edit, steps: edit.steps.filter((_, j) => j !== i) })} aria-label="Remove step"><Icon name="close" className="ic" /></button>
           </div>
           <div className="grid cols-4" style={{ marginTop: 8 }}>
             <div className="field"><label>Done by</label>
@@ -225,7 +227,7 @@ function Templates({ ws, templates, reload, setMsg, canManage }: { ws: string; t
                 </select>
                 {f.type === 'dropdown' && <input className="input" value={f.options.join(', ')} onChange={(e) => setStep(i, { fields: s.fields.map((x, j) => (j === k ? { ...x, options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) } : x)) })} placeholder="Options, comma separated" aria-label="Options" />}
                 <label className="row small" style={{ whiteSpace: 'nowrap' }}><input type="checkbox" checked={f.required} onChange={(e) => setStep(i, { fields: s.fields.map((x, j) => (j === k ? { ...x, required: e.target.checked } : x)) })} /> Required</label>
-                <button type="button" className="btn sm ghost" onClick={() => setStep(i, { fields: s.fields.filter((_, j) => j !== k) })} aria-label="Remove field">✕</button>
+                <button type="button" className="btn sm ghost" onClick={() => setStep(i, { fields: s.fields.filter((_, j) => j !== k) })} aria-label="Remove field"><Icon name="close" className="ic" /></button>
               </div>
             ))}
             <button type="button" className="btn sm ghost" style={{ marginTop: 6 }} onClick={() => setStep(i, { fields: [...s.fields, { key: '', label: '', type: 'text', options: [], required: false }] })}>+ Field</button>

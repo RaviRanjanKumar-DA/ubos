@@ -308,7 +308,7 @@ tr.selected td { background: var(--brand-50) !important; }
 .save-bar { position: sticky; bottom: 12px; display: flex; align-items: center; gap: 10px; background: #1d1b2e; color: #fff; border-radius: 10px; padding: 10px 14px; box-shadow: 0 10px 30px rgba(0,0,0,.2); margin-top: 12px; z-index: 5; }
 .save-bar .btn.ghost { color: #fff; }
 @media (max-width: 1100px) { .perm-row { flex-direction: column; align-items: flex-start; } .seg { flex-wrap: wrap; } }
-@media (max-width: 860px) { .roles-grid { grid-template-columns: 1fr; } .roles-grid > .card:first-child { position: static; } }
+@media (max-width: 860px) { .roles-grid { grid-template-columns: minmax(0, 1fr); } .roles-grid > .card:first-child { position: static; } }
 .seg-btn.on.lvl-NONE { background: #dddbe8; color: #4b4864; }
 .seg-btn.on.lvl-OWN { background: #bcd8ff; color: #1d5fb8; }
 .seg-btn.on.lvl-TEAM, .seg-btn.on.lvl-DEPARTMENT, .seg-btn.on.lvl-BRANCH { background: #d2c6f7; color: #5b3cc4; }
@@ -719,4 +719,46 @@ tr.selected td { background: var(--brand-50) !important; }
   .ticket-kpis .value { font-size: 20px; }
   table[data-cards] td[data-label="Ticket"] { display: block; text-align: left; }
   table[data-cards] td[data-label="Ticket"]::before { display: none; }
+}
+
+/* Setup and admin pages */
+.dialog-bg { z-index: 70; }
+.dialog h2 { margin-bottom: 6px; overflow-wrap: anywhere; }
+.dialog .input { margin-top: 8px; }
+.dialog-body { margin: 0; font-size: 14px; }
+.dialog-actions { margin-top: 18px; }
+.pick-ws { max-width: 640px; }
+.pick-ws h2 { margin-bottom: 4px; }
+.pick-ws-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr)); gap: 10px; margin-top: 14px; }
+.pick-ws-item { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: #fff; font: inherit; font-weight: 600; color: var(--ink); text-align: left; cursor: pointer; transition: border-color .12s, background .12s; }
+.pick-ws-item:hover { border-color: var(--brand); background: var(--brand-50); color: var(--brand); }
+.pick-ws-item .ic { color: var(--brand); }
+.audit-filters { display: grid; grid-template-columns: minmax(0, 1fr) 200px 200px; gap: 10px; padding: 12px; margin-bottom: 12px; }
+.audit-detail { min-width: 240px; max-width: 460px; overflow-wrap: anywhere; }
+.audit-line + .audit-line { margin-top: 2px; }
+.audit-more summary { cursor: pointer; color: var(--brand); font-weight: 600; margin-top: 2px; }
+.org-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 16px; align-items: start; }
+.org-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.org-head h2 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.org-head h2 .ic { color: var(--brand); }
+.org-tools { display: flex; align-items: center; gap: 6px; flex: 0 1 auto; min-width: 0; }
+.org-dept { margin-top: 14px; padding-left: 14px; border-left: 3px solid var(--brand-100); }
+.org-team { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.org-team:last-child { border-bottom: 0; padding-bottom: 0; }
+.org-team-name { display: inline-flex; align-items: center; gap: 7px; min-width: 0; flex-wrap: wrap; }
+.org-team-name .ic { color: var(--muted); }
+.org-ws { height: 33px; width: 200px; min-width: 0; padding-top: 0; padding-bottom: 0; font-size: 13.5px; }
+.approval-act { flex-wrap: wrap; gap: 6px; }
+.approval-note { width: 220px; height: 33px; flex: 1 1 180px; }
+.perm-chev { transition: transform .15s; }
+.perm-chev.shut { transform: rotate(-90deg); }
+.stage-chip .btn svg.ic, .badge .ic { width: 14px; height: 14px; }
+@media (max-width: 1100px) { .seg { flex: 0 1 auto; max-width: 100%; } }
+@media (max-width: 640px) {
+  .seg { display: flex; width: 100%; }
+  .seg-btn { flex: 1 1 auto; border-left: 0; }
+  .audit-filters { grid-template-columns: 1fr; }
+  .audit-detail { min-width: 0; max-width: none; text-align: right; }
+  .org-ws { width: auto; flex: 1 1 140px; }
+  .org-team .org-tools { width: 100%; }
 }

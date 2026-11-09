@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -114,7 +116,7 @@ function Keys({ data, wsName, act, onSecret }: { data: { scopes: { value: string
                   <td className="small">{k.scopes.join(', ')}</td>
                   <td className="small">{wsName(k.workspaceId)}</td>
                   <td className="small">{when(k.lastUsedAt)}</td>
-                  <td>{k.revokedAt ? <span className="badge grey">Revoked</span> : <button className="btn sm ghost" onClick={() => { if (confirm(`Revoke “${k.name}”? Systems using it stop working at once.`)) act(() => api(`/api/v1/api-keys/${k.id}/revoke`, { method: 'POST', noWorkspace: true }), 'Key revoked.'); }}>Revoke</button>}</td>
+                  <td>{k.revokedAt ? <span className="badge grey">Revoked</span> : <button className="btn sm ghost" onClick={async () => { if (await askConfirm(`Revoke “${k.name}”? Systems using it stop working at once.`)) act(() => api(`/api/v1/api-keys/${k.id}/revoke`, { method: 'POST', noWorkspace: true }), 'Key revoked.'); }}>Revoke</button>}</td>
                 </tr>
               ))}
             </tbody>
@@ -189,7 +191,7 @@ function Hooks({ data, wsName, act, onSecret }: { data: { events: { value: strin
       {log && (
         <div className="drawer-bg" onClick={() => setLog(null)}>
           <aside className="drawer" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Deliveries">
-            <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Deliveries · {log.hook.name}</h2><button className="btn sm ghost" onClick={() => setLog(null)} aria-label="Close">✕</button></div>
+            <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Deliveries · {log.hook.name}</h2><button className="btn sm ghost" onClick={() => setLog(null)} aria-label="Close"><Icon name="close" className="ic" /></button></div>
             {!log.rows.length && <p className="small muted">Nothing sent yet.</p>}
             {log.rows.map((d) => (
               <div key={d.id} className="event-row">

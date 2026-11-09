@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -52,7 +53,7 @@ export default function IntegrationsPage() {
       <div className="page-head">
         <div>
           <h1>Integrations</h1>
-          <div className="muted small">{active.length} active of {list?.length ?? 0} · switch each service on or off for {me.tenant.name}. Services marked ⚡ Live bring leads in now; the others connect in the phase shown. API keys and outgoing webhooks are under Developer.</div>
+          <div className="muted small">{active.length} active of {list?.length ?? 0} · switch each service on or off for {me.tenant.name}. Services marked Live bring leads in now; the others connect in the phase shown. API keys and outgoing webhooks are under Developer.</div>
         </div>
         <div className="row">
           <label className="row small" style={{ gap: 6 }}><input type="checkbox" checked={onlyActive} onChange={(e) => setOnlyActive(e.target.checked)} /> Active only</label>
@@ -86,7 +87,7 @@ export default function IntegrationsPage() {
                   <span className="row" style={{ gap: 6 }}>
                     {i.status === 'active' ? <span className="badge ok"><span className="dot" />Active</span> : <span className="badge grey">Inactive</span>}
                     {i.phase === 'Live'
-                      ? <span className="badge ok" style={{ fontWeight: 500 }} title="Data flows into UBOS now">⚡ Live</span>
+                      ? <span className="badge ok" style={{ fontWeight: 500 }} title="Data flows into UBOS now"><Icon name="bolt" className="ic" />Live</span>
                       : <span className="badge" style={{ fontWeight: 500 }} title="When the live connection ships">{i.phase}</span>}
                   </span>
                   {canManage && (

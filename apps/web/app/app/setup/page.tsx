@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -48,8 +49,8 @@ export default function SetupPage() {
           );
         })}
         <div className="setup-label" style={{ marginTop: 18, paddingTop: 14, borderTop: '1px solid var(--line)' }}>Resources</div>
-        {([['app', '⬇', 'Download app'], ['contact', '💬', 'Contact our team'], ['videos', '▶', 'Help videos'], ['updates', '📣', 'Product updates']] as const).map(([k, i, l]) => (
-          <button key={k} className="setup-nav-item" onClick={() => setResource(k)}><span className="setup-res-icon" aria-hidden="true">{i}</span><span>{l}</span></button>
+        {([['app', 'download', 'Download app'], ['contact', 'chat', 'Contact our team'], ['videos', 'play', 'Help videos'], ['updates', 'megaphone', 'Product updates']] as const).map(([k, i, l]) => (
+          <button key={k} className="setup-nav-item" onClick={() => setResource(k)}><span className="setup-res-icon" aria-hidden="true"><Icon name={i} className="ic" /></span><span>{l}</span></button>
         ))}
       </aside>
 

@@ -29,7 +29,7 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 
 "Every feature of every CRM" is tracked as a feature-by-feature comparison with eight CRMs, India first: see `CRM-COMPARISON.md`. Each gap has a priority and a phase, and the Must items set the order of work.
 
-The UI is redone in three batches, alternating with feature slices: UI 1 (design foundation, navigation, small screens), slice 2.6, UI 2 (daily pages), slice 2.7, UI 3 (setup and admin pages), slice 2.8, then the Must gaps.
+The UI is redone in three batches, alternating with feature slices: UI 1 (design foundation, navigation, small screens), slice 2.6, UI 2 (daily pages), slice 2.7, UI 3 (setup and admin pages), slice 2.8, then the Must gaps. UI 1, UI 2 and UI 3 are done. UI 3 replaced browser pop-ups with in-app dialogs, added a business line picker where a page needs one, made the Audit Log readable and filterable, and redid Org Structure. Audit Log still reads the latest 200 entries; going further back needs server paging and date filters.
 
 ## Setup Guide & onboarding checklist (requested 17 Oct 2026)
 

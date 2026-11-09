@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { PickWorkspace } from '@/components/PickWorkspace';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -40,7 +42,7 @@ export default function ProductsPage() {
   if (!ws) return (
     <>
       <div className="page-head"><h1>Products & prices</h1></div>
-      <div className="card"><p className="muted" style={{ margin: 0 }}>Products, prices and payment rules belong to a business line. Choose one in the switcher at the top.</p></div>
+      <PickWorkspace text="Products, prices and payment rules belong to a business line." />
     </>
   );
 
@@ -228,9 +230,9 @@ function RulesTab({ ws, products, act }: { ws: string; products: Product[]; act:
               <option value="new_sale">→ New sale</option><option value="instalment">→ Instalment</option>
             </select>
             {canManage && <span className="row" style={{ gap: 2, marginLeft: 'auto' }}>
-              <button className="btn sm ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up">↑</button>
-              <button className="btn sm ghost" disabled={i === rules.length - 1} onClick={() => move(i, 1)} aria-label="Move down">↓</button>
-              <button className="btn sm ghost" onClick={() => { setRules(rules.filter((_, j) => j !== i)); setDirty(true); }} aria-label="Remove rule">✕</button>
+              <button className="btn sm ghost" disabled={i === 0} onClick={() => move(i, -1)} aria-label="Move up"><Icon name="up" className="ic" /></button>
+              <button className="btn sm ghost" disabled={i === rules.length - 1} onClick={() => move(i, 1)} aria-label="Move down"><Icon name="down" className="ic" /></button>
+              <button className="btn sm ghost" onClick={() => { setRules(rules.filter((_, j) => j !== i)); setDirty(true); }} aria-label="Remove rule"><Icon name="close" className="ic" /></button>
             </span>}
           </div>
           <div className="grid cols-3" style={{ marginTop: 8 }}>

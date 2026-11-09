@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { PickWorkspace } from '@/components/PickWorkspace';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -33,7 +35,7 @@ export default function FormsPage() {
     try { await fn(); setMsg({ type: 'notice', text }); await load(); return true; } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); return false; }
   };
 
-  if (!ws) return (<><div className="page-head"><h1>Web forms</h1></div><div className="card muted">Forms belong to a business line. Choose one in the switcher at the top.</div></>);
+  if (!ws) return (<><div className="page-head"><h1>Web forms</h1></div><PickWorkspace text="Forms belong to a business line." /></>);
   const label = (t: string) => data?.targets.find((x) => x.value === t)?.label ?? t;
 
   return (
@@ -66,8 +68,8 @@ export default function FormsPage() {
                   </select>
                   <input className="input" value={f.label} aria-label="Question" onChange={(e) => setEdit({ ...edit, fields: edit.fields.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} required />
                   <label className="row small" style={{ whiteSpace: 'nowrap', flexWrap: 'nowrap', gap: 4 }}><input type="checkbox" checked={f.required} onChange={(e) => setEdit({ ...edit, fields: edit.fields.map((x, j) => (j === i ? { ...x, required: e.target.checked } : x)) })} /> Required</label>
-                  <button type="button" className="btn sm ghost" disabled={i === 0} aria-label="Move up" onClick={() => { const n = [...edit.fields]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setEdit({ ...edit, fields: n }); }}>↑</button>
-                  <button type="button" className="btn sm ghost" aria-label="Remove" disabled={f.target === 'name'} onClick={() => setEdit({ ...edit, fields: edit.fields.filter((_, j) => j !== i) })}>✕</button>
+                  <button type="button" className="btn sm ghost" disabled={i === 0} aria-label="Move up" onClick={() => { const n = [...edit.fields]; [n[i - 1], n[i]] = [n[i], n[i - 1]]; setEdit({ ...edit, fields: n }); }}><Icon name="up" className="ic" /></button>
+                  <button type="button" className="btn sm ghost" aria-label="Remove" disabled={f.target === 'name'} onClick={() => setEdit({ ...edit, fields: edit.fields.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>
                 </div>
               ))}
               {edit.fields.length < data.targets.length && <button type="button" className="btn sm ghost" onClick={() => { const t = data.targets.find((x) => !edit.fields.some((f) => f.target === x.value))!; setEdit({ ...edit, fields: [...edit.fields, { target: t.value, label: t.label, required: false }] }); }}>+ Question</button>}

@@ -1,5 +1,7 @@
 'use client';
 
+import { PickWorkspace } from '@/components/PickWorkspace';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -31,7 +33,7 @@ export default function CampaignsPage() {
     api<Options>('/api/v1/call-campaigns/options').then(setOpts).catch(() => setOpts(null));
   }, [ws, version, load]);
 
-  if (!ws) return <><div className="page-head"><h1>Call campaigns</h1></div><div className="card muted">Campaigns belong to a business line. Choose one in the switcher at the top.</div></>;
+  if (!ws) return <><div className="page-head"><h1>Call campaigns</h1></div><PickWorkspace text="Campaigns belong to a business line." /></>;
 
   const act = async (id: string, body: object, done: string) => {
     try { await api(`/api/v1/call-campaigns/${id}`, { method: 'PATCH', body }); setMsg({ type: 'notice', text: done }); load(); }
@@ -65,7 +67,7 @@ export default function CampaignsPage() {
                   {c.canManage && <Link className="btn sm outline" href={`/app/campaigns/${c.id}/report`}>Report</Link>}
                   {c.canManage && c.status === 'active' && <button className="btn sm ghost" onClick={() => act(c.id, { status: 'paused' }, `${c.name} paused.`)}>Pause</button>}
                   {c.canManage && c.status === 'paused' && <button className="btn sm ghost" onClick={() => act(c.id, { status: 'active' }, `${c.name} resumed.`)}>Resume</button>}
-                  {c.canManage && <button className="btn sm ghost" onClick={() => { if (confirm(`Archive ${c.name}? Its calls stay in the call log.`)) act(c.id, { archived: true }, `${c.name} archived.`); }}>Archive</button>}
+                  {c.canManage && <button className="btn sm ghost" onClick={async () => { if (await askConfirm(`Archive ${c.name}? Its calls stay in the call log.`)) act(c.id, { archived: true }, `${c.name} archived.`); }}>Archive</button>}
                 </div>
               </div>
             );

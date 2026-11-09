@@ -1,5 +1,7 @@
 'use client';
 
+import { PickWorkspace } from '@/components/PickWorkspace';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -20,7 +22,7 @@ export default function KnowledgePage() {
 
   const load = useCallback(() => api<{ canManage: boolean; articles: Row[] }>(`/api/v1/kb${q ? `?q=${encodeURIComponent(q)}` : ''}`).then(setData).catch(() => setData({ canManage: false, articles: [] })), [q]);
   useEffect(() => { if (!ws) return; const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q, ws, version]);
-  if (!ws) return <><div className="page-head"><h1>Knowledge base</h1></div><div className="card muted">Articles belong to a business line. Choose one in the switcher at the top.</div></>;
+  if (!ws) return <><div className="page-head"><h1>Knowledge base</h1></div><PickWorkspace text="Articles belong to a business line." /></>;
 
   const open = async (id: string) => { setErr(''); try { setReading(await api<Full>(`/api/v1/kb/${id}`)); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Could not open this article'); } };
   const save = async (e: React.FormEvent) => {
@@ -32,7 +34,7 @@ export default function KnowledgePage() {
     } catch (x) { setErr(x instanceof ApiError ? x.message : 'Failed'); }
   };
   const archive = async (a: Full) => {
-    if (!confirm(`Archive “${a.title}”? It stops showing here.`)) return;
+    if (!await askConfirm(`Archive “${a.title}”? It stops showing here.`)) return;
     try { await api(`/api/v1/kb/${a.id}`, { method: 'PATCH', body: { archived: true } }); setReading(null); load(); } catch (x) { setErr(x instanceof ApiError ? x.message : 'Failed'); }
   };
   return (

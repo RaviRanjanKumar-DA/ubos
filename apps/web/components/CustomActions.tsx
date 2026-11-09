@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { FIELD_TYPE_LABELS } from '@/lib/workspace';
@@ -116,7 +117,7 @@ function ActionDialog({ action, workspaceId, onClose, onSave }: { action: Custom
               <select className="input" style={{ width: 190 }} value={x.type} onChange={(e) => setQ(i, { type: e.target.value })}>
                 {Object.entries(FIELD_TYPE_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
               </select>
-              <button type="button" className="btn sm ghost" aria-label="Remove question" onClick={() => setQs(qs.filter((_, j) => j !== i))} disabled={qs.length === 1}>✕</button>
+              <button type="button" className="btn sm ghost" aria-label="Remove question" onClick={() => setQs(qs.filter((_, j) => j !== i))} disabled={qs.length === 1}><Icon name="close" className="ic" /></button>
             </div>
             {(x.type === 'dropdown' || x.type === 'multiselect') && (
               <input className="input" style={{ marginTop: 6 }} value={x.options.join(', ')} onChange={(e) => setQ(i, { options: e.target.value.split(',').map((o) => o.trim()).filter(Boolean) })} placeholder="Options, separated by commas" />

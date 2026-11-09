@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -33,8 +35,8 @@ export function MyPhoneCard() {
       {msg && <div className={msg.type}>{msg.text}</div>}
       {active ? (
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span><b>📱 {active.name}</b> <span className="small muted">· app {active.appVersion ?? '?'} · last sync {active.lastSyncAt ? new Date(active.lastSyncAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}{active.pendingCalls ? ` · ${active.pendingCalls} call(s) waiting` : ''}</span></span>
-          <button className="btn sm ghost" onClick={async () => { if (!confirm('Unpair this phone? It stops syncing at once.')) return; await api(`/api/v1/devices/${active.id}/revoke`, { method: 'POST', noWorkspace: true }).catch(() => undefined); setMsg({ type: 'notice', text: 'Phone unpaired.' }); load(); }}>Unpair</button>
+          <span><b><Icon name="phone" className="ic" /> {active.name}</b> <span className="small muted">· app {active.appVersion ?? '?'} · last sync {active.lastSyncAt ? new Date(active.lastSyncAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' }) : 'not yet'}{active.pendingCalls ? ` · ${active.pendingCalls} call(s) waiting` : ''}</span></span>
+          <button className="btn sm ghost" onClick={async () => { if (!await askConfirm('Unpair this phone? It stops syncing at once.')) return; await api(`/api/v1/devices/${active.id}/revoke`, { method: 'POST', noWorkspace: true }).catch(() => undefined); setMsg({ type: 'notice', text: 'Phone unpaired.' }); load(); }}>Unpair</button>
         </div>
       ) : <p className="small">No phone paired yet.</p>}
       {code ? (

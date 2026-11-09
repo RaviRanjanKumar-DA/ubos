@@ -64,7 +64,7 @@ export function Pricing({ onChanged }: { onChanged: () => void }) {
               {p.maxWorkspaces ? `Up to ${p.maxWorkspaces} business lines` : 'Unlimited business lines'} · {p.storageGbPerUser} GB / user{p.aiCreditsPerUser ? ` · ${p.aiCreditsPerUser} AI credits` : ''}
             </div>
             <div className="small">
-              {p.features.some((f) => f.featureKey === 'module.telephony') ? '📞 Cloud calling ' : ''}{p.features.some((f) => f.featureKey === 'module.sim_calling') ? '📱 SIM calling' : ''}
+              {p.features.some((f) => f.featureKey === 'module.telephony') ? 'Cloud calling  ' : ''}{p.features.some((f) => f.featureKey === 'module.sim_calling') ? 'SIM calling' : ''}
               {!p.features.some((f) => ['module.telephony', 'module.sim_calling'].includes(f.featureKey)) && <span className="muted">No calling</span>}
               {p.recordingRetentionDays > 0 && <span className="muted"> · recordings {p.recordingRetentionDays} days</span>}
             </div>
@@ -158,7 +158,7 @@ function PlanDialog({ plan, onClose, onSave }: { plan: PlanRow | null; onClose: 
         </div>
         <div className="small" style={{ fontWeight: 600, margin: '4px 0 6px' }}>Calling</div>
         <div className="row" style={{ marginBottom: 10 }}>
-          {([['', 'No calling', []], ['cloud', '📞 Cloud calling', ['module.telephony']], ['sim', '📱 SIM calling', ['module.sim_calling']], ['both', 'Both', ['module.telephony', 'module.sim_calling']]] as const).map(([k, l, keys]) => {
+          {([['', 'No calling', []], ['cloud', 'Cloud calling', ['module.telephony']], ['sim', 'SIM calling', ['module.sim_calling']], ['both', 'Both', ['module.telephony', 'module.sim_calling']]] as const).map(([k, l, keys]) => {
             const has = (x: string) => f.features.includes(x);
             const on = keys.length === 0 ? !has('module.telephony') && !has('module.sim_calling') : keys.every(has) && (k === 'both' || !has(k === 'cloud' ? 'module.sim_calling' : 'module.telephony'));
             return <button type="button" key={k} className={`chip ${on ? 'on' : ''}`} onClick={() => setF({ ...f, features: [...f.features.filter((x) => x !== 'module.telephony' && x !== 'module.sim_calling'), ...keys] })}>{l}</button>;

@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { GOAL_METRICS, METRICS } from '@ubos/shared';
 import { api, ApiError } from '@/lib/api';
@@ -56,7 +57,7 @@ export default function GoalsPage() {
         {canManage && (
           <span className="row" style={{ gap: 4 }}>
             <button className="btn sm ghost" onClick={() => setEditing(g)}>Edit</button>
-            <button className="btn sm ghost" onClick={() => { if (confirm(`Archive the goal “${g.name}”?`)) save(() => api(`/api/v1/goals/${g.id}`, { method: 'PATCH', body: { isArchived: true } }), 'Goal archived.'); }}>Archive</button>
+            <button className="btn sm ghost" onClick={async () => { if (await askConfirm(`Archive the goal “${g.name}”?`)) save(() => api(`/api/v1/goals/${g.id}`, { method: 'PATCH', body: { isArchived: true } }), 'Goal archived.'); }}>Archive</button>
           </span>
         )}
       </div>

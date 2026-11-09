@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import readXlsxFile from 'read-excel-file';
@@ -369,7 +371,7 @@ function UserForm(props: {
               <option value="">All workspaces</option>
               {props.workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
             </select>
-            <button type="button" className="btn sm ghost" aria-label="Remove role" onClick={() => setAssign(assign.filter((_, j) => j !== i))}>✕</button>
+            <button type="button" className="btn sm ghost" aria-label="Remove role" onClick={() => setAssign(assign.filter((_, j) => j !== i))}><Icon name="close" className="ic" /></button>
           </div>
         ))}
         <button type="button" className="btn sm outline" onClick={() => setAssign([...assign, { roleId: '', workspaceId: null }])}>+ Add another role</button>
@@ -393,7 +395,7 @@ function UserForm(props: {
             )}
             <button type="button" className={`btn sm ${user.isActive ? 'danger' : 'outline'}`} disabled={busy}
               onClick={() => run(async () => {
-                if (user.isActive && !confirm(`Deactivate ${user.name}? They will be signed out everywhere.`)) return setBusy(false);
+                if (user.isActive && !await askConfirm(`Deactivate ${user.name}? They will be signed out everywhere.`)) return setBusy(false);
                 await api(`/api/v1/users/${user.id}`, { method: 'PATCH', noWorkspace: true, body: { isActive: !user.isActive } });
                 props.onSaved();
               })}>{user.isActive ? 'Deactivate' : 'Reactivate'}</button>

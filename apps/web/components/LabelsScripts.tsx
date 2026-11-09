@@ -1,5 +1,6 @@
 'use client';
 
+import { askText } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import type { WorkspaceSettings } from '@/lib/workspace';
@@ -49,7 +50,7 @@ export function LabelsSettings({ ws, readOnly, isOrgAdmin }: { ws: WorkspaceSett
           </span>
           {canEdit(l) && (
             <span className="row" style={{ gap: 2 }}>
-              {!l.isArchived && <button className="btn sm ghost" onClick={() => { const n = prompt('Rename label', l.name); if (n && n !== l.name) run(() => api(`/api/v1/labels/${l.id}`, { method: 'PATCH', workspace: ws.id, body: { name: n } }), 'Label renamed.'); }}>Rename</button>}
+              {!l.isArchived && <button className="btn sm ghost" onClick={async () => { const n = await askText('Rename label', l.name); if (n && n !== l.name) run(() => api(`/api/v1/labels/${l.id}`, { method: 'PATCH', workspace: ws.id, body: { name: n } }), 'Label renamed.'); }}>Rename</button>}
               <button className="btn sm ghost" onClick={() => run(() => api(`/api/v1/labels/${l.id}`, { method: 'PATCH', workspace: ws.id, body: { isArchived: !l.isArchived } }), l.isArchived ? 'Label restored.' : 'Label archived (kept on old leads).')}>{l.isArchived ? 'Restore' : 'Archive'}</button>
             </span>
           )}

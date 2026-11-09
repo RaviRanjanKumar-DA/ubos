@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm, askText } from '@/components/Dialogs';
 import { Menu } from '@/components/Menu';
 import { Icon } from '@/components/Icon';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
@@ -116,7 +117,7 @@ function LeadsPage() {
     setLayout(v?.layout ?? 'list');
   }
   async function saveView(existing?: SavedView) {
-    const name = existing ? existing.name : prompt('Name this view, e.g. "Hot leads this week"');
+    const name = existing ? existing.name : await askText('Name this view, e.g. "Hot leads this week"');
     if (!name) return;
     const body = { name, workspaceId: me.currentWorkspaceId, query: { quick, adv, sort }, layout };
     try {
@@ -224,7 +225,7 @@ function LeadsPage() {
         <span style={{ flex: 1 }} />
         {view?.isMine && <button className="btn sm ghost" onClick={() => saveView(view)}>Update view</button>}
         {view?.isMine && can('crm.view.share') && <button className="btn sm ghost" onClick={() => setShareView(view)}>Share</button>}
-        {view?.isMine && <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={() => { if (confirm(`Remove the view “${view.name}”?`)) api(`/api/v1/views/${view.id}`, { method: 'DELETE' }).then(() => { applyView(null); loadViews(); }); }}>Remove</button>}
+        {view?.isMine && <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={async () => { if (await askConfirm(`Remove the view “${view.name}”?`)) api(`/api/v1/views/${view.id}`, { method: 'DELETE' }).then(() => { applyView(null); loadViews(); }); }}>Remove</button>}
       </div>}
 
       <div className="card lead-bar">

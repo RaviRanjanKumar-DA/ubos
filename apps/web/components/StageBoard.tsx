@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm, askText } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Field, Option, Pipeline, Stage, STAGE_PALETTE } from '@/lib/workspace';
@@ -33,8 +35,8 @@ export function StageBoard({ pipeline, fields, statuses, lostReasons, readOnly, 
     const first = list.findIndex((s) => !s.isWon && !s.isLost);
     return [list[first], ...list.filter((s, i) => i !== first && !s.isWon && !s.isLost), ...list.filter((s) => s.isWon), ...list.filter((s) => s.isLost)].filter(Boolean);
   };
-  const add = (kind: 'open' | 'won' | 'lost') => {
-    const name = prompt(kind === 'open' ? 'Name of the new stage, e.g. Pitched Elite' : kind === 'won' ? 'Name of the won stage, e.g. Lead Closed' : 'Name of the lost stage, e.g. Not Eligible');
+  const add = async (kind: 'open' | 'won' | 'lost') => {
+    const name = await askText(kind === 'open' ? 'Name of the new stage, e.g. Pitched Elite' : kind === 'won' ? 'Name of the won stage, e.g. Lead Closed' : 'Name of the lost stage, e.g. Not Eligible');
     if (!name?.trim()) return;
     update(normalized([...stages, { name: name.trim(), isWon: kind === 'won', isLost: kind === 'lost', color: STAGE_PALETTE[stages.length % 8] }]));
   };
@@ -54,15 +56,15 @@ export function StageBoard({ pipeline, fields, statuses, lostReasons, readOnly, 
     return (
       <div key={s.id ?? `n-${i}`} className="stage-chip" style={{ background: colorOf(s, i) }}
         draggable={draggable && !readOnly} onDragStart={() => setDragFrom(i)} onDragOver={(e) => draggable && e.preventDefault()} onDrop={() => draggable && drop(i)}>
-        {draggable && !readOnly && <span className="grip" aria-hidden="true">⠿</span>}
+        {draggable && !readOnly && <span className="grip" aria-hidden="true"><Icon name="grip" className="ic" /></span>}
         <div style={{ flex: 1, minWidth: 0 }}>
           <b>{s.name}</b> {i === initial && <span className="badge" style={{ fontStyle: 'italic' }}>Default</span>}
           <div className="small" style={{ opacity: 0.75 }}>{s.leadCount ?? 0} leads{rules.length ? ` · ${rules.join(' · ')}` : ''}</div>
         </div>
         {!readOnly && (
           <>
-            <button type="button" className="btn sm ghost" aria-label={`Edit ${s.name}`} onClick={() => setEditing(i)}>✎</button>
-            {i !== initial && <button type="button" className="btn sm ghost" aria-label={`Delete ${s.name}`} disabled={!!s.leadCount} title={s.leadCount ? 'Move its leads first' : undefined} onClick={() => remove(i)}>🗑</button>}
+            <button type="button" className="btn sm ghost" aria-label={`Edit ${s.name}`} onClick={() => setEditing(i)}><Icon name="edit" className="ic" /></button>
+            {i !== initial && <button type="button" className="btn sm ghost" aria-label={`Delete ${s.name}`} disabled={!!s.leadCount} title={s.leadCount ? 'Move its leads first' : undefined} onClick={() => remove(i)}><Icon name="trash" className="ic" /></button>}
           </>
         )}
       </div>
@@ -78,11 +80,11 @@ export function StageBoard({ pipeline, fields, statuses, lostReasons, readOnly, 
         </div>
         {!readOnly && (
           <div className="row" style={{ gap: 4 }}>
-            <button className="btn sm ghost" onClick={() => {
-              const name = prompt('Rename pipeline', pipeline.name);
+            <button className="btn sm ghost" onClick={async () => {
+              const name = await askText('Rename pipeline', pipeline.name);
               if (name) act(() => api(`/api/v1/pipelines/${pipeline.id}`, { method: 'PATCH', body: { name } }), 'Pipeline renamed.');
             }}>Rename</button>
-            {canDelete && <button className="btn sm ghost" onClick={() => confirm(`Delete the ${pipeline.name} pipeline?`) && act(() => api(`/api/v1/pipelines/${pipeline.id}`, { method: 'DELETE' }), 'Pipeline deleted.')}>Delete</button>}
+            {canDelete && <button className="btn sm ghost" onClick={async () => await askConfirm(`Delete the ${pipeline.name} pipeline?`) && act(() => api(`/api/v1/pipelines/${pipeline.id}`, { method: 'DELETE' }), 'Pipeline deleted.')}>Delete</button>}
           </div>
         )}
       </div>

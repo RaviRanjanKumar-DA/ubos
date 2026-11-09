@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 
@@ -67,7 +68,7 @@ export function MyNotificationsCard() {
         }} />
         Email me a summary of my day every morning ({hourLabel(s.digestHour)})
       </label>
-      <p className="small muted" style={{ marginBottom: 0 }}>Reminders before tasks, meetings and follow-ups always arrive in the bell 🔔 and by email.{msg ? ` ${msg}` : ''}</p>
+      <p className="small muted" style={{ marginBottom: 0 }}>Reminders before tasks, meetings and follow-ups always arrive in the bell and by email.{msg ? ` ${msg}` : ''}</p>
     </div>
   );
 }
@@ -91,8 +92,8 @@ export function CallingCard() {
     <div className="card" style={{ marginTop: 14, maxWidth: 760 }}>
       <h2>Calls & recordings</h2>
       <div className="row" style={{ gap: 14, marginBottom: 10 }}>
-        <span className={`badge ${c.cloudCalling ? 'ok' : 'grey'}`}>📞 Cloud calling {c.cloudCalling ? 'included' : 'not in your plan'}</span>
-        <span className={`badge ${c.simCalling ? 'ok' : 'grey'}`}>📱 SIM calling {c.simCalling ? 'included' : 'not in your plan'}</span>
+        <span className={`badge ${c.cloudCalling ? 'ok' : 'grey'}`}><Icon name="calls" className="ic" />Cloud calling {c.cloudCalling ? 'included' : 'not in your plan'}</span>
+        <span className={`badge ${c.simCalling ? 'ok' : 'grey'}`}><Icon name="phone" className="ic" />SIM calling {c.simCalling ? 'included' : 'not in your plan'}</span>
         <span className="small muted">{c.plan} keeps recordings up to {c.planRetentionDays} days</span>
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}

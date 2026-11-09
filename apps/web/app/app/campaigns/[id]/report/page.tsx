@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { use, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError, API_URL, session } from '@/lib/api';
@@ -25,7 +26,7 @@ export default function CampaignReport({ params }: { params: Promise<{ id: strin
   useEffect(() => { load(); }, [load, version]);
 
   const release = async (itemId: string) => {
-    if (!confirm('Put this lead back in the queue? The caller will not need to save an outcome.')) return;
+    if (!await askConfirm('Put this lead back in the queue? The caller will not need to save an outcome.')) return;
     try { await api(`/api/v1/call-campaigns/items/${itemId}/release`, { method: 'POST' }); load(); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Failed'); }
   };
   const download = async () => {

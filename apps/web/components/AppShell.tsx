@@ -24,6 +24,7 @@ interface ShellCtx {
   can: (perm: string) => boolean;
   /** Changes whenever the workspace switches, so pages can refetch. */
   version: number;
+  switchWorkspace: (id: string) => Promise<void>;
 }
 const Ctx = createContext<ShellCtx | null>(null);
 export const useShell = () => {
@@ -199,7 +200,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   pages.push({ href: '/app/security', label: 'My Security', icon: 'lock' });
 
   return (
-    <Ctx.Provider value={{ me, can, version }}>
+    <Ctx.Provider value={{ me, can, version, switchWorkspace }}>
       <div className="shell">
         <aside className={`sidebar ${open ? 'open' : ''}`}>
           <div className="brand"><span className="logo">U</span> UBOS</div>

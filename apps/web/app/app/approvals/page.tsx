@@ -29,18 +29,18 @@ export default function ApprovalsPage() {
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}
       <div className="card">
-        {!data?.items.length ? <p className="small muted" style={{ margin: 0 }}>Nothing waiting.</p> : data.items.map((a) => (
+        {!data?.items.length ? <div className="empty">{status === 'pending' ? 'Nothing is waiting for a decision.' : 'No approvals yet.'}</div> : data.items.map((a) => (
           <div key={a.id} className="run-card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <div>
-                <b>{a.title}</b> <span className={`badge ${a.status === 'approved' ? 'ok' : a.status === 'rejected' ? 'bad' : a.status === 'pending' ? 'warn' : 'grey'}`}>{a.status}</span>
+                <b>{a.title}</b> <span className={`badge ${a.status === 'approved' ? 'ok' : a.status === 'rejected' ? 'bad' : a.status === 'pending' ? 'warn' : 'grey'}`}>{a.status === 'pending' ? 'Waiting' : a.status.charAt(0).toUpperCase() + a.status.slice(1)}</span>
                 <div className="small muted">{a.kind === 'quote_discount' ? 'Quote discount' : 'Process sign-off'} · {a.customerName ?? ''} · asked by {a.requestedByName} · {new Date(a.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}
                   {a.decidedByName ? ` · ${a.status} by ${a.decidedByName}${a.decisionNote ? `: ${a.decisionNote}` : ''}` : ''}</div>
                 {a.leadId && <Link className="small" href={`/app/leads/${a.leadId}?tab=${a.kind === 'quote_discount' ? 'quotes' : 'process'}`}>Open the lead →</Link>}
               </div>
               {data.canDecide && a.status === 'pending' && (
-                <div className="row" style={{ gap: 6 }}>
-                  <input className="input" style={{ width: 220 }} placeholder="Note (needed to reject)" value={notes[a.id] ?? ''} onChange={(e) => setNotes({ ...notes, [a.id]: e.target.value })} />
+                <div className="row approval-act">
+                  <input className="input approval-note" placeholder="Note (needed to reject)" value={notes[a.id] ?? ''} onChange={(e) => setNotes({ ...notes, [a.id]: e.target.value })} />
                   <button className="btn sm ghost" onClick={() => decide(a, 'reject')}>Reject</button>
                   <button className="btn sm" onClick={() => decide(a, 'approve')}>Approve</button>
                 </div>

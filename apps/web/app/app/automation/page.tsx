@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { PickWorkspace } from '@/components/PickWorkspace';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -37,7 +39,7 @@ export default function AutomationPage() {
   useEffect(() => { load(); }, [load, version]);
   const act = async (fn: () => Promise<unknown>, text: string) => { setMsg(null); try { await fn(); setMsg({ type: 'notice', text }); await load(); return true; } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); return false; } };
 
-  if (!ws) return <><div className="page-head"><h1>Automation</h1></div><div className="card muted">Automation belongs to a business line. Choose one in the switcher at the top.</div></>;
+  if (!ws) return <><div className="page-head"><h1>Automation</h1></div><PickWorkspace text="Automation belongs to a business line." /></>;
   if (!o) return <><div className="page-head"><h1>Automation</h1></div><div className="card muted">Automation is not available on this plan or for your role.</div></>;
   const label = (list: Opt[], v?: string | null) => list.find((x) => x.value === v)?.label ?? v ?? '';
   const describeAct = (a: Act) => `${label(o.actions, a.type)}${a.type === 'assign' ? `: ${a.userId && a.userId !== 'rules' ? label(o.users, a.userId) : 'next person in turn'}` : a.stageId ? `: ${label(o.stages, a.stageId)}` : a.status ? `: ${label(o.statuses, a.status)}` : a.labelId ? `: ${label(o.labels, a.labelId)}` : a.templateId ? `: ${label(o.templates, a.templateId)}` : a.sequenceId ? `: ${label(o.sequences, a.sequenceId)}` : a.title ? `: ${a.title}` : ''}`;
@@ -108,7 +110,7 @@ function RuleForm({ o, d, set, onSave, onCancel }: { o: Options; d: Draft; set: 
           <select className="input" value={c.field} onChange={(e) => cond(i, { field: e.target.value, value: '' })} aria-label="Field">{o.fields.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}</select>
           <select className="input" style={{ maxWidth: 130 }} value={c.op} onChange={(e) => cond(i, { op: e.target.value })} aria-label="Comparison">{o.ops.map((x) => <option key={x.value} value={x.value}>{x.label}</option>)}</select>
           {!NO_VALUE.includes(c.op) && valueInput(c, i)}
-          <button type="button" className="btn sm ghost" aria-label="Remove condition" onClick={() => set({ ...d, conditions: d.conditions.filter((_, j) => j !== i) })}>✕</button>
+          <button type="button" className="btn sm ghost" aria-label="Remove condition" onClick={() => set({ ...d, conditions: d.conditions.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>
         </div>
       ))}
       <button type="button" className="btn sm ghost" onClick={() => set({ ...d, conditions: [...d.conditions, { field: 'source', op: 'eq', value: '' }] })}>+ Condition</button>
@@ -124,7 +126,7 @@ function RuleForm({ o, d, set, onSave, onCancel }: { o: Options; d: Draft; set: 
           {a.type === 'enroll_sequence' && pick(o.sequences, a.sequenceId, (v) => action(i, { sequenceId: v }), 'Sequence')}
           {a.type === 'create_task' && <><input className="input" value={a.title ?? ''} onChange={(e) => action(i, { title: e.target.value })} placeholder="Task title (use {name})" aria-label="Task title" required /><input className="input" style={{ maxWidth: 110 }} type="number" min={0} value={a.dueHours ?? 24} onChange={(e) => action(i, { dueHours: Number(e.target.value) })} aria-label="Due after hours" title="Due after this many hours" /></>}
           {(a.type === 'add_remark' || a.type === 'notify_owner') && <input className="input" value={a.text ?? ''} onChange={(e) => action(i, { text: e.target.value })} placeholder="Text (use {name})" aria-label="Text" required />}
-          <button type="button" className="btn sm ghost" disabled={d.actions.length === 1} aria-label="Remove action" onClick={() => set({ ...d, actions: d.actions.filter((_, j) => j !== i) })}>✕</button>
+          <button type="button" className="btn sm ghost" disabled={d.actions.length === 1} aria-label="Remove action" onClick={() => set({ ...d, actions: d.actions.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>
         </div>
       ))}
       <button type="button" className="btn sm ghost" onClick={() => set({ ...d, actions: [...d.actions, { type: 'add_remark', text: '' }] })}>+ Action</button>
@@ -156,7 +158,7 @@ function Sequences({ o, seqs, act }: { o: Options; seqs: Seq[]; act: (fn: () => 
             <div key={i} className="row" style={{ flexWrap: 'nowrap', marginBottom: 6 }}>
               <input className="input" style={{ maxWidth: 90 }} type="number" min={0} value={s.delayHours} onChange={(e) => setF({ ...f, steps: f.steps.map((x, j) => (j === i ? { ...x, delayHours: Number(e.target.value) } : x)) })} aria-label="Wait hours" title="Hours to wait before this step" />
               <select className="input" value={s.templateId} onChange={(e) => setF({ ...f, steps: f.steps.map((x, j) => (j === i ? { ...x, templateId: e.target.value } : x)) })} aria-label="Template" required><option value="">Choose a template…</option>{o.templates.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}</select>
-              <button type="button" className="btn sm ghost" disabled={f.steps.length === 1} aria-label="Remove step" onClick={() => setF({ ...f, steps: f.steps.filter((_, j) => j !== i) })}>✕</button>
+              <button type="button" className="btn sm ghost" disabled={f.steps.length === 1} aria-label="Remove step" onClick={() => setF({ ...f, steps: f.steps.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>
             </div>
           ))}
           <div className="small muted" style={{ marginBottom: 6 }}>Hours to wait before each step (0 = straight away).</div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -156,7 +157,7 @@ function Phones({ all }: { all: boolean }) {
                   <td className="small">{d.appVersion ?? '—'}</td>
                   <td className="small">{when(d.lastSyncAt)} {stale(d) && <span className="badge warn">Not syncing</span>}</td>
                   <td className="small">{d.pendingCalls ? <span className="badge warn">{d.pendingCalls} call(s)</span> : '0'}</td>
-                  <td>{d.revokedAt ? <span className="badge grey">Unpaired</span> : <button className="btn sm ghost" onClick={async () => { if (confirm(`Unpair ${d.name}? It stops syncing at once.`)) { await api(`/api/v1/devices/${d.id}/revoke`, { method: 'POST', noWorkspace: true }).catch(() => undefined); load(); } }}>Unpair</button>}</td>
+                  <td>{d.revokedAt ? <span className="badge grey">Unpaired</span> : <button className="btn sm ghost" onClick={async () => { if (await askConfirm(`Unpair ${d.name}? It stops syncing at once.`)) { await api(`/api/v1/devices/${d.id}/revoke`, { method: 'POST', noWorkspace: true }).catch(() => undefined); load(); } }}>Unpair</button>}</td>
                 </tr>
               ))}
             </tbody>

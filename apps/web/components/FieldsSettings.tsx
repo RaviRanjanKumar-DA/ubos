@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm } from '@/components/Dialogs';
 import { useMemo, useState } from 'react';
 import { api } from '@/lib/api';
 import { Field, FIELD_TYPE_LABELS, WorkspaceSettings } from '@/lib/workspace';
@@ -48,9 +50,9 @@ export function FieldsSettings({ ws, readOnly, isOrgAdmin, act }: { ws: Workspac
           <div className="small muted">{ws.leadIdentifier === 'email' ? 'abc@xyz.com — required on every lead; mobile optional' : '98765 43210 — required on every lead; email optional'}</div>
         </div>
         {isOrgAdmin && (
-          <button className="btn sm ghost" onClick={() => {
+          <button className="btn sm ghost" onClick={async () => {
             const next = ws.leadIdentifier === 'email' ? 'mobile' : 'email';
-            if (confirm(`Change the Lead ID to ${next === 'email' ? 'Email ID' : 'Mobile number'} for the whole organization? New leads will need it.`)) {
+            if (await askConfirm(`Change the Lead ID to ${next === 'email' ? 'Email ID' : 'Mobile number'} for the whole organization? New leads will need it.`)) {
               act(() => api('/api/v1/settings/lead-identifier', { method: 'PUT', body: { leadIdentifier: next }, noWorkspace: true }), 'Lead ID changed.');
             }
           }}>Change</button>
@@ -117,8 +119,8 @@ export function FieldsSettings({ ws, readOnly, isOrgAdmin, act }: { ws: Workspac
                 {!readOnly && (
                   <td style={{ whiteSpace: 'nowrap' }}>
                     {sort === 'position' && view === 'active' && <>
-                      <button className="btn sm ghost" aria-label="Move up" onClick={() => move(f, -1)}>↑</button>
-                      <button className="btn sm ghost" aria-label="Move down" onClick={() => move(f, 1)}>↓</button>
+                      <button className="btn sm ghost" aria-label="Move up" onClick={() => move(f, -1)}><Icon name="up" className="ic" /></button>
+                      <button className="btn sm ghost" aria-label="Move down" onClick={() => move(f, 1)}><Icon name="down" className="ic" /></button>
                     </>}
                     <button className="btn sm ghost" onClick={() => setEditing(f)}>Edit</button>
                     <button className="btn sm ghost" onClick={() => act(() => api(`/api/v1/fields/${f.id}`, { method: 'PATCH', body: { isArchived: !f.isArchived } }), f.isArchived ? 'Field restored.' : 'Field archived (values kept).')}>{f.isArchived ? 'Restore' : 'Archive'}</button>

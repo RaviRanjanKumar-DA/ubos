@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, rupees } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -109,8 +111,8 @@ function Buy({ catalog, onOrdered }: { catalog: Catalog; onOrdered: (number: str
                   </div>
                   {l.description && <div className="small muted" style={{ margin: '4px 0' }}>{l.description}</div>}
                   <div className="small" style={{ margin: '4px 0' }}>
-                    <span style={{ opacity: l.features.includes('module.telephony') ? 1 : 0.4 }}>{l.features.includes('module.telephony') ? '✓' : '✕'} 📞 Cloud calling</span>{'  '}
-                    <span style={{ opacity: l.features.includes('module.sim_calling') ? 1 : 0.4 }}>{l.features.includes('module.sim_calling') ? '✓' : '✕'} 📱 SIM calling</span>
+                    <span style={{ opacity: l.features.includes('module.telephony') ? 1 : 0.4 }}>{l.features.includes('module.telephony') ? <Icon name="tick" className="ic" /> : <Icon name="close" className="ic" />} Cloud calling</span>{'  '}
+                    <span style={{ opacity: l.features.includes('module.sim_calling') ? 1 : 0.4 }}>{l.features.includes('module.sim_calling') ? <Icon name="tick" className="ic" /> : <Icon name="close" className="ic" />} SIM calling</span>
                     {l.recordingRetentionDays > 0 && <div className="muted">Call recordings kept {l.recordingRetentionDays} days</div>}
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 700, marginTop: 6 }}>{rupees(Math.round(price / months))}<span className="small muted" style={{ fontWeight: 500 }}> / user / month</span></div>
@@ -182,7 +184,7 @@ function History() {
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   async function cancel(o: Order) {
-    if (!confirm(`Cancel order ${o.number}?`)) return;
+    if (!await askConfirm(`Cancel order ${o.number}?`)) return;
     try { await api(`/api/v1/billing/orders/${o.id}/cancel`, { method: 'POST', noWorkspace: true }); load(); } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed'); }
   }
 

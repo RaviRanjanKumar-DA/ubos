@@ -7,7 +7,7 @@ import { Icon } from './Icon';
 export interface MenuItem { label: string; icon?: string; href?: string; onClick?: () => void; hidden?: boolean }
 
 /** A small "More" button that keeps less-used actions out of the page header. */
-export function Menu({ items, label = 'More' }: { items: MenuItem[]; label?: string }) {
+export function Menu({ items, label = 'More', sm }: { items: MenuItem[]; label?: string; sm?: boolean }) {
   const [open, setOpen] = useState(false);
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -22,7 +22,7 @@ export function Menu({ items, label = 'More' }: { items: MenuItem[]; label?: str
   if (!shown.length) return null;
   return (
     <span className="menu" ref={box}>
-      <button type="button" className="btn outline" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>{label} <Icon name="chevron" className="ic" /></button>
+      <button type="button" className={`btn outline${sm ? ' sm' : ''}`} aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>{label} <Icon name="chevron" className="ic" /></button>
       {open && (
         <div className="menu-pop" role="menu">
           {shown.map((i) => {

@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 import { relTime } from '@/lib/workspace';
 
 interface Notice { id: string; type: string; title: string; body: string | null; link: string | null; readAt: string | null; createdAt: string }
-const ICON: Record<string, string> = { mention: '@', reminder: '⏰', assignment: '👤', digest: '☀' };
+const ICON: Record<string, string> = { mention: 'forum', reminder: 'clock', assignment: 'hr', digest: 'sun' };
 
 /** Notification bell: mentions, reminders, assignments and the daily summary. Checks every minute. */
 export function Bell({ version }: { version: number }) {
@@ -49,7 +49,7 @@ export function Bell({ version }: { version: number }) {
           {!data?.items.length && <div className="small muted" style={{ padding: 10 }}>Nothing yet. Mentions, reminders and new tasks show up here.</div>}
           {data?.items.map((n) => (
             <button key={n.id} className={`bell-item ${n.readAt ? '' : 'unread'}`} onClick={() => openItem(n)}>
-              <span className="bell-icon" aria-hidden="true">{ICON[n.type] ?? '•'}</span>
+              <span className="bell-icon" aria-hidden="true"><Icon name={ICON[n.type] ?? 'bell'} className="ic" /></span>
               <span style={{ minWidth: 0, flex: 1 }}>
                 <span className="bell-title">{n.title}</span>
                 {n.body && <span className="small muted bell-body">{n.body.length > 90 ? `${n.body.slice(0, 90)}…` : n.body}</span>}

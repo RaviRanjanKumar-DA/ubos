@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useRef, useState } from 'react';
 import { BUSINESS_LINES } from '@ubos/shared';
 
@@ -31,7 +32,7 @@ export function BusinessLinePicker({ value, onChange, max }: { value: PickedLine
         {value.map((v) => (
           <span key={v.name} className="badge" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             {v.name}
-            <button type="button" aria-label={`Remove ${v.name}`} onClick={(e) => { e.stopPropagation(); toggle(v); }} style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}>✕</button>
+            <button type="button" aria-label={`Remove ${v.name}`} onClick={(e) => { e.stopPropagation(); toggle(v); }} style={{ border: 0, background: 'none', cursor: 'pointer', padding: 0, color: 'inherit' }}><Icon name="close" className="ic" /></button>
           </span>
         ))}
         <span aria-hidden="true" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)' }}>▾</span>

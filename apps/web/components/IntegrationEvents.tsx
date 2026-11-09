@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -59,7 +60,7 @@ export function IntegrationEvents({ integrationKey, canManage }: { integrationKe
                 {canManage && e.status === 'failed' && <button className="btn sm outline" disabled={busy} onClick={() => run(async () => {
                   const r = await api<{ outcome: string; errors: string[] }>(`/api/v1/integrations/${integrationKey}/events/${e.id}/replay`, { method: 'POST', noWorkspace: true });
                   return r.outcome === 'rejected' ? `Still rejected: ${r.errors.join('; ')}` : `Done — ${OUTCOME[r.outcome] ?? r.outcome}.`;
-                })}>↻ Process again</button>}
+                })}><Icon name="refresh" className="ic" />Process again</button>}
               </div>
             </div>
           )}

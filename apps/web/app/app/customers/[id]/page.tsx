@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { CustomerTickets } from '@/components/support/CustomerTickets';
 import { useShell } from '@/components/AppShell';
 import { useCallback, useEffect, useState } from 'react';
@@ -106,7 +107,7 @@ export default function Customer360Page() {
                   </span>
                   {c.canMerge && !m.undoneAt && (
                     <button className="btn sm ghost" onClick={async () => {
-                      if (!confirm(`Undo merge of ${m.duplicate.name}? The separate record comes back with its leads.`)) return;
+                      if (!await askConfirm(`Undo merge of ${m.duplicate.name}? The separate record comes back with its leads.`)) return;
                       try {
                         await api(`/api/v1/customers/merges/${m.id}/undo`, { method: 'POST', noWorkspace: true });
                         setNotice('Merge undone.');

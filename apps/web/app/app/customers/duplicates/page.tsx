@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -89,8 +90,8 @@ export default function DuplicatesPage() {
               <button className="btn ghost" onClick={() => act(() => api('/api/v1/customers/duplicates/dismiss', { method: 'POST', body: { aId: p.a, bId: p.b }, noWorkspace: true }), 'Marked as different people.')}>
                 Not the same person
               </button>
-              <button className="btn" onClick={() => {
-                if (confirm(`Merge into ${keepName}?`)) act(() => api('/api/v1/customers/merge', { method: 'POST', body: { primaryId: keepId, duplicateId: other }, noWorkspace: true }), `Merged into ${keepName}. You can undo it from the customer page.`);
+              <button className="btn" onClick={async () => {
+                if (await askConfirm(`Merge into ${keepName}?`)) act(() => api('/api/v1/customers/merge', { method: 'POST', body: { primaryId: keepId, duplicateId: other }, noWorkspace: true }), `Merged into ${keepName}. You can undo it from the customer page.`);
               }}>
                 Merge — keep {keepName}
               </button>

@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, platformApi, rupees } from '@/lib/api';
@@ -60,7 +61,7 @@ export default function ConsolePage() {
   useEffect(() => { load(); }, [load]);
 
   async function setStatus(t: Tenant, status: 'active' | 'suspended') {
-    if (status === 'suspended' && !confirm(`Suspend ${t.name}? Their users will be locked out until you reactivate.`)) return;
+    if (status === 'suspended' && !await askConfirm(`Suspend ${t.name}? Their users will be locked out until you reactivate.`)) return;
     try {
       await platformApi(`/platform/v1/tenants/${t.id}/status`, { method: 'PATCH', body: { status } });
       load();
@@ -90,13 +91,12 @@ export default function ConsolePage() {
             <h1>{view === 'orders' ? 'Orders & payments' : view === 'pricing' ? 'Plans & prices' : 'Organizations'}</h1>
             <div className="muted small">{view === 'orders' ? 'Licence and service orders from every organization. Confirm a payment to apply it.' : view === 'pricing' ? 'Create packages, change prices and choose what organizations can buy.' : 'Every company using UBOS, including your own (Tenant #1).'}</div>
           </div>
-          <button className="btn" onClick={() => setAdding(true)}>+ Onboard company</button>
+          <button className="btn" onClick={() => setAdding(true)}><Icon name="plus" className="ic" />Onboard company</button>
         </div>
         {error && <div className="error">{error}</div>}
-        <div className="row" style={{ gap: 2, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
+        <div className="dash-tabs" role="tablist">
           {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices']] as const).map(([k, l]) => (
-            <button key={k} className="btn ghost" onClick={() => setView(k)}
-              style={{ borderRadius: 0, borderBottom: view === k ? '2px solid var(--brand)' : '2px solid transparent', color: view === k ? 'var(--brand)' : undefined }}>{l}</button>
+            <button key={k} role="tab" aria-selected={view === k} className={`dash-tab${view === k ? ' on' : ''}`} onClick={() => setView(k)}>{l}</button>
           ))}
         </div>
         {view === 'orders' && <Orders onChanged={load} />}

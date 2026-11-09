@@ -1,5 +1,6 @@
 'use client';
 
+import { askConfirm, askText } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -80,8 +81,8 @@ export default function WorkspaceSettingsPage() {
               canDelete={data.pipelines.length > 1} onEditLostReasons={() => setTab('lists')} />
           ))}
           {!ro && (
-            <button className="btn outline" onClick={() => {
-              const name = prompt('Name of the new pipeline / process, e.g. Renewals');
+            <button className="btn outline" onClick={async () => {
+              const name = await askText('Name of the new pipeline / process, e.g. Renewals');
               if (name) act(() => call(`/api/v1/workspaces/${id}/pipelines`, 'POST', { name }), 'Pipeline added.');
             }}>+ Add pipeline</button>
           )}
@@ -116,12 +117,12 @@ export default function WorkspaceSettingsPage() {
           <p className="small muted">Industry template: {data.template ?? '—'}</p>
           {isOrgAdmin ? (
             <div className="row">
-              <button className="btn outline" onClick={() => {
-                const name = prompt('Workspace name', data.name);
+              <button className="btn outline" onClick={async () => {
+                const name = await askText('Workspace name', data.name);
                 if (name) act(() => api(`/api/v1/workspaces/${id}`, { method: 'PATCH', body: { name }, noWorkspace: true }), 'Renamed.');
               }}>Rename</button>
-              <button className={`btn ${data.isArchived ? 'outline' : 'danger'}`} onClick={() => {
-                if (data.isArchived || confirm(`Archive ${data.name}? It disappears from the workspace switcher; its data is kept.`)) {
+              <button className={`btn ${data.isArchived ? 'outline' : 'danger'}`} onClick={async () => {
+                if (data.isArchived || await askConfirm(`Archive ${data.name}? It disappears from the workspace switcher; its data is kept.`)) {
                   act(() => api(`/api/v1/workspaces/${id}`, { method: 'PATCH', body: { isArchived: !data.isArchived }, noWorkspace: true }), data.isArchived ? 'Workspace restored.' : 'Workspace archived.');
                 }
               }}>{data.isArchived ? 'Restore workspace' : 'Archive workspace'}</button>

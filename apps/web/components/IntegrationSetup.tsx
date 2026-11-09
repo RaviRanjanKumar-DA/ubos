@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { IntegrationEvents } from './IntegrationEvents';
 import { api, ApiError } from '@/lib/api';
@@ -93,7 +94,7 @@ export function IntegrationSetup({ id, canManage, onClose, onChanged }: { id: st
                   {s.mapping?.saved && <span className="badge ok">Fields mapped</span>}
                 </div>
               </div>
-              <button className="btn sm ghost" onClick={onClose} aria-label="Close">✕</button>
+              <button className="btn sm ghost" onClick={onClose} aria-label="Close"><Icon name="close" className="ic" /></button>
             </div>
 
             {guide && (
@@ -220,7 +221,7 @@ function MapFields({ id, name, mapping, canManage, onSaved }: { id: string; name
                 </option>
               ))}
             </select>
-            {canManage && <button className="btn sm ghost" aria-label={`Remove ${f}`} onClick={() => { setRows(rows.filter((x) => x !== f)); const m = { ...map }; delete m[f]; setMap(m); }}>✕</button>}
+            {canManage && <button className="btn sm ghost" aria-label={`Remove ${f}`} onClick={() => { setRows(rows.filter((x) => x !== f)); const m = { ...map }; delete m[f]; setMap(m); }}><Icon name="close" className="ic" /></button>}
           </div>
         ))}
       </div>

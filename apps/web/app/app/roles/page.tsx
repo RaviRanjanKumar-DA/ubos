@@ -1,5 +1,7 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
+import { askConfirm, askText } from '@/components/Dialogs';
 import { useEffect, useMemo, useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
@@ -69,7 +71,7 @@ export default function RolesPage() {
   const readOnly = !canManage || !!current?.isProtected;
   const clean = (m: Record<string, string>) => JSON.stringify(Object.entries(m).filter(([, v]) => v).sort());
   const dirty = name !== saved.name || clean(grants) !== clean(saved.grants);
-  const switchTo = (r: Role | 'new') => { if (!dirty || confirm('Discard unsaved changes to this role?')) open(r); };
+  const switchTo = async (r: Role | 'new') => { if (!dirty || await askConfirm('Discard unsaved changes to this role?')) open(r); };
 
   async function act(fn: () => Promise<unknown>, text: string, pick?: string) {
     setMsg(null);
@@ -111,7 +113,7 @@ export default function RolesPage() {
                 <b>{r.name}</b>{r.isProtected && <span className="badge" style={{ marginLeft: 6 }}>Built-in</span>}
                 <span className="small muted" style={{ display: 'block' }}>{r.isProtected ? 'Full access' : summary(toMap(r))}</span>
               </span>
-              <span className="badge grey" title="People with this role">{r.userCount} 👤</span>
+              <span className="badge grey" title="People with this role">{r.userCount} <Icon name="hr" className="ic" /></span>
             </button>
           ))}
           {selected === 'new' && <div className="role-item on"><b>New role</b></div>}
@@ -133,14 +135,14 @@ export default function RolesPage() {
                 <div className="row">
                   {current && <span className="small muted">{current.userCount} {current.userCount === 1 ? 'person has' : 'people have'} this role · {summary(grants)}</span>}
                   {current && canManage && (
-                    <button type="button" className="btn sm outline" onClick={() => {
-                      const n = prompt('Name for the copy', `${current.name} (copy)`);
+                    <button type="button" className="btn sm outline" onClick={async () => {
+                      const n = await askText('Name for the copy', `${current.name} (copy)`);
                       if (n) act(() => api(`/api/v1/roles/${current.id}/clone`, { method: 'POST', body: { name: n }, noWorkspace: true }), current.isProtected ? 'Role copied — you can edit the copy.' : 'Role copied.');
                     }}>{current.isProtected ? 'Duplicate to customise' : 'Duplicate'}</button>
                   )}
                   {current && !readOnly && (
-                    <button type="button" className="btn sm danger" onClick={() => {
-                      if (confirm(`Delete role "${current.name}"?`)) act(() => api(`/api/v1/roles/${current.id}`, { method: 'DELETE', noWorkspace: true }), 'Role deleted.', '');
+                    <button type="button" className="btn sm danger" onClick={async () => {
+                      if (await askConfirm(`Delete role "${current.name}"?`)) act(() => api(`/api/v1/roles/${current.id}`, { method: 'DELETE', noWorkspace: true }), 'Role deleted.', '');
                     }}>Delete</button>
                   )}
                 </div>
@@ -163,7 +165,7 @@ export default function RolesPage() {
                 <div key={g.label} className="card perm-section">
                   <div className="perm-head">
                     <button type="button" className="perm-toggle" onClick={() => { const n = new Set(closed); if (n.has(g.label)) n.delete(g.label); else n.add(g.label); setClosed(n); }} aria-expanded={!isClosed}>
-                      <span aria-hidden="true">{isClosed ? '▸' : '▾'}</span> <b>{g.label}</b>
+                      <Icon name="chevron" className={`ic perm-chev${isClosed ? ' shut' : ''}`} /> <b>{g.label}</b>
                       <span className={`badge ${allowed ? 'ok' : 'grey'}`} style={{ marginLeft: 8 }}>{allowed} of {g.permissions.length} allowed</span>
                     </button>
                     {!readOnly && (
