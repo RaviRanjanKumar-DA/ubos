@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useState } from 'react';
 import { api, ApiError } from '@/lib/api';
 import { fromIstInput, toIstInput } from '@/lib/ist';
@@ -47,7 +48,7 @@ export function TaskDialog({ task, leadId, leadName, people, canAssign, meId, de
         <div className="row" style={{ gap: 0, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden', width: 'fit-content', marginBottom: 12 }}>
           {(['task', 'meeting', 'call'] as const).map((t) => (
             <button type="button" key={t} className={`btn sm ${f.type === t ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setF({ ...f, type: t })}>
-              {t === 'task' ? '✔ Task' : t === 'meeting' ? '👥 Meeting' : '📞 Call'}
+              <Icon name={t === 'task' ? 'tick' : t === 'meeting' ? 'leads' : 'calls'} className="ic" /> {t === 'task' ? 'Task' : t === 'meeting' ? 'Meeting' : 'Call'}
             </button>
           ))}
         </div>

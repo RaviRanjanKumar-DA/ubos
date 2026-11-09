@@ -1,5 +1,7 @@
 'use client';
 
+import { Menu } from '@/components/Menu';
+import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -33,7 +35,7 @@ const TAB_SHORT: Record<string, string> = {
 function FilterBox({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
   return (
     <label className="fbox">
-      <span className="fbox-icon" aria-hidden="true">{icon}</span>
+      <span className="fbox-icon" aria-hidden="true"><Icon name={icon} className="ic" /></span>
       <span className="fbox-main"><span className="fbox-label">{label}</span>{children}</span>
     </label>
   );
@@ -235,12 +237,12 @@ export default function DashboardPage() {
         <div className="row">
           {!editing && (
             <>
-              {dash && (dash.canEdit && !dash.isTemplate
-                ? <button className="btn outline" onClick={() => setDraft({ name: dash.name, widgets: dash.widgets })}>Edit</button>
-                : <button className="btn outline" onClick={() => setDraft({ name: `${dash.name} (my copy)`, widgets: dash.widgets })} title="Change widgets and save it as your own dashboard">Customise</button>)}
-              {dash?.canShare && !dash.isTemplate && list?.canShare && <button className="btn outline" onClick={() => setSharing(true)}>Share</button>}
               {dash && <EmailMe dashboardId={dash.id} />}
-              <button className="btn" onClick={() => saveCopy('My dashboard', [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }]).then((id) => { if (id) setDraft({ name: 'My dashboard', widgets: [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] }); })}>+ New</button>
+              <Menu items={[
+                { label: dash?.canEdit && !dash.isTemplate ? 'Edit this dashboard' : 'Customise a copy', icon: 'edit', hidden: !dash, onClick: () => dash && setDraft({ name: dash.canEdit && !dash.isTemplate ? dash.name : `${dash.name} (my copy)`, widgets: dash.widgets }) },
+                { label: 'Share', icon: 'share', hidden: !(dash?.canShare && !dash.isTemplate && list?.canShare), onClick: () => setSharing(true) },
+                { label: 'New dashboard', icon: 'plus', onClick: () => saveCopy('My dashboard', [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }]).then((id) => { if (id) setDraft({ name: 'My dashboard', widgets: [{ id: 'k1', type: 'kpi', title: 'New leads', metric: 'leads', groupBy: 'none', w: 3, h: 1 }] }); }) },
+              ]} />
             </>
           )}
           {editing && (
@@ -257,20 +259,20 @@ export default function DashboardPage() {
         <div className="dash-tabs" role="tablist" aria-label="Dashboards">
           {tabs.map((t) => (
             <button key={t.id} role="tab" aria-selected={dash?.id === t.id} className={`dash-tab ${dash?.id === t.id ? 'on' : ''}`} title={t.hint} onClick={() => { setCross([]); open(t.id); }}>
-              {t.kind === 'mine' ? '★ ' : t.kind === 'locked' ? '🔒 ' : t.kind === 'shared' ? '↗ ' : ''}{t.name}
+              {t.kind === 'mine' ? <Icon name="star" className="ic" /> : t.kind === 'locked' ? <Icon name="lock" className="ic" /> : t.kind === 'shared' ? <Icon name="share" className="ic" /> : null}{t.name}
             </button>
           ))}
         </div>
       )}
 
       <div className="card fbar">
-        <FilterBox icon="📅" label="Period">
+        <FilterBox icon="calendar" label="Period">
           <select value={range} onChange={(e) => setRange(e.target.value as RangePreset)}>
             {(Object.keys(RANGE_LABELS) as RangePreset[]).map((r) => <option key={r} value={r}>{RANGE_LABELS[r]}</option>)}
           </select>
         </FilterBox>
         {!me.currentWorkspaceId && me.workspaces.length > 1 && (
-          <FilterBox icon="🏢" label="Business line">
+          <FilterBox icon="tenants" label="Business line">
             <select value={line} onChange={(e) => setLine(e.target.value)}>
               <option value="">All business lines</option>
               {me.workspaces.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
@@ -278,7 +280,7 @@ export default function DashboardPage() {
           </FilterBox>
         )}
         {teams.length > 0 && (
-          <FilterBox icon="👥" label="Team">
+          <FilterBox icon="leads" label="Team">
             <select value={team} onChange={(e) => setTeam(e.target.value)}>
               <option value="">All teams</option>
               {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -286,28 +288,28 @@ export default function DashboardPage() {
           </FilterBox>
         )}
         {people.length > 0 && (
-          <FilterBox icon="👤" label="RM / person">
+          <FilterBox icon="hr" label="RM / person">
             <select value={owner} onChange={(e) => setOwner(e.target.value)}>
               <option value="">Everyone</option>
               {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </FilterBox>
         )}
-        <FilterBox icon="◎" label="Status">
+        <FilterBox icon="radio" label="Status">
           <select value={status} onChange={(e) => setStatus(e.target.value)}>
             <option value="">All statuses</option>
             {statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             <option value="__none__">No status</option>
           </select>
         </FilterBox>
-        <FilterBox icon="⇲" label="Source">
+        <FilterBox icon="trend" label="Source">
           <select value={source} onChange={(e) => setSource(e.target.value)}>
             <option value="">All sources</option>
             {sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
         </FilterBox>
         <div className="fbar-actions" ref={moreRef}>
-          <button className={`btn outline ${moreOpen ? 'on' : ''}`} onClick={() => setMoreOpen(!moreOpen)}>⚲ More filters ▾</button>
+          <button className={`btn outline ${moreOpen ? 'on' : ''}`} onClick={() => setMoreOpen(!moreOpen)}><Icon name="funnel" className="ic" /> More filters <Icon name="chevron" className="ic" /></button>
           {moreOpen && (
             <div className="card fbar-more">
               <div className="field">
@@ -324,7 +326,7 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}>⬇ Export</button>}
+          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv}><Icon name="download" className="ic" /> Export</button>}
         </div>
       </div>
       <div className="fbar-foot">
@@ -332,16 +334,16 @@ export default function DashboardPage() {
           <>
             <span className="small">Filtered by</span>
             {cross.map((c) => (
-              <button key={c.group} className="chip on" onClick={() => setCross(cross.filter((x) => x.group !== c.group))} title="Remove">{GROUP_LABELS[c.group as keyof typeof GROUP_LABELS]}: {c.label} ✕</button>
+              <button key={c.group} className="chip on" onClick={() => setCross(cross.filter((x) => x.group !== c.group))} title="Remove">{GROUP_LABELS[c.group as keyof typeof GROUP_LABELS]}: {c.label} <Icon name="close" className="ic" /></button>
             ))}
             <Link className="small" href={leadsLink()}>View these leads →</Link>
           </>
-        ) : <span className="small muted">Tip: click a bar, slice or row to filter every card; click it again to clear.</span>}
+        ) : <span className="small muted fbar-tip">Tip: click a bar, slice or row to filter every card; click it again to clear.</span>}
         <span style={{ flex: 1 }} />
         {loading && <span className="small muted">Updating…</span>}
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}
-      {editing && <div className="notice small">Drag widgets to reorder. Use ✎ to change a widget, or the size buttons to resize it.</div>}
+      {editing && <div className="notice small">Drag widgets to reorder. Use the pencil to change a widget, or the size buttons to resize it.</div>}
 
       <div className="dash-grid">
         {widgets.map((w, i) => (
@@ -356,8 +358,8 @@ export default function DashboardPage() {
                   <button className="btn sm ghost" title="Narrower" aria-label="Narrower" onClick={() => setDraft({ ...draft, widgets: draft.widgets.map((x, j) => (j === i ? { ...x, w: ([3, 3, 4, 6, 8] as const)[[3, 4, 6, 8, 12].indexOf(x.w)] } : x)) })}>◂</button>
                   <button className="btn sm ghost" title="Wider" aria-label="Wider" onClick={() => setDraft({ ...draft, widgets: draft.widgets.map((x, j) => (j === i ? { ...x, w: ([4, 6, 8, 12, 12] as const)[[3, 4, 6, 8, 12].indexOf(x.w)] } : x)) })}>▸</button>
                   <button className="btn sm ghost" title="Taller / shorter" aria-label="Change height" onClick={() => setDraft({ ...draft, widgets: draft.widgets.map((x, j) => (j === i ? { ...x, h: ((x.h % 3) + 1) as WidgetConfig['h'] } : x)) })}>↕</button>
-                  <button className="btn sm ghost" title="Edit" aria-label="Edit widget" onClick={() => setDialog(w)}>✎</button>
-                  <button className="btn sm ghost" title="Remove" aria-label="Remove widget" style={{ color: 'var(--bad)' }} onClick={() => setDraft({ ...draft, widgets: draft.widgets.filter((_, j) => j !== i) })}>✕</button>
+                  <button className="btn sm ghost" title="Edit" aria-label="Edit widget" onClick={() => setDialog(w)}><Icon name="edit" className="ic" /></button>
+                  <button className="btn sm ghost" title="Remove" aria-label="Remove widget" style={{ color: 'var(--bad)' }} onClick={() => setDraft({ ...draft, widgets: draft.widgets.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>
                 </span>
               )}
             </header>
@@ -404,7 +406,7 @@ function EmailMe({ dashboardId }: { dashboardId: string }) {
   }, [dashboardId]);
   return (
     <span style={{ position: 'relative' }}>
-      <button className={`btn ${sub ? '' : 'outline'}`} onClick={() => setOpen(!open)} title="Get this dashboard by email">✉ {sub ? (sub.frequency === 'weekly' ? 'Weekly email' : 'Daily email') : 'Email me'}</button>
+      <button className={`btn ${sub ? '' : 'outline'}`} onClick={() => setOpen(!open)} title="Get this dashboard by email"><Icon name="mail" className="ic" /> {sub ? (sub.frequency === 'weekly' ? 'Weekly email' : 'Daily email') : 'Email me'}</button>
       {open && (
         <div className="card fbar-more" style={{ width: 280 }}>
           <div className="field"><label>Send</label>

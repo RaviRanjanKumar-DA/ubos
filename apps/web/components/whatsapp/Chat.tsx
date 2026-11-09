@@ -10,7 +10,7 @@ export interface Thread {
   id: string; phone: string | null; name: string; leadId: string | null; workspaceId: string | null; assigneeId: string | null; assigneeName: string | null; status: string; unread: number;
   windowOpen: boolean; optedOut: boolean; messages: Msg[];
 }
-const TICK: Record<string, string> = { queued: '🕓', sent: '✓', delivered: '✓✓', read: '✓✓', failed: '⚠' };
+const TICK: Record<string, string> = { queued: '…', sent: '✓', delivered: '✓✓', read: '✓✓', failed: '⚠' };
 const time = (d: string) => new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
 
 /** One WhatsApp chat: messages (live), reply box inside the 24-hour window, approved templates otherwise. */

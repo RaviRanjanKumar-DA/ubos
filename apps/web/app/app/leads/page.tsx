@@ -1,5 +1,7 @@
 'use client';
 
+import { Menu } from '@/components/Menu';
+import { Icon } from '@/components/Icon';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { BroadcastDialog } from '@/components/whatsapp/BroadcastDialog';
 import Link from 'next/link';
@@ -202,29 +204,32 @@ function LeadsPage() {
           <form onSubmit={(e) => { e.preventDefault(); load(); }}>
             <input className="input" style={{ width: 210 }} placeholder="Search name, mobile, email" value={quick.q} onChange={(e) => setQuick({ ...quick, q: e.target.value })} />
           </form>
-          {can('crm.lead.export') && <button className="btn outline" onClick={exportCsv} title="Exports the leads matching the current filters">Export</button>}
-          {can('crm.lead.import') && me.currentWorkspaceId && <Link className="btn outline" href="/app/leads/import">Bulk upload</Link>}
-          {can('crm.lead.import') && me.currentWorkspaceId && <Link className="btn outline" href="/app/leads/update">Bulk update</Link>}
           {can('crm.lead.create') && ws && <button className="btn" onClick={() => setAdding(true)}>+ Add lead</button>}
+          <Menu items={[
+            { label: 'Export matching leads', icon: 'download', onClick: exportCsv, hidden: !can('crm.lead.export') },
+            { label: 'Bulk upload', icon: 'upload', href: '/app/leads/import', hidden: !can('crm.lead.import') || !me.currentWorkspaceId },
+            { label: 'Bulk update', icon: 'edit', href: '/app/leads/update', hidden: !can('crm.lead.import') || !me.currentWorkspaceId },
+            { label: 'Save these filters as a view', icon: 'star', onClick: () => saveView() },
+          ]} />
         </div>
       </div>
 
-      <div className="view-bar">
+      {views.length > 0 && <div className="view-bar">
         <button className={`view-tab ${!activeView ? 'on' : ''}`} onClick={() => applyView(null)}>All leads</button>
         {views.map((v) => (
           <button key={v.id} className={`view-tab ${activeView === v.id ? 'on' : ''}`} onClick={() => applyView(v)} title={v.isMine ? 'My view' : `Shared by ${v.owner}`}>
-            {v.isMine ? '' : '↗ '}{v.name}{v.layout === 'board' ? ' ▦' : ''}
+            {!v.isMine && <Icon name="share" className="ic" />}{v.name}{v.layout === 'board' && <Icon name="board" className="ic" />}
           </button>
         ))}
         <span style={{ flex: 1 }} />
         {view?.isMine && <button className="btn sm ghost" onClick={() => saveView(view)}>Update view</button>}
         {view?.isMine && can('crm.view.share') && <button className="btn sm ghost" onClick={() => setShareView(view)}>Share</button>}
         {view?.isMine && <button className="btn sm ghost" style={{ color: 'var(--bad)' }} onClick={() => { if (confirm(`Remove the view “${view.name}”?`)) api(`/api/v1/views/${view.id}`, { method: 'DELETE' }).then(() => { applyView(null); loadViews(); }); }}>Remove</button>}
-        <button className="btn sm outline" onClick={() => saveView()}>☆ Save as view</button>
-      </div>
+      </div>}
 
-      <div className="card" style={{ padding: 12, marginBottom: 12 }}>
-        <div className="chips">
+      <div className="card lead-bar">
+        <div className="lead-bar-top">
+        <div className="chips chips-scroll">
           <button className={`chip ${quick.followUp === 'today' ? 'on' : ''}`} onClick={() => setQ('followUp', 'today')}>Follow-ups today <span className="count">{counts.today}</span></button>
           <button className={`chip ${quick.followUp === 'overdue' ? 'on' : counts.overdue ? 'alert' : ''}`} onClick={() => setQ('followUp', 'overdue')}>Overdue <span className="count">{counts.overdue}</span></button>
           <button className={`chip ${quick.followUp === 'none' ? 'on' : ''}`} onClick={() => setQ('followUp', 'none')}>No follow-up planned</button>
@@ -232,20 +237,22 @@ function LeadsPage() {
           <span style={{ width: 1, background: 'var(--line)', margin: '0 4px' }} />
           <button className={`chip ${quick.owner === 'me' ? 'on' : ''}`} onClick={() => setQ('owner', 'me')}>My leads</button>
           {can('crm.lead.assign') && <button className={`chip ${quick.owner === 'unassigned' ? 'on' : ''}`} onClick={() => setQ('owner', 'unassigned')}>Unassigned</button>}
-          <span style={{ flex: 1 }} />
-          <select className="input" style={{ width: 'auto', height: 32 }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
+        </div>
+        <div className="lead-bar-tools">
+          <select className="input lead-sort" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort">
             {SORTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           {ws && (
             <span className="row" style={{ gap: 0, border: '1px solid var(--line)', borderRadius: 8, overflow: 'hidden' }}>
-              <button className={`btn sm ${layout === 'list' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('list')} title="List">☰ List</button>
-              <button className={`btn sm ${layout === 'board' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('board')} title="Board by stage">▦ Board</button>
+              <button className={`btn sm ${layout === 'list' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('list')} title="List" aria-label="List"><Icon name="list" className="ic" /></button>
+              <button className={`btn sm ${layout === 'board' ? '' : 'ghost'}`} style={{ borderRadius: 0 }} onClick={() => setLayout('board')} title="Board by stage" aria-label="Board by stage"><Icon name="board" className="ic" /></button>
             </span>
           )}
-          {ws && <button className={`btn sm ${nAdv ? '' : 'outline'}`} onClick={() => setShowFilters(true)}>⚲ Filters{nAdv ? ` (${nAdv})` : ''}</button>}
+          {ws && <button className={`btn sm ${nAdv ? '' : 'outline'}`} onClick={() => setShowFilters(true)}><Icon name="funnel" className="ic" /> Filters{nAdv ? ` (${nAdv})` : ''}</button>}
+        </div>
         </div>
         {ws && ws.pipelines.length > 0 && (
-          <div className="chips" style={{ marginTop: 10 }}>
+          <div className="chips chips-scroll lead-stages">
             {ws.pipelines.flatMap((p) => p.stages.map((s) => (
               <button key={s.id} className={`chip ${adv.stageIds.includes(s.id!) ? 'on' : ''}`}
                 onClick={() => setAdv({ ...adv, stageIds: adv.stageIds.includes(s.id!) ? adv.stageIds.filter((x) => x !== s.id) : [...adv.stageIds, s.id!] })}>
@@ -257,7 +264,7 @@ function LeadsPage() {
         )}
         {(activeChips.length > 0 || filtered) && (
           <div className="chips" style={{ marginTop: 10 }}>
-            {activeChips.map((c) => <button key={c.label} className="chip on" onClick={c.clear} title="Remove this filter">{c.label} ✕</button>)}
+            {activeChips.map((c) => <button key={c.label} className="chip on" onClick={c.clear} title="Remove this filter">{c.label} <Icon name="close" className="ic" /></button>)}
             {filtered && <button className="chip" onClick={() => { setQuick(EMPTY_Q); setAdv(EMPTY_ADV); }}>Clear all filters</button>}
           </div>
         )}
@@ -296,7 +303,7 @@ function LeadsPage() {
                             <span>{l.status ? <span className={`badge ${STATUS_TONE[l.status] ?? ''}`}>{label('statuses', l.status)}</span> : null}</span>
                             <span className="muted">{l.slaBreached ? <span className="badge bad">Stuck {l.inStageDays}d</span> : l.owner ?? 'Unassigned'}</span>
                           </div>
-                          {l.nextFollowUpAt && <div className="small" style={{ color: new Date(l.nextFollowUpAt) < new Date() ? 'var(--bad)' : 'var(--muted)' }}>⏰ {relTime(l.nextFollowUpAt)}</div>}
+                          {l.nextFollowUpAt && <div className="small" style={{ color: new Date(l.nextFollowUpAt) < new Date() ? 'var(--bad)' : 'var(--muted)' }}><Icon name="clock" className="ic" /> {relTime(l.nextFollowUpAt)}</div>}
                         </div>
                       ))}
                       {!cards.length && <div className="small muted" style={{ padding: 8, textAlign: 'center' }}>{dragLead ? 'Drop here' : 'No leads'}</div>}

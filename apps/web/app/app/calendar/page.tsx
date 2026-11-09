@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -10,7 +11,7 @@ import { relTime } from '@/lib/workspace';
 
 interface CalEvent { kind: 'task' | 'meeting' | 'call' | 'follow_up'; id: string; title: string; at: string; durationMin: number | null; done: boolean; assignee: string | null; leadId: string | null; leadName: string | null; location: string | null }
 type Person = { id: string; name: string };
-const KIND: Record<CalEvent['kind'], [string, string]> = { meeting: ['👥', 'Meeting'], task: ['✔', 'Task'], call: ['📞', 'Call'], follow_up: ['⏰', 'Follow-up'] };
+const KIND: Record<CalEvent['kind'], [string, string]> = { meeting: ['leads', 'Meeting'], task: ['tick', 'Task'], call: ['calls', 'Call'], follow_up: ['clock', 'Follow-up'] };
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 /** A square on the grid, as a date (the same form as istDay). */
 const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -99,7 +100,7 @@ export default function CalendarPage() {
               <button className="btn sm outline" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} aria-label="Next month">›</button>
             </div>
             <h2 style={{ margin: 0 }}>{month.toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', month: 'long', year: 'numeric' })}</h2>
-            <div className="row small" style={{ gap: 10 }}>{Object.entries(KIND).map(([k, [i, l]]) => <span key={k} className={`cal-key k-${k}`}>{i} {l}</span>)}</div>
+            <div className="row small" style={{ gap: 10 }}>{Object.entries(KIND).map(([k, [i, l]]) => <span key={k} className={`cal-key k-${k}`}><Icon name={i} className="ic" /> {l}</span>)}</div>
           </div>
           <div className="cal-grid">
             {DAYS.map((d) => <div key={d} className="cal-dow">{d}</div>)}
@@ -124,12 +125,12 @@ export default function CalendarPage() {
 
         <div className="card">
           <h2>Open tasks {overdue.length > 0 && <span className="badge bad">{overdue.length} overdue</span>}</h2>
-          {!tasks.length && <p className="small muted">Nothing open. 🎉</p>}
+          {!tasks.length && <p className="small muted">Nothing open.</p>}
           {tasks.slice(0, 30).map((t) => (
             <div key={t.id} className="task-row">
               <input type="checkbox" aria-label={`Done: ${t.title}`} onChange={() => complete({ kind: t.type, id: t.id, done: false } as CalEvent)} />
               <div style={{ minWidth: 0, flex: 1 }}>
-                <button className="link-btn" onClick={() => setDialog({ task: t })}>{KIND[t.type][0]} {t.title}</button>
+                <button className="link-btn" onClick={() => setDialog({ task: t })}><Icon name={KIND[t.type][0]} className="ic" /> {t.title}</button>
                 <div className="small muted">
                   <span style={{ color: t.overdue ? 'var(--bad)' : undefined }}>{relTime(t.dueAt)}</span>
                   {t.leadId && <> · <Link href={`/app/leads/${t.leadId}`}>{t.leadName}</Link></>}
@@ -144,10 +145,10 @@ export default function CalendarPage() {
       {picked && (
         <div className="modal-bg" onClick={() => setPicked(null)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="small muted">{KIND[picked.kind][0]} {KIND[picked.kind][1]}{picked.done ? ' · done' : ''}</div>
+            <div className="small muted"><Icon name={KIND[picked.kind][0]} className="ic" /> {KIND[picked.kind][1]}{picked.done ? ' · done' : ''}</div>
             <h2 style={{ marginTop: 4 }}>{picked.title}</h2>
             <p className="small">{new Date(picked.at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'full', timeStyle: 'short' })}{picked.durationMin ? ` · ${picked.durationMin} min` : ''}</p>
-            {picked.location && <p className="small">📍 {/^https?:/.test(picked.location) ? <a href={picked.location} target="_blank" rel="noreferrer">{picked.location}</a> : picked.location}</p>}
+            {picked.location && <p className="small"><Icon name="pin" className="ic" /> {/^https?:/.test(picked.location) ? <a href={picked.location} target="_blank" rel="noreferrer">{picked.location}</a> : picked.location}</p>}
             {picked.assignee && <p className="small muted">Assigned to {picked.assignee}</p>}
             <div className="row end">
               {picked.leadId && <Link className="btn outline" href={`/app/leads/${picked.leadId}`}>Open {picked.leadName ?? 'lead'}</Link>}

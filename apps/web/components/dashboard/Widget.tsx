@@ -74,7 +74,7 @@ export function WidgetBody({ w, data, onDrill, onCross, active }: {
           <tbody>
             {rows.map((r, i) => (
               <tr key={r.userId}>
-                <td>{i < 3 ? ['🥇', '🥈', '🥉'][i] : i + 1}</td>
+                <td>{i + 1}</td>
                 <td style={{ whiteSpace: 'nowrap' }}><Link href={`/app/leads?owners=${r.userId}`}>{r.name}</Link></td>
                 <td><b>{r.won}</b></td><td>{r.wonValue ? fmt(r.wonValue, 'currency') : '—'}</td><td>{pc(r.winRate)}</td><td>{r.leads}</td>
                 <td>{r.activities}</td><td>{r.calls}</td><td>{r.connected}{r.connectRate !== null && <span className="small muted"> · {r.connectRate}%</span>}</td><td>{fmt(r.talkMinutes, 'minutes')}</td>
@@ -91,7 +91,7 @@ export function WidgetBody({ w, data, onDrill, onCross, active }: {
   }
   if (w.type === 'followups') {
     const rows = (data as { rows: FollowRow[] }).rows;
-    if (!rows.length) return <div className="empty" style={{ padding: 18 }}>Nothing due — all caught up 🎉</div>;
+    if (!rows.length) return <div className="empty" style={{ padding: 18 }}>Nothing due — all caught up</div>;
     return (
       <div className="fu-list">
         {rows.map((f) => (

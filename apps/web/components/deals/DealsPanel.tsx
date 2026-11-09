@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
@@ -84,9 +85,9 @@ export function DealsPanel({ lead, people, initialTab, onChange }: {
     <div className="card" style={{ marginBottom: 14 }} id="deals">
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
         <div className="dash-tabs" role="tablist" aria-label="Sale and delivery" style={{ marginBottom: 0 }}>
-          {([['process', '⚙ Process'], ['quotes', '🧾 Quotes'], ['payments', '₹ Payments'], ['team', '👥 Lead team'], ...(can('crm.whatsapp.chat') ? [['whatsapp', '💬 WhatsApp']] : []), ...(can('crm.message.send') ? [['outreach', '✉ SMS & Email']] : [])] as [Tab, string][]).map(([k, l]) => (
+          {([['process', 'tree', 'Process'], ['quotes', 'receipt', 'Quotes'], ['payments', 'finance', 'Payments'], ['team', 'leads', 'Lead team'], ...(can('crm.whatsapp.chat') ? [['whatsapp', 'forum', 'WhatsApp']] : []), ...(can('crm.message.send') ? [['outreach', 'mail', 'SMS & Email']] : [])] as [Tab, string, string][]).map(([k, ic, l]) => (
             <button key={k} role="tab" aria-selected={tab === k} className={`dash-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>
-              {l}{counts[k] && <span className="tab-count" style={{ marginLeft: 6 }}>{counts[k]}</span>}
+              <Icon name={ic} className="ic" /> {l}{counts[k] && <span className="tab-count" style={{ marginLeft: 6 }}>{counts[k]}</span>}
             </button>
           ))}
         </div>
@@ -171,7 +172,7 @@ function RunCard({ run, proc, act, call }: { run: Run; proc: Processes; act: Act
               <span className="step-num">{s.status === 'done' ? '✓' : s.position + 1}</span>
               <span className="step-name">{s.name}</span>
               <span className={`badge ${STEP_TONE[s.status] ?? ''}`}>{STEP_LABEL[s.status] ?? s.status}</span>
-              {s.locked && <span title="Completed and locked">🔒</span>}
+              {s.locked && <span title="Completed and locked"><Icon name="lock" className="ic" /></span>}
               {s.sentBackCount > 0 && <span className="badge warn" title="Sent back to this step">↩ {s.sentBackCount}</span>}
               <span className="small muted step-meta">{s.assigneeName ?? ''}{s.dueAt && s.status !== 'done' ? ` · due ${new Date(s.dueAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}{s.completedAt ? ` · ${s.completedByName ?? ''} ${new Date(s.completedAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}` : ''}</span>
             </button>
@@ -220,7 +221,7 @@ function StepBody({ step, run, canUnlock, onUnlock, act, call }: { step: StepRow
         </dl>
       ))}
       <div className="row end" style={{ gap: 6 }}>
-        {step.locked && canUnlock && run.status !== 'cancelled' && <button className="btn sm ghost" onClick={onUnlock}>🔓 Unlock</button>}
+        {step.locked && canUnlock && run.status !== 'cancelled' && <button className="btn sm ghost" onClick={onUnlock}><Icon name="unlock" className="ic" /> Unlock</button>}
         {editable && step.fields.length > 0 && <button className="btn sm ghost" onClick={() => act(() => call(`/api/v1/process-steps/${step.id}`, 'PUT', { data: values }), 'Saved.')}>Save</button>}
         {editable && <button className="btn sm" onClick={() => act(() => call(`/api/v1/process-steps/${step.id}/complete`, 'POST', { data: values }), step.requiresApproval ? 'Sent for sign-off.' : 'Step completed.')}>{step.requiresApproval ? 'Submit for sign-off' : 'Mark step done'}</button>}
       </div>
@@ -300,7 +301,7 @@ function QuotesTab({ quotes, lead, canQuote, act, call }: { quotes: Quote[]; lea
                         }, 'Quote marked as sent.')}>{q.needsApproval && q.status === 'draft' ? 'Ask approval' : 'Mark sent'}</button>
                       )}
                       {canQuote && ['draft', 'approved'].includes(q.status) && q.status === 'approved' && (
-                        <button className="btn sm ghost" title="Send by email to the customer" onClick={() => act(() => call(`/api/v1/quotes/${q.id}/send`, 'POST', { email: true }), 'Quote emailed to the customer.')}>✉ Email</button>
+                        <button className="btn sm ghost" title="Send by email to the customer" onClick={() => act(() => call(`/api/v1/quotes/${q.id}/send`, 'POST', { email: true }), 'Quote emailed to the customer.')}><Icon name="mail" className="ic" /> Email</button>
                       )}
                       {canQuote && q.status === 'sent' && <button className="btn sm" onClick={() => act(() => call(`/api/v1/quotes/${q.id}/accept`, 'POST', { markWon: true }), 'Accepted — the lead is won and its process has started.')}>Accepted ✓</button>}
                       {canQuote && q.status === 'sent' && <button className="btn sm ghost" onClick={() => setDeclining(q)}>Declined</button>}

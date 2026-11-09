@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { useEffect, useState } from 'react';
 import { recordingUrl } from '@/lib/live';
 
@@ -9,18 +10,18 @@ export function RecordingPlayer({ callId, workspaceId, onAudio }: { callId: stri
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
   useEffect(() => () => { if (src?.startsWith('blob:')) URL.revokeObjectURL(src); }, [src]);
-  if (src) return src.startsWith('blob:') ? <audio ref={onAudio} src={src} controls autoPlay style={{ height: 32, maxWidth: 260 }} /> : <a className="btn sm ghost" href={src} target="_blank" rel="noreferrer">▶ Open at provider</a>;
+  if (src) return src.startsWith('blob:') ? <audio ref={onAudio} src={src} controls autoPlay style={{ height: 32, maxWidth: 260 }} /> : <a className="btn sm ghost" href={src} target="_blank" rel="noreferrer"><Icon name="play" className="ic" /> Open at provider</a>;
   return (
     <span>
       <button className="btn sm ghost" disabled={busy} title="Play recording" onClick={async () => {
         setBusy(true); setErr('');
         try { setSrc(await recordingUrl(callId, workspaceId)); } catch (e) { setErr(e instanceof Error ? e.message : 'Failed'); }
         setBusy(false);
-      }}>{busy ? '…' : '▶ Play'}</button>
+      }}>{busy ? '…' : <><Icon name="play" className="ic" /> Play</>}</button>
       {err && <span className="small" style={{ color: 'var(--bad)' }}> {err}</span>}
     </span>
   );
 }
 
 export const dur = (s: number) => (s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`);
-export const CHANNEL: Record<string, string> = { sim: '📱 SIM', cloud: '☁ Cloud', manual: '✍ Logged' };
+export const CHANNEL: Record<string, string> = { sim: 'SIM', cloud: 'Cloud', manual: 'Logged by hand' };

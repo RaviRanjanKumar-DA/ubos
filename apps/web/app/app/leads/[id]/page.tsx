@@ -1,5 +1,6 @@
 'use client';
 
+import { Icon } from '@/components/Icon';
 import { Suspense, useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
@@ -29,7 +30,7 @@ interface LabelRow { id: string; name: string; color: string }
 interface Script { id: string; stageId: string | null; title: string; body: string }
 type Tab = 'call' | 'remark' | 'follow_up';
 
-const ICON: Record<string, string> = { call: '📞', remark: '📝', status: '🏷️', assignment: '👤', stage: '➜', follow_up: '⏰', import: '⬆', action: '✔', task: '📅', labels: '🏷', quote: '🧾', payment: '₹', process: '⚙', team: '👥', message: '✉', automation: '⚡' };
+const ICON: Record<string, string> = { call: 'calls', remark: 'edit', status: 'tag', assignment: 'hr', stage: 'flag', follow_up: 'clock', import: 'upload', action: 'tick', task: 'calendar', labels: 'tag', quote: 'receipt', payment: 'finance', process: 'tree', team: 'leads', message: 'mail', automation: 'bolt' };
 const QUICK = [
   { label: 'In 2 hours', date: () => new Date(Date.now() + 2 * 3_600_000) },
   { label: 'Tomorrow 11 am', date: () => istAt(11, 1) },
@@ -116,6 +117,8 @@ function LeadPage() {
     }
   }
 
+  // Calls and the timeline come first, unless a link opened a specific tab of the sale panel.
+  const deals = <DealsPanel lead={{ id: lead.id, name: lead.name, workspace: lead.workspace, canUpdate: lead.canUpdate, ownerId: lead.owner?.id ?? null }} people={people} initialTab={tabParam} onChange={load} />;
   return (
     <>
       <div className="page-head" style={{ alignItems: 'flex-start' }}>
@@ -130,7 +133,7 @@ function LeadPage() {
           </div>
           <div className="lead-labels">
           {lead.labelIds.map((lid) => labels.find((x) => x.id === lid)).filter(Boolean).map((x) => <span key={x!.id} className="lbl" style={{ background: x!.color }}>{x!.name}</span>)}
-          {lead.canUpdate && labels.length > 0 && <button className="btn sm ghost" onClick={() => setLabelEdit(!labelEdit)}>🏷 {lead.labelIds.length ? 'Edit labels' : 'Add label'}</button>}
+          {lead.canUpdate && labels.length > 0 && <button className="btn sm ghost" onClick={() => setLabelEdit(!labelEdit)}><Icon name="tag" className="ic" /> {lead.labelIds.length ? 'Edit labels' : 'Add label'}</button>}
           {labelEdit && (
             <div className="card label-pop">
               {labels.map((x) => {
@@ -182,7 +185,7 @@ function LeadPage() {
         </div>
       </div>
       {msg && <div className={msg.type}>{msg.text}</div>}
-      <DealsPanel lead={{ id: lead.id, name: lead.name, workspace: lead.workspace, canUpdate: lead.canUpdate, ownerId: lead.owner?.id ?? null }} people={people} initialTab={tabParam} onChange={load} />
+      {tabParam && deals}
 
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 14, alignItems: 'start' }} className="lead-grid">
         <div style={{ display: 'grid', gap: 14 }}>
@@ -222,7 +225,7 @@ function LeadPage() {
           <div className="timeline">
             {lead.activities.map((a) => (
               <div key={a.id} className={`tl-item ${a.type} ${a.type === 'call' && !a.connected ? 'missed' : ''}`}>
-                <span className="tl-dot" aria-hidden="true">{ICON[a.type] ?? '•'}</span>
+                <span className="tl-dot" aria-hidden="true"><Icon name={ICON[a.type] ?? 'tick'} className="ic" /></span>
                 <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap', alignItems: 'baseline' }}>
                   <b style={{ fontSize: 13.5 }}>{describe(a)}</b>
                   <span className="small muted" style={{ whiteSpace: 'nowrap' }}>{relTime(a.at)}</span>
@@ -235,13 +238,14 @@ function LeadPage() {
               </div>
             ))}
             <div className="tl-item">
-              <span className="tl-dot" aria-hidden="true">★</span>
+              <span className="tl-dot" aria-hidden="true"><Icon name="star" className="ic" /></span>
               <b style={{ fontSize: 13.5 }}>Enquiry received</b>
               <div className="small muted">{label('sources', lead.source)} · {new Date(lead.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</div>
             </div>
           </div>
         </div>
       </div>
+      {!tabParam && <div className="lead-deals">{deals}</div>}
       {losing && ws && <LostDialog ws={ws} name={lead.name} onClose={() => setLosing(null)} onPick={(r) => moveTo(losing, r)} />}
       <style>{`@media (max-width: 960px) { .lead-grid { grid-template-columns: 1fr !important; } }`}</style>
     </>
@@ -285,14 +289,14 @@ function ActionPanel({ ws, lead, act, call, people }: {
   return (
     <form className="card" onSubmit={save}>
       <div className="row" style={{ gap: 4, borderBottom: '1px solid var(--line)', marginBottom: 12 }}>
-        {([['call', '📞 Log call'], ['remark', '📝 Remark'], ['follow_up', '⏰ Follow-up']] as [Tab, string][]).map(([k, l]) => (
+        {([['call', 'calls', 'Log call'], ['remark', 'edit', 'Remark'], ['follow_up', 'clock', 'Follow-up']] as [Tab, string, string][]).map(([k, ic, l]) => (
           <button type="button" key={k} className="btn ghost sm" onClick={() => setTab(k)}
-            style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}>{l}</button>
+            style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}><Icon name={ic} className="ic" /> {l}</button>
         ))}
       </div>
       {tab === 'call' && script && (
         <div className="script-box">
-          <button type="button" className="link-btn small" onClick={() => setShowScript(!showScript)}>📋 Call script: {script.title} {showScript ? '▾' : '▸'}</button>
+          <button type="button" className="link-btn small" onClick={() => setShowScript(!showScript)}><Icon name="checklist" className="ic" /> Call script: {script.title} {showScript ? '▾' : '▸'}</button>
           {showScript && <div className="script-body">{script.body}</div>}
         </div>
       )}
@@ -356,7 +360,7 @@ function DetailsCard({ ws, lead, act, call }: {
         <dl style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 14px', margin: '10px 0 0' }}>
           {fields.map((f) => [
             <dt key={`${f.key}-l`} className="muted small">{f.label}</dt>,
-            <dd key={`${f.key}-v`} style={{ margin: 0 }}>{access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '—') : showValue(f, lead.customFields[f.key]) || '—'}{access(f.key) !== 'editable' && <span className="small muted" title="Your role cannot change this field"> 🔒</span>}</dd>,
+            <dd key={`${f.key}-v`} style={{ margin: 0 }}>{access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '—') : showValue(f, lead.customFields[f.key]) || '—'}{access(f.key) !== 'editable' && <span className="small muted" title="Your role cannot change this field"> <Icon name="lock" className="ic" /></span>}</dd>,
           ])}
         </dl>
       ) : (
@@ -370,7 +374,7 @@ function DetailsCard({ ws, lead, act, call }: {
               <label htmlFor={`f_${f.key}`}>{f.label}{f.required && ' *'}</label>
               {access(f.key) === 'editable'
                 ? <FieldInput field={f} value={values[f.key]} onChange={(v) => setValues({ ...values, [f.key]: v })} />
-                : <input className="input" value={`${access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '') : showValue(f, lead.customFields[f.key])} 🔒`} disabled />}
+                : <input className="input" value={`${access(f.key) === 'masked' ? String(lead.customFields[f.key] ?? '') : showValue(f, lead.customFields[f.key])} (locked)`} disabled />}
             </div>
           ))}
           <div className="row end">
@@ -416,7 +420,7 @@ function ActionsCard({ lead, act, call }: {
       <div className="chips">
         {actions.map((x) => (
           <button key={x.id} className="chip" onClick={() => setRunning(x)} title={x.description ?? undefined}>
-            {done.has(x.id) ? '✔ ' : ''}{x.name} <span className="count">{x.score > 0 ? `+${x.score}` : x.score}</span>
+            {done.has(x.id) ? '✓ ' : ''}{x.name} <span className="count">{x.score > 0 ? `+${x.score}` : x.score}</span>
           </button>
         ))}
       </div>
@@ -472,7 +476,7 @@ function TasksCard({ lead, people, onChange }: { lead: LeadDetail; people: { id:
         <div key={t.id} className="task-row">
           <input type="checkbox" checked={!!t.doneAt} aria-label={`Done: ${t.title}`} onChange={() => api(`/api/v1/tasks/${t.id}`, { method: 'PATCH', body: { done: !t.doneAt }, workspace: lead.workspace.id }).then(() => { load(); onChange(); })} />
           <div style={{ minWidth: 0, flex: 1, opacity: t.doneAt ? 0.55 : 1 }}>
-            <button className="link-btn" onClick={() => setDialog(t)} style={{ textDecoration: t.doneAt ? 'line-through' : undefined }}>{t.type === 'meeting' ? '👥' : t.type === 'call' ? '📞' : '✔'} {t.title}</button>
+            <button className="link-btn" onClick={() => setDialog(t)} style={{ textDecoration: t.doneAt ? 'line-through' : undefined }}><Icon name={t.type === 'meeting' ? 'leads' : t.type === 'call' ? 'calls' : 'tick'} className="ic" /> {t.title}</button>
             <div className="small muted"><span style={{ color: t.overdue ? 'var(--bad)' : undefined }}>{new Date(t.dueAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' })}</span>{t.location ? ` · ${t.location}` : ''}{t.assigneeId !== me.user.id ? ` · ${t.assignee}` : ''}</div>
           </div>
         </div>
@@ -494,7 +498,7 @@ function DialButton({ leadId, workspaceId, onMsg }: { leadId: string; workspaceI
       try { const r = await api<{ message: string }>(`/api/v1/leads/${leadId}/dial`, { method: 'POST', body: {}, workspace: workspaceId }); onMsg({ type: 'notice', text: r.message }); }
       catch (e) { onMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); }
       setBusy(false);
-    }}>📞 Call</button>
+    }}><Icon name="calls" className="ic" /> Call</button>
   );
 }
 
