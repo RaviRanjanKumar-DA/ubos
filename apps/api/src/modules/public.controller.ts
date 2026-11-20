@@ -2,7 +2,7 @@ import { RazorpayWebhooks } from './finance/payment-links';
 import { BadRequestException, Body, Controller, ForbiddenException, Get, Headers, HttpCode, Ip, NotFoundException, Param, Patch, Post, Query, Req, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { z } from 'zod';
-import { DUPLICATE_MODES, normalizeMobile, type ApiScope, type DuplicateMode } from '@ubos/shared';
+import { DUPLICATE_MODES, normalizeMobile, type ApiScope, type DuplicateMode, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { ctx } from '../common/context';
 import { parse } from '../common/errors';
@@ -272,7 +272,7 @@ export class PublicApiController {
     const key = await this.db.platform.apiKey.findUnique({ where: { keyHash: sha256(raw) } });
     if (!key || key.revokedAt || (key.expiresAt && key.expiresAt < new Date())) throw new UnauthorizedException({ code: 'API_KEY_INVALID', message: 'This API key is not valid' });
     const t = await this.db.platform.tenant.findUnique({ where: { id: key.tenantId } });
-    if (!t || !['active', 'trial'].includes(t.status)) throw new UnauthorizedException({ code: 'API_KEY_INVALID', message: 'This API key is not valid' });
+    if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) throw new UnauthorizedException({ code: 'API_KEY_INVALID', message: 'This API key is not valid' });
     ctx().tenant = { id: t.id, slug: t.slug, name: t.name, status: t.status };
     rateLimit(`key:${key.id}`, 120);
     if (scope && !key.scopes.includes(scope)) throw new ForbiddenException({ code: 'SCOPE_MISSING', message: `This key does not have the ${scope} scope` });

@@ -1,6 +1,6 @@
 import { rescoreLead } from '../../common/lead-rules';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { matchesConditions, type RuleCondition } from '@ubos/shared';
+import { matchesConditions, type RuleCondition, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../../common/db.service';
 import { contextStore } from '../../common/context';
 import { activity, applyStageChange, assignmentAvailability, eligibleOwners, makeAssigner } from '../../common/lead-ops';
@@ -33,7 +33,7 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
 
   private async asTenant<T>(tenantId: string, depth: number, fn: () => Promise<T>): Promise<T | null> {
     const t = await this.db.platform.tenant.findUnique({ where: { id: tenantId } });
-    if (!t || !['active', 'trial'].includes(t.status)) return null;
+    if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) return null;
     return contextStore.run({ traceId: `automation-${Date.now()}`, ip: null, tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status }, automationDepth: depth }, fn);
   }
 

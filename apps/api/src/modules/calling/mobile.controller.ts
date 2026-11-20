@@ -11,6 +11,7 @@ import { storage } from '../../common/storage';
 import { randomToken, sha256 } from '../../auth/crypto';
 import { rateLimit } from '../integration-runtime';
 import { ingestCall } from './call-pipeline';
+import { LIVE_TENANT_STATUSES } from '@ubos/shared';
 
 const Pair = z.object({ org: z.string().trim().min(2).max(60), code: z.string().regex(/^\d{6}$/), deviceName: z.string().trim().min(1).max(60), platform: z.enum(['android', 'ios']).default('android'), appVersion: z.string().max(20).optional() });
 const CallIn = z.object({
@@ -38,7 +39,7 @@ export class MobileController {
     const input = parse(Pair, body);
     rateLimit(`pair:${ip}`, 10);
     const t = await this.db.app.tenant.findUnique({ where: { slug: input.org.toLowerCase() } });
-    if (!t || !['active', 'trial'].includes(t.status)) throw new UnauthorizedException({ code: 'PAIRING_FAILED', message: 'Organization code or pairing code is wrong' });
+    if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) throw new UnauthorizedException({ code: 'PAIRING_FAILED', message: 'Organization code or pairing code is wrong' });
     ctx().tenant = { id: t.id, slug: t.slug, name: t.name, status: t.status };
     return this.db.tenant(async (tx) => {
       if (!(await tenantFeatures(tx)).features.has('module.sim_calling')) throw new ForbiddenException({ code: 'PLAN_UPGRADE_REQUIRED', message: 'Your plan does not include SIM calling' });
@@ -204,7 +205,7 @@ export class MobileController {
     if (!d || d.revokedAt) throw new UnauthorizedException({ code: 'DEVICE_REVOKED', message: 'This phone is no longer paired — pair it again' });
     const t = await this.db.platform.tenant.findUnique({ where: { id: d.tenantId } });
     const u = await this.db.platform.user.findUnique({ where: { id: d.userId } });
-    if (!t || !['active', 'trial'].includes(t.status) || !u?.isActive) throw new UnauthorizedException({ code: 'DEVICE_REVOKED', message: 'This phone is no longer paired — pair it again' });
+    if (!t || !LIVE_TENANT_STATUSES.includes(t.status) || !u?.isActive) throw new UnauthorizedException({ code: 'DEVICE_REVOKED', message: 'This phone is no longer paired — pair it again' });
     const info = { id: t.id, slug: t.slug, name: t.name, status: t.status };
     ctx().tenant = info;
     rateLimit(`device:${d.id}`, 240);

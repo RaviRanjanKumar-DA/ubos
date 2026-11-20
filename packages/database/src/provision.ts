@@ -28,6 +28,9 @@ export interface ProvisionInput {
   admin: { name: string; email: string; password: string };
   workspaces: WorkspaceInput[];
   actor?: { type: 'platform_user' | 'system'; id?: string };
+  /** Trial length and user licences (default 14 days, 5 licences). */
+  trial?: { days: number; licences: number };
+  signedUpVia?: 'console' | 'self_serve' | 'seed';
 }
 
 /**
@@ -128,19 +131,20 @@ export async function provisionTenant(tx: Tx, input: ProvisionInput) {
       industry: input.industry,
       isInternal: input.isInternal ?? false,
       status: input.isInternal ? 'active' : 'trial',
+      signedUpVia: input.signedUpVia ?? 'console',
     },
   });
 
   await tx.organizationSetting.create({ data: { tenantId: tenant.id } });
 
   const now = new Date();
-  const trialEnd = new Date(now.getTime() + 14 * 86_400_000);
+  const trialEnd = new Date(now.getTime() + (input.trial?.days ?? 14) * 86_400_000);
   await tx.subscription.create({
     data: {
       tenantId: tenant.id,
       planId: plan.id,
       period: 'monthly',
-      licences: input.isInternal ? 1000 : 5,
+      licences: input.isInternal ? 1000 : (input.trial?.licences ?? 5),
       status: input.isInternal ? 'active' : 'trialing',
       trialEndsAt: input.isInternal ? null : trialEnd,
       currentPeriodEnd: input.isInternal ? new Date(now.getTime() + 3650 * 86_400_000) : trialEnd,

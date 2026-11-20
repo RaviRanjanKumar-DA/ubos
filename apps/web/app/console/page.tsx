@@ -20,6 +20,8 @@ interface Tenant {
   licences: number;
   subscriptionStatus: string;
   trialEndsAt: string | null;
+  endsAt: string | null;
+  signedUpVia: string;
   users: number;
   workspaces: number;
   mrrPaise: number;
@@ -36,7 +38,8 @@ export default function ConsolePage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState(false);
-  const [view, setView] = useState<'tenants' | 'orders' | 'pricing'>('tenants');
+  const [editing, setEditing] = useState<Tenant | null>(null);
+  const [view, setView] = useState<'tenants' | 'orders' | 'pricing' | 'signup'>('tenants');
 
   const load = useCallback(async () => {
     try {
@@ -72,6 +75,8 @@ export default function ConsolePage() {
 
   const statusBadge = (t: Tenant) =>
     t.status === 'suspended' ? <span className="badge bad">Suspended</span>
+    : t.status === 'expired' ? <span className="badge bad">Paused (not renewed)</span>
+    : t.status === 'grace' ? <span className="badge warn">Grace days</span>
     : t.subscriptionStatus === 'trialing' ? <span className="badge warn">Trial</span>
     : <span className="badge ok"><span className="dot" />Active</span>;
 
@@ -95,12 +100,13 @@ export default function ConsolePage() {
         </div>
         {error && <div className="error">{error}</div>}
         <div className="dash-tabs" role="tablist">
-          {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices']] as const).map(([k, l]) => (
+          {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices'], ['signup', 'Signup & trials']] as const).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={view === k} className={`dash-tab${view === k ? ' on' : ''}`} onClick={() => setView(k)}>{l}</button>
           ))}
         </div>
         {view === 'orders' && <Orders onChanged={load} />}
         {view === 'pricing' && <Pricing onChanged={load} />}
+        {view === 'signup' && <SignupSettings plans={plans} />}
         {view === 'tenants' && <>
         {metrics && (
           <div className="grid cols-4" style={{ marginBottom: 14 }}>
@@ -124,15 +130,15 @@ export default function ConsolePage() {
                     <td>{t.plan}</td>
                     <td>
                       {statusBadge(t)}
-                      {t.trialEndsAt && t.subscriptionStatus === 'trialing' && (
-                        <div className="small muted">ends {new Date(t.trialEndsAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>
-                      )}
+                      {t.endsAt && !t.isInternal && <div className="small muted">{t.subscriptionStatus === 'trialing' ? 'trial ends' : 'valid till'} {new Date(t.endsAt).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata' })}</div>}
+                      {t.signedUpVia === 'self_serve' && <div className="small muted">signed up online</div>}
                     </td>
                     <td className="small" title="Setup Guide steps done (available steps)">{t.setup ? `${Math.round((t.setup.done / Math.max(1, t.setup.total)) * 100)}% · ${t.setup.done}/${t.setup.total}` : '—'}</td>
                     <td>{t.workspaces}</td>
                     <td>{t.users}</td>
                     <td>{t.mrrPaise ? rupees(t.mrrPaise) : '—'}</td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                      {!t.isInternal && <button className="btn sm ghost" onClick={() => setEditing(t)}>Subscription</button>}
                       {!t.isInternal && (t.status === 'suspended'
                         ? <button className="btn sm outline" onClick={() => setStatus(t, 'active')}>Reactivate</button>
                         : <button className="btn sm danger" onClick={() => setStatus(t, 'suspended')}>Suspend</button>)}
@@ -145,10 +151,11 @@ export default function ConsolePage() {
           </div>
         </div>
         <p className="small muted" style={{ marginTop: 10 }}>
-          MRR counts paid, non-internal subscriptions only. Billing, invoices and usage metering arrive in Phase 3.
+          MRR counts paid, non-internal subscriptions only. Trials and paid periods move to grace days and then pause on their own; your own company never does.
         </p>
         </>}
       </div>
+      {editing && <SubscriptionDialog t={editing} plans={plans} onClose={() => setEditing(null)} onDone={() => { setEditing(null); load(); }} />}
       {adding && <Onboard plans={plans} onClose={() => setAdding(false)} onDone={() => { setAdding(false); load(); }} />}
     </div>
   );
@@ -294,5 +301,72 @@ function Orders({ onChanged }: { onChanged: () => void }) {
         </div>
       )}
     </>
+  );
+}
+
+const istInput = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }) : '');
+const USAGE_LABELS: [string, string][] = [['active_users', 'Active users'], ['storage_mb', 'Storage (MB)'], ['calls', 'Calls'], ['call_minutes', 'Call minutes'], ['whatsapp_out', 'WhatsApp sent'], ['sms_out', 'SMS sent'], ['email_out', 'Emails sent']];
+
+/** Extend a trial, change licences or plan by hand (audited, with a reason), and see this month's usage. */
+function SubscriptionDialog({ t, plans, onClose, onDone }: { t: Tenant; plans: Plan[]; onClose: () => void; onDone: () => void }) {
+  const [f, setF] = useState({ planCode: t.planCode, licences: String(t.licences ?? 1), endsOn: istInput(t.endsAt), reason: '' });
+  const [usage, setUsage] = useState<Record<string, number> | null>(null);
+  const [error, setError] = useState('');
+  useEffect(() => { platformApi<{ usage: Record<string, number> }>(`/platform/v1/tenants/${t.id}/usage`).then((r) => setUsage(r.usage)).catch(() => setUsage(null)); }, [t.id]);
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    try {
+      await platformApi(`/platform/v1/tenants/${t.id}/subscription`, { method: 'PATCH', body: { reason: f.reason, ...(f.planCode !== t.planCode ? { planCode: f.planCode } : {}), ...(Number(f.licences) !== t.licences ? { licences: Number(f.licences) } : {}), ...(f.endsOn && f.endsOn !== istInput(t.endsAt) ? { endsOn: f.endsOn } : {}) } });
+      onDone();
+    } catch (x) { setError(x instanceof ApiError ? x.message : 'Failed'); }
+  };
+  return (
+    <div className="modal-bg">
+      <form className="modal" onSubmit={save}>
+        <h2>{t.name}</h2>
+        <p className="small muted" style={{ marginTop: -6 }}>{t.subscriptionStatus === 'trialing' ? 'On a free trial' : 'Paid subscription'} · {t.slug}</p>
+        {usage && <div className="att-totals" style={{ marginTop: 0, marginBottom: 14 }}>{USAGE_LABELS.map(([k, l]) => <div key={k}><span className="muted small">{l}</span><b>{(usage[k] ?? 0).toLocaleString('en-IN')}</b></div>)}</div>}
+        <div className="grid cols-2">
+          <div className="field"><label htmlFor="sd-p">Plan</label><select id="sd-p" className="input" value={f.planCode} onChange={(e) => setF({ ...f, planCode: e.target.value })}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></div>
+          <div className="field"><label htmlFor="sd-l">User licences</label><input id="sd-l" className="input" type="number" min={1} required value={f.licences} onChange={(e) => setF({ ...f, licences: e.target.value })} /></div>
+          <div className="field"><label htmlFor="sd-e">{t.subscriptionStatus === 'trialing' ? 'Trial ends on' : 'Valid till'}</label><input id="sd-e" className="input" type="date" value={f.endsOn} onChange={(e) => setF({ ...f, endsOn: e.target.value })} /></div>
+        </div>
+        <div className="field"><label htmlFor="sd-r">Reason (kept in the audit log)</label><input id="sd-r" className="input" required minLength={3} maxLength={200} placeholder="e.g. Extended trial after demo call" value={f.reason} onChange={(e) => setF({ ...f, reason: e.target.value })} /></div>
+        {error && <div className="error">{error}</div>}
+        <div className="row end"><button type="button" className="btn ghost" onClick={onClose}>Go back</button><button className="btn">Save</button></div>
+      </form>
+    </div>
+  );
+}
+
+interface SignupCfg { signupEnabled: boolean; trialDays: number; trialPlanCode: string; trialLicences: number; graceDays: number }
+function SignupSettings({ plans }: { plans: Plan[] }) {
+  const [f, setF] = useState<SignupCfg | null>(null);
+  const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  useEffect(() => { platformApi<SignupCfg>('/platform/v1/settings').then(setF).catch((e) => setMsg({ type: 'error', text: e.message })); }, []);
+  if (!f) return msg ? <div className={msg.type}>{msg.text}</div> : null;
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const { signupEnabled, trialDays, trialPlanCode, trialLicences, graceDays } = f;
+      await platformApi('/platform/v1/settings', { method: 'PUT', body: { signupEnabled, trialDays, trialPlanCode, trialLicences, graceDays } });
+      setMsg({ type: 'notice', text: 'Saved.' });
+    } catch (x) { setMsg({ type: 'error', text: x instanceof ApiError ? x.message : 'Failed' }); }
+  };
+  return (
+    <form className="card" style={{ maxWidth: 640 }} onSubmit={save}>
+      <h2>Signup and trials</h2>
+      {msg && <div className={msg.type}>{msg.text}</div>}
+      <label className="row small" style={{ gap: 8, marginBottom: 14 }}><input type="checkbox" checked={f.signupEnabled} onChange={(e) => setF({ ...f, signupEnabled: e.target.checked })} />Anyone can start a free trial at /signup</label>
+      <div className="grid cols-2">
+        <div className="field"><label htmlFor="ss-d">Trial length (days)</label><input id="ss-d" className="input" type="number" min={1} max={90} required value={f.trialDays} onChange={(e) => setF({ ...f, trialDays: Number(e.target.value) })} /></div>
+        <div className="field"><label htmlFor="ss-l">Users on a trial</label><input id="ss-l" className="input" type="number" min={1} max={100} required value={f.trialLicences} onChange={(e) => setF({ ...f, trialLicences: Number(e.target.value) })} /></div>
+        <div className="field"><label htmlFor="ss-p">Trial plan</label><select id="ss-p" className="input" value={f.trialPlanCode} onChange={(e) => setF({ ...f, trialPlanCode: e.target.value })}>{plans.map((p) => <option key={p.code} value={p.code}>{p.name}</option>)}</select></div>
+        <div className="field"><label htmlFor="ss-g">Grace days after the end</label><input id="ss-g" className="input" type="number" min={0} max={60} required value={f.graceDays} onChange={(e) => setF({ ...f, graceDays: Number(e.target.value) })} /></div>
+      </div>
+      <p className="small muted">Admins get reminders 7, 3 and 1 day before a trial or paid period ends, when it ends, and when the account pauses. A paused account can still sign in and pay; nothing is deleted.</p>
+      <button className="btn">Save</button>
+    </form>
   );
 }

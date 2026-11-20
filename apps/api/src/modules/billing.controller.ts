@@ -6,6 +6,8 @@ import { RequirePermission } from '../common/auth.guard';
 import { auth, tenantId } from '../common/context';
 import { parse } from '../common/errors';
 import { randomToken } from '../auth/crypto';
+import { billingState, istClock } from '@ubos/shared';
+import { platformSettings, usageMonth } from '../platform/billing-lifecycle';
 
 export const GST_PCT = 18;
 export const CYCLE_MONTHS: Record<string, number> = { quarterly: 3, annual: 12 };
@@ -54,6 +56,20 @@ export class BillingController {
         services: products.filter((p) => p.kind === 'service').map((p) => ({ code: p.code, name: p.name, description: p.description, pricePaise: p.priceOncePaise })),
       };
     });
+  }
+
+  /** This month's usage against what the plan includes, and where the trial or subscription stands. */
+  @Get('usage')
+  @RequirePermission('org.billing.manage', 'ORGANIZATION')
+  async usage(@Query('month') month?: string) {
+    const m = month && /^d{4}-(0[1-9]|1[0-2])$/.test(month) ? month : istClock(new Date()).day.slice(0, 7);
+    const p = this.db.platform, tid = tenantId();
+    const [sub, s] = await Promise.all([p.subscription.findFirst({ where: { tenantId: tid }, include: { plan: true }, orderBy: { currentPeriodEnd: 'desc' } }), platformSettings(p)]);
+    return {
+      month: m, usage: await usageMonth(p, tid, m),
+      allowance: sub ? { users: sub.licences, storageMb: sub.plan.storageGbPerUser * sub.licences * 1024 } : null,
+      billing: sub ? { ...billingState(sub, s.graceDays), status: sub.status } : null,
+    };
   }
 
   /** Places an order (status "pending"). Payment by gateway comes later; until then the Platform Owner marks it paid. */

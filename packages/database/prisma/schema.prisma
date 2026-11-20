@@ -52,6 +52,8 @@ model Tenant {
   deployment    String          @default("shared") // shared | dedicated | onprem
   dbConnectionRef String?       // for dedicated databases
   createdAt     DateTime        @default(now())
+  signedUpVia   String          @default("console") // console | self_serve | seed
+  statusChangedAt DateTime?
   domains       TenantDomain[]
   subscriptions Subscription[]
   overrides     TenantEntitlement[]
@@ -109,8 +111,9 @@ model UsageRecord {
   tenantId  String
   metric    String   // active_users | storage_gb | ai_credits | api_calls | whatsapp_msgs | call_minutes
   quantity  Decimal
-  periodDay DateTime
+  periodDay DateTime // noon IST of the day
 
+  @@unique([tenantId, metric, periodDay])
   @@index([tenantId, metric, periodDay])
 }
 
@@ -2313,4 +2316,29 @@ model AttendanceRequest {
   createdAt    DateTime  @default(now())
 
   @@index([tenantId, status])
+}
+
+/** Platform-wide settings for self-serve signup and the trial and renewal lifecycle (one row, id "default"). */
+model PlatformSetting {
+  id            String   @id @default("default")
+  signupEnabled Boolean  @default(true)
+  trialDays     Int      @default(14)
+  trialPlanCode String   @default("business")
+  trialLicences Int      @default(5)
+  graceDays     Int      @default(7) // after a trial or paid period ends, before the account pauses
+  updatedAt     DateTime @default(now())
+}
+
+/** 6-digit email codes for self-serve signup (only a hash is kept). */
+model SignupCode {
+  id        String    @id @default(uuid())
+  email     String
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  ip        String?
+  createdAt DateTime  @default(now())
+
+  @@index([email, createdAt])
 }

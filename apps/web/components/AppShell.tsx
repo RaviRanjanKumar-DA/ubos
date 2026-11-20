@@ -10,7 +10,7 @@ import { Search, PageLink } from './Search';
 
 export interface Me {
   user: { id: string; name: string; email: string };
-  tenant: { name: string; slug: string; status: string; plan?: string; trialEndsAt?: string | null };
+  tenant: { name: string; slug: string; status: string; plan?: string; trialEndsAt?: string | null; billing?: { phase: string; endsAt: string; graceEndsAt: string; daysLeft: number } | null };
   roles: { role: string; workspaceId: string | null }[];
   workspaces: { id: string; name: string; slug: string }[];
   currentWorkspaceId: string | null;
@@ -147,6 +147,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       // Organization policy: a new password or 2FA setup comes before any other screen.
       if ((m.security.mustChangePassword || m.security.mfaSetupRequired) && !window.location.pathname.startsWith('/app/security')) {
         router.replace(`/app/security?reason=${m.security.mustChangePassword ? 'password' : 'mfa'}`);
+      } else if (m.tenant.status === 'expired' && m.permissions['org.billing.manage'] && !window.location.pathname.startsWith('/app/billing')) {
+        // A paused account only opens Billing.
+        router.replace('/app/billing');
       }
     } catch (e) {
       if (e instanceof ApiError && (e.status === 401 || e.code === 'TENANT_SUSPENDED' || e.code === 'IP_NOT_ALLOWED')) {
@@ -283,10 +286,29 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
           </header>
-          <div className="content" ref={contentRef}>{children}</div>
+          <div className="content" ref={contentRef}>
+            <BillingBanner me={me} canPay={can('org.billing.manage')} />
+            {me.tenant.status === 'expired' && !can('org.billing.manage') ? <div className="card empty">Your organization&apos;s UBOS subscription has ended. Ask your admin to renew it; nothing has been deleted.</div> : children}
+          </div>
         </div>
       </div>
       {searching && <Search pages={pages} canLeads={can('crm.lead.view')} canCustomers={can('crm.customer.view')} onClose={() => setSearching(false)} />}
     </Ctx.Provider>
+  );
+}
+
+/** Trial ending soon, grace days or a paused account: a strip above every page, with a link to Billing for admins. */
+function BillingBanner({ me, canPay }: { me: Me; canPay: boolean }) {
+  const b = me.tenant.billing;
+  if (!b || (b.phase === 'trial' && b.daysLeft > 7) || b.phase === 'active') return null;
+  const days = (n: number) => `${n} ${n === 1 ? 'day' : 'days'}`;
+  const text = b.phase === 'trial' ? (b.daysLeft === 0 ? 'Your free trial ends today.' : `Your free trial ends in ${days(b.daysLeft)}.`)
+    : b.phase === 'grace' ? `Your subscription has ended. Everything keeps working for ${days(b.daysLeft)} more, then the account pauses.`
+    : 'Your account is paused. Renew to open everything again; nothing has been deleted.';
+  return (
+    <div className={`billing-banner ${b.phase}`}>
+      <span>{text}</span>
+      {canPay ? <Link href="/app/billing" className="btn sm">{b.phase === 'trial' ? 'Choose licences' : 'Renew now'}</Link> : <span className="small">Ask your admin to renew.</span>}
+    </div>
   );
 }

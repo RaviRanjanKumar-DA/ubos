@@ -4,7 +4,7 @@ import MailComposer from 'nodemailer/lib/mail-composer';
 import type { Tx } from '@ubos/database';
 import { DbService } from '../../common/db.service';
 import { authFor } from '../../common/auth-for';
-import { resolvePermissions } from '@ubos/shared';
+import { resolvePermissions, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { auth, AuthInfo, contextStore, ctx, TenantInfo } from '../../common/context';
 import { activity } from '../../common/lead-ops';
 import { notify } from '../../common/notify';
@@ -195,7 +195,7 @@ export class MailService {
     const due = await this.db.platform.mailAccount.findMany({ where: { status: 'active', OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(Date.now() - every) } }] }, take: 50, orderBy: { lastSyncAt: 'asc' } });
     for (const a of due) {
       const t = await this.db.platform.tenant.findUnique({ where: { id: a.tenantId } });
-      if (!t || !['active', 'trial'].includes(t.status)) continue;
+      if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) continue;
       await contextStore.run({ traceId: `mail-${Date.now()}`, ip: null, tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status } }, () => this.syncAccount(a.id)).catch((e) => this.log.error(e instanceof Error ? e.message : e));
     }
   }

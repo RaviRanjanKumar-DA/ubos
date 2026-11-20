@@ -16,6 +16,7 @@ import { decrypt, encrypt, randomToken } from '../../auth/crypto';
 import { asTenant, IntakeService } from '../integration-runtime';
 import { clickSignature, MailService } from './mail.service';
 import { connectCallback, isMailProvider, MAIL, mailConfigured, META, webBase, type MailProvider } from './providers';
+import { LIVE_TENANT_STATUSES } from '@ubos/shared';
 
 const COOKIE = 'ubos_connect';
 const safeEq = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
@@ -217,7 +218,7 @@ export class ConnectCallbackController {
       if (!st || st.typ !== 'connect' || st.provider !== provider || !cookie || !safeEq(String(st.nonce), cookie)) return done('STATE_INVALID');
       if (q.error || !q.code) return done('CANCELLED');
       const t = await this.db.app.tenant.findUnique({ where: { slug: st.tenant } });
-      if (!t || !['active', 'trial'].includes(t.status)) return done('STATE_INVALID');
+      if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) return done('STATE_INVALID');
       const info: TenantInfo = { id: t.id, slug: t.slug, name: t.name, status: t.status };
       ctx().tenant = info;
       ctx().auth = await authFor(this.db, info, st.userId, 'connect');
@@ -289,7 +290,7 @@ export class ConnectCallbackController {
       const page = await this.db.platform.metaPage.findFirst({ where: { pageId: String(c.value.page_id), status: 'active' } });
       if (!page?.tokenEncrypted) continue;
       const t = await this.db.platform.tenant.findUnique({ where: { id: page.tenantId } });
-      if (!t || !['active', 'trial'].includes(t.status)) continue;
+      if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) continue;
       ctx().tenant = { id: t.id, slug: t.slug, name: t.name, status: t.status };
       try { await this.ingest(page, String(c.value.leadgen_id), c.value.form_id ? String(c.value.form_id) : null); }
       catch (e) {

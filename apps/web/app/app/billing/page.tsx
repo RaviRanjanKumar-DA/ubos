@@ -23,7 +23,7 @@ const STATUS_BADGE: Record<Order['status'], string> = { pending: 'warn', paid: '
 
 export default function BillingPage() {
   const { can } = useShell();
-  const [tab, setTab] = useState<'buy' | 'history'>('buy');
+  const [tab, setTab] = useState<'buy' | 'history' | 'usage'>('buy');
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -47,7 +47,7 @@ export default function BillingPage() {
         </div>
       </div>
       <div className="row" style={{ gap: 2, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
-        {([['buy', 'Buy licences'], ['history', 'Transaction history']] as const).map(([k, l]) => (
+        {([['buy', 'Buy licences'], ['usage', 'Usage'], ['history', 'Transaction history']] as const).map(([k, l]) => (
           <button key={k} className="btn ghost" onClick={() => { setTab(k); setNotice(''); }}
             style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}>{l}</button>
         ))}
@@ -56,6 +56,7 @@ export default function BillingPage() {
       {notice && <div className="notice">{notice}</div>}
       {tab === 'buy' && catalog && <Buy catalog={catalog} onOrdered={(n) => { setNotice(`Order ${n} placed. It becomes active as soon as the payment is confirmed — see Transaction history.`); setTab('history'); loadCatalog(); }} />}
       {tab === 'history' && <History />}
+      {tab === 'usage' && <Usage />}
     </>
   );
 }
@@ -240,5 +241,50 @@ function History() {
         </div>
       </div>
     </>
+  );
+}
+
+interface UsageView { month: string; usage: Record<string, number>; allowance: { users: number; storageMb: number } | null; billing: { phase: string; endsAt: string; graceEndsAt: string; daysLeft: number; status: string } | null }
+const USAGE_ROWS: [string, string, (a: NonNullable<UsageView['allowance']>) => number | null][] = [
+  ['active_users', 'Active users', (a) => a.users], ['storage_mb', 'Storage (MB)', (a) => a.storageMb], ['calls', 'Calls', () => null], ['call_minutes', 'Call minutes', () => null],
+  ['whatsapp_out', 'WhatsApp messages sent', () => null], ['sms_out', 'SMS sent', () => null], ['email_out', 'Emails sent', () => null],
+];
+const PHASE: Record<string, [string, string]> = { trial: ['warn', 'Free trial'], active: ['ok', 'Active'], grace: ['warn', 'Ended, in grace days'], expired: ['bad', 'Paused'] };
+
+/** This month's usage against what the licences include, and where the trial or subscription stands. */
+function Usage() {
+  const [v, setV] = useState<UsageView | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { api<UsageView>('/api/v1/billing/usage', { noWorkspace: true }).then(setV).catch((e) => setErr(e.message)); }, []);
+  if (err) return <div className="error">{err}</div>;
+  if (!v) return null;
+  const b = v.billing;
+  return (
+    <div className="hr-grid">
+      {b && (
+        <div className="card">
+          <h2>Subscription</h2>
+          <div className="hr-row"><span>Status</span><span><span className={`badge ${PHASE[b.phase]?.[0]}`}>{PHASE[b.phase]?.[1]}</span></span></div>
+          <div className="hr-row"><span>{b.status === 'trialing' ? 'Trial ends' : 'Valid till'}</span><span>{fmt(b.endsAt)}</span></div>
+          {(b.phase === 'grace' || b.phase === 'expired') && <div className="hr-row"><span>Pauses on</span><span>{fmt(b.graceEndsAt)}</span></div>}
+          {(b.phase === 'trial' || b.phase === 'grace') && <div className="hr-row"><span>Days left</span><span>{b.daysLeft}</span></div>}
+          <p className="small muted">Buy licences before the end date to keep going without a break. After it ends there are a few grace days, then only Billing stays open until you renew. Nothing is deleted.</p>
+        </div>
+      )}
+      <div className="card" style={{ padding: 0 }}>
+        <div style={{ padding: '16px 18px 0' }}><h2>Usage this month</h2></div>
+        <div className="table-wrap">
+          <table className="table">
+            <thead><tr><th>Item</th><th>Used</th><th>Included</th></tr></thead>
+            <tbody>
+              {USAGE_ROWS.map(([k, label, inc]) => {
+                const cap = v.allowance ? inc(v.allowance) : null, used = v.usage[k] ?? 0;
+                return <tr key={k}><td>{label}</td><td className={cap !== null && used > cap ? 'kpi-bad' : ''}>{used.toLocaleString('en-IN')}</td><td>{cap === null ? '—' : cap.toLocaleString('en-IN')}</td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }

@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import { authenticator } from 'otplib';
 import QRCode from 'qrcode';
 import { z } from 'zod';
+import { billingState } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { Public } from '../common/auth.guard';
 import { auth, ctx, tenantId } from '../common/context';
@@ -200,7 +201,7 @@ export class AuthController {
     }));
     return {
       user: { id: a.userId, name: a.name, email: a.email },
-      tenant: { name: t.name, slug: t.slug, status: t.status, plan: sub?.plan.name, trialEndsAt: sub?.trialEndsAt },
+      tenant: { name: t.name, slug: t.slug, status: t.status, plan: sub?.plan.name, trialEndsAt: sub?.trialEndsAt, billing: sub && t.status !== 'active' ? billingState(sub, (await this.db.platform.platformSetting.findUnique({ where: { id: 'default' } }))?.graceDays ?? 7) : null },
       roles: a.assignments.map((r) => ({ role: r.roleName, workspaceId: r.workspaceId })),
       workspaces,
       currentWorkspaceId: a.workspaceId,

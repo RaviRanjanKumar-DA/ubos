@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, NestMiddleware, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, HttpException, Injectable, NestMiddleware, NotFoundException } from '@nestjs/common';
 import type { NextFunction, Request, Response } from 'express';
 import { DbService } from './db.service';
 import { ctx } from './context';
@@ -39,6 +39,10 @@ export class TenantMiddleware implements NestMiddleware {
     if (!tenant) throw new NotFoundException({ code: 'TENANT_NOT_FOUND', message: 'Organization not found' });
     if (tenant.status === 'suspended' || tenant.status === 'cancelled') {
       throw new ForbiddenException({ code: 'TENANT_SUSPENDED', message: 'This organization account is not active' });
+    }
+    // A trial or subscription that ran out (after the grace days) leaves only signing in, notifications and Billing open, so people can pay.
+    if (tenant.status === 'expired' && !/^\/api\/v1\/(auth|billing|notifications)(\/|$|\?)/.test(req.originalUrl)) {
+      throw new HttpException({ code: 'SUBSCRIPTION_EXPIRED', message: 'Your UBOS subscription has ended. Open Billing to continue.' }, 402);
     }
     ctx().tenant = { id: tenant.id, slug: tenant.slug, name: tenant.name, status: tenant.status };
     next();

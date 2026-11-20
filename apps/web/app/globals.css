@@ -930,3 +930,8 @@ tr.clickable { cursor: pointer; }
   table[data-cards] td[data-label="Name"] { display: block; text-align: left; }
   table[data-cards] td[data-label="Name"]::before { display: none; }
 }
+
+/* Trial and renewal banner */
+.billing-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 16px; border-radius: 10px; font-size: 14px; background: var(--brand-50); color: var(--ink); border: 1px solid #cfc6f2; }
+.billing-banner.grace { background: var(--warn-bg); border-color: #f0d9a8; }
+.billing-banner.expired { background: var(--bad-bg); border-color: #f3c4bf; }

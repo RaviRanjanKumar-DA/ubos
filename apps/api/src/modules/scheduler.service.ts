@@ -1,12 +1,13 @@
 import { CollectionsReminders } from './finance/collections';
 import { AccessReminders } from './packages/access';
 import { HrReminders } from './hr/hr.controller';
+import { BillingLifecycle } from '../platform/billing-lifecycle';
 import { ChatbotService } from './chatbot/chatbot.service';
 import { MailService } from './connected/mail.service';
 import { notifyTicketBreaches } from './support/tickets.controller';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { Tx } from '@ubos/database';
-import { accessibleWorkspaceIds, DASHBOARD_TEMPLATES, FeatureKey, METRICS, resolvePermissions, RoleAssignment, DataScope, WidgetConfig } from '@ubos/shared';
+import { accessibleWorkspaceIds, DASHBOARD_TEMPLATES, FeatureKey, METRICS, resolvePermissions, RoleAssignment, DataScope, WidgetConfig, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { AuthInfo, contextStore, tenantId, TenantInfo } from '../common/context';
 import { scopeFilter } from '../common/scope';
@@ -39,7 +40,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   private lastPurge = 0;
-  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService, private collections: CollectionsReminders, private access: AccessReminders, private hr: HrReminders) {}
+  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService, private collections: CollectionsReminders, private access: AccessReminders, private hr: HrReminders, private billing: BillingLifecycle) {}
 
   onModuleInit() {
     if (process.env.SCHEDULER_DISABLED === 'true') return;
@@ -55,7 +56,8 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
     const totals = { reminders: 0, digests: 0, dashboards: 0 };
     try {
-      const tenants = await this.db.platform.tenant.findMany({ where: { status: { in: ['active', 'trial'] }, ...(onlyTenantId ? { id: onlyTenantId } : {}) } });
+      if (!onlyTenantId) await this.billing.run().catch((e) => this.log.error(e instanceof Error ? e.message : e));
+      const tenants = await this.db.platform.tenant.findMany({ where: { status: { in: LIVE_TENANT_STATUSES }, ...(onlyTenantId ? { id: onlyTenantId } : {}) } });
       for (const t of tenants) {
         const info: TenantInfo = { id: t.id, slug: t.slug, name: t.name, status: t.status };
         await contextStore.run({ traceId: `scheduler-${Date.now()}`, ip: null, tenant: info }, async () => {

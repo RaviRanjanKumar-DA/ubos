@@ -204,7 +204,7 @@ function LoginForm() {
       )}
 
       <p className="small muted" style={{ marginTop: 16 }}>
-        Platform staff? <a href="/console/login">Open the Platform Console</a>
+        New to UBOS? <a href="/signup">Start a free trial</a> · Platform staff? <a href="/console/login">Open the Platform Console</a>
       </p>
     </div>
   );

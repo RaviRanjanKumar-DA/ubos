@@ -2,7 +2,7 @@ import { HttpException, Injectable, Logger, NotFoundException, OnModuleDestroy, 
 import { createHash, createHmac } from 'crypto';
 import { lookup } from 'dns/promises';
 import { isIP } from 'net';
-import { DUPLICATE_MODES, parseCsv, type DuplicateMode } from '@ubos/shared';
+import { DUPLICATE_MODES, parseCsv, type DuplicateMode, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { contextStore, ctx, TenantInfo } from '../common/context';
 import { decrypt, encrypt } from '../auth/crypto';
@@ -33,7 +33,7 @@ export function rateLimit(key: string, perMinute: number) {
 /** Runs `fn` as the organization with this slug (public routes have no signed-in user). */
 export async function asTenant<T>(db: DbService, slug: string, fn: (t: TenantInfo) => Promise<T>): Promise<T> {
   const t = await db.app.tenant.findUnique({ where: { slug: slug.toLowerCase() } });
-  if (!t || !['active', 'trial'].includes(t.status)) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Not found' });
+  if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) throw new NotFoundException({ code: 'NOT_FOUND', message: 'Not found' });
   const info: TenantInfo = { id: t.id, slug: t.slug, name: t.name, status: t.status };
   ctx().tenant = info;
   return fn(info);
@@ -251,7 +251,7 @@ export async function dueSheetSyncs(db: DbService, intake: IntakeService) {
     const every = Math.max(5, Number(cfg.values.syncMinutes) || 15);
     if (cfg.lastSyncAt && Date.now() - new Date(cfg.lastSyncAt).getTime() < every * 60_000) continue;
     const t = await db.platform.tenant.findUnique({ where: { id: c.tenantId } });
-    if (!t || !['active', 'trial'].includes(t.status)) continue;
+    if (!t || !LIVE_TENANT_STATUSES.includes(t.status)) continue;
     await contextStore.run({ traceId: `sheets-${Date.now()}`, ip: null, tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status } }, () => intake.syncSheet(t.id).catch(() => undefined));
   }
 }

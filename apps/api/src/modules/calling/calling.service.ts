@@ -1,5 +1,5 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { normalizeMobile } from '@ubos/shared';
+import { normalizeMobile, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../../common/db.service';
 import { contextStore } from '../../common/context';
 import { tenantFeatures } from '../../common/auth-for';
@@ -76,7 +76,7 @@ export class CallingService {
 
   /** Deletes recordings older than the retention (organization setting, never longer than the plan). Runs from the scheduler. */
   async purge(onlyTenantId?: string) {
-    const tenants = await this.db.platform.tenant.findMany({ where: { status: { in: ['active', 'trial'] }, ...(onlyTenantId ? { id: onlyTenantId } : {}) } });
+    const tenants = await this.db.platform.tenant.findMany({ where: { status: { in: LIVE_TENANT_STATUSES }, ...(onlyTenantId ? { id: onlyTenantId } : {}) } });
     let removed = 0;
     for (const t of tenants) {
       await contextStore.run({ traceId: `purge-${Date.now()}`, ip: null, tenant: { id: t.id, slug: t.slug, name: t.name, status: t.status } }, async () => {

@@ -185,7 +185,7 @@ export class PlatformController {
       return {
         id: t.id, name: t.name, slug: t.slug, status: t.status, industry: t.industry, isInternal: t.isInternal,
         plan: s?.plan.name, planCode: s?.plan.code, licences: s?.licences, subscriptionStatus: s?.status,
-        trialEndsAt: s?.trialEndsAt, users: t._count.users, workspaces: t._count.workspaces, createdAt: t.createdAt, setup: setup.get(t.id),
+        trialEndsAt: s?.trialEndsAt, endsAt: s ? (s.status === 'trialing' ? s.trialEndsAt : s.currentPeriodEnd) : null, signedUpVia: t.signedUpVia, statusChangedAt: t.statusChangedAt, users: t._count.users, workspaces: t._count.workspaces, createdAt: t.createdAt, setup: setup.get(t.id),
         mrrPaise: s && !t.isInternal && s.status === 'active' ? s.licences * s.plan.pricePerUserPaise : 0,
       };
     });
