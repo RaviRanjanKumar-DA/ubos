@@ -69,6 +69,7 @@ export default function EmployeePage() {
         </div>
         {e.can.manage && (
           <div className="row" style={{ flexWrap: 'wrap' }}>
+            <Link className="btn ghost" href={`/app/hr/attendance/${e.id}`}>Attendance and leave</Link>
             <button className="btn outline" onClick={() => setEditing(true)}>Edit</button>
             {e.status === 'onboarding' && <button className="btn" onClick={() => move('active')}>Mark as working</button>}
             {(e.status === 'onboarding' || e.status === 'active') && <button className="btn ghost" onClick={() => move('notice')}>Resigned</button>}

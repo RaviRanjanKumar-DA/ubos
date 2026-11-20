@@ -45,7 +45,8 @@
     "verify:collections": "node scripts/verify-collections.mjs",
     "verify:expenses": "node scripts/verify-expenses.mjs",
     "verify:packages": "node scripts/verify-packages.mjs",
-    "verify:hr": "node scripts/verify-hr.mjs"
+    "verify:hr": "node scripts/verify-hr.mjs",
+    "verify:attendance": "node scripts/verify-attendance.mjs"
   },
   "engines": {
     "node": ">=20"

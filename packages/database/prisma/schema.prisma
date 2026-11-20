@@ -1055,20 +1055,36 @@ model Employee {
   assets         AssetAssignment[]
   tasks          EmployeeTask[]
   documents      EmployeeDocument[]
+  attendance     Attendance[]
+  attendanceRequests AttendanceRequest[]
+  leaveAdjustments LeaveAdjustment[]
 
   @@unique([tenantId, employeeCode])
 }
 
 model LeaveRequest {
-  id         String   @id @default(uuid())
-  tenantId   String
-  employeeId String
-  employee   Employee @relation(fields: [employeeId], references: [id])
-  leaveType  String
-  fromDate   DateTime
-  toDate     DateTime
-  status     String   @default("pending")
-  approverId String?
+  id           String     @id @default(uuid())
+  tenantId     String
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  leaveType    String     @default("") // type code at the time of the request
+  leaveTypeId  String?
+  type         LeaveType? @relation(fields: [leaveTypeId], references: [id], onDelete: Restrict)
+  fromDate     DateTime // noon IST of the first day
+  toDate       DateTime
+  halfDay      Boolean    @default(false)
+  days         Float      @default(0)
+  reason       String?
+  status       String     @default("pending") // pending | approved | rejected | cancelled
+  approverId   String?
+  createdById  String?
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime   @default(now())
+
+  @@index([tenantId, employeeId])
+  @@index([tenantId, status])
 }
 
 model Asset {
@@ -2188,6 +2204,7 @@ model HrSetting {
   onboardingTasks Json
   exitTasks       Json
   docTypes        Json
+  attendance      Json? // shift, weekly offs, leave year (AttendanceSettings in @ubos/shared)
   updatedAt       DateTime @default(now()) @updatedAt
 }
 
@@ -2199,4 +2216,101 @@ model ReminderMark {
   createdAt DateTime @default(now())
 
   @@unique([tenantId, key])
+}
+
+model LeaveType {
+  id              String            @id @default(uuid())
+  tenantId        String
+  code            String
+  name            String
+  isPaid          Boolean           @default(true)
+  yearlyDays      Float             @default(0)
+  accrual         String            @default("yearly") // yearly | monthly
+  carryForwardMax Float             @default(0)
+  allowHalfDay    Boolean           @default(true)
+  allowNegative   Boolean           @default(false) // no balance limit, e.g. leave without pay
+  position        Int               @default(0)
+  isArchived      Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  requests        LeaveRequest[]
+  adjustments     LeaveAdjustment[]
+
+  @@unique([tenantId, code])
+}
+
+/**
+ * Manual credits and debits to a leave balance, by leave year.
+ */
+model LeaveAdjustment {
+  id          String    @id @default(uuid())
+  tenantId    String
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  leaveTypeId String
+  type        LeaveType @relation(fields: [leaveTypeId], references: [id])
+  year        Int
+  days        Float
+  reason      String
+  createdById String
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId, employeeId])
+}
+
+model Holiday {
+  id         String   @id @default(uuid())
+  tenantId   String
+  day        String // YYYY-MM-DD (IST)
+  name       String
+  isArchived Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, day])
+}
+
+/**
+ * One row per employee per IST day: first check-in, last check-out, and any HR correction.
+ */
+model Attendance {
+  id            String    @id @default(uuid())
+  tenantId      String
+  employeeId    String
+  employee      Employee  @relation(fields: [employeeId], references: [id])
+  day           String // YYYY-MM-DD (IST)
+  checkInAt     DateTime?
+  checkOutAt    DateTime?
+  inLat         Float?
+  inLng         Float?
+  outLat        Float?
+  outLng        Float?
+  source        String    @default("web") // web | mobile | manual
+  override      String? // present | half_day | absent | on_duty, set by HR
+  note          String?
+  correctedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
+
+  @@unique([tenantId, employeeId, day])
+  @@index([tenantId, day])
+}
+
+/**
+ * An employee asking to correct a day's times (forgot to check in or out).
+ */
+model AttendanceRequest {
+  id           String    @id @default(uuid())
+  tenantId     String
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  day          String
+  checkInAt    DateTime
+  checkOutAt   DateTime
+  reason       String
+  status       String    @default("pending") // pending | approved | rejected | cancelled
+  decidedById  String?
+  decidedAt    DateTime?
+  decisionNote String?
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, status])
 }

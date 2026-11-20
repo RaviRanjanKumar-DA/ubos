@@ -1,4 +1,5 @@
 import { HrController, HrReminders } from './modules/hr/hr.controller';
+import { AttendanceController } from './modules/hr/attendance.controller';
 import { AccessController, AccessReminders } from './modules/packages/access';
 import { GalleryController, PublicGalleryController } from './modules/packages/gallery';
 import { ExpensesController } from './modules/finance/expenses.controller';
@@ -79,6 +80,7 @@ class HealthController {
   imports: [JwtModule.register({})],
   controllers: [
     HrController,
+    AttendanceController,
     AccessController,
     GalleryController,
     PublicGalleryController,

@@ -74,7 +74,10 @@ const NAV: NavGroup[] = [
     { href: '/app/pnl', label: 'Profit & loss', icon: 'trend', perm: 'finance.pnl.view' },
   ] },
   { id: 'people', title: 'People', items: [
+    { href: '/app/me/attendance', label: 'My attendance', icon: 'clock', perm: 'feature:module.hrms' },
     { href: '/app/hr', label: 'Employees', icon: 'hr', perm: 'hr.employee.view' },
+    { href: '/app/hr/attendance', label: 'Attendance', icon: 'calendar', perm: 'hr.attendance.view' },
+    { href: '/app/hr/leave', label: 'Leave', icon: 'checklist', perm: 'hr.leave.approve' },
     { href: '/app/hr/assets', label: 'Assets', icon: 'tag', perm: 'hr.asset.manage' },
   ] },
   { id: 'org', title: 'Organization', startClosed: true, items: [
@@ -206,10 +209,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (error) return <div className="content"><div className="error">{error}</div></div>;
   if (!me) return <div className="content muted">Loading…</div>;
 
-  const can = (perm: string) => !!me.permissions[perm];
+  const can = (perm: string) => (perm.startsWith('feature:') ? me.features.includes(perm.slice(8)) : !!me.permissions[perm]);
   const hasOrgRole = me.roles.some((r) => r.workspaceId === null);
 
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !isLink(i) || can(i.perm)) })).filter((g) => g.items.length);
+  // The closest matching link is the active one, so /app/hr/assets does not also light up /app/hr.
+  const activeHref = groups.flatMap((g) => g.items).filter(isLink).map((i) => i.href).filter((h) => pathname === h || pathname.startsWith(`${h}/`)).sort((x, y) => y.length - x.length)[0];
   const pages: PageLink[] = groups.flatMap((g) => g.items.filter(isLink));
   pages.push({ href: '/app/security', label: 'My Security', icon: 'lock' });
 
@@ -219,7 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <aside className={`sidebar ${open ? 'open' : ''}`}>
           <div className="brand"><span className="logo">U</span> UBOS</div>
           {groups.map((g) => {
-            const hasActive = g.items.some((i) => isLink(i) && pathname.startsWith(i.href));
+            const hasActive = g.items.some((i) => isLink(i) && i.href === activeHref);
             const isOpen = !g.title || hasActive || (navOpen[g.id] ?? !g.startClosed);
             return (
               <div key={g.id}>
@@ -229,7 +234,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </button>
                 )}
                 {isOpen && g.items.map((item) => (isLink(item) ? (
-                  <Link key={item.href} href={item.href} className={`nav-item ${pathname.startsWith(item.href) ? 'active' : ''}`} onClick={() => setOpen(false)}>
+                  <Link key={item.href} href={item.href} className={`nav-item ${item.href === activeHref ? 'active' : ''}`} onClick={() => setOpen(false)}>
                     <Icon name={item.icon} /> {item.label}
                   </Link>
                 ) : (

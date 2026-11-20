@@ -50,7 +50,7 @@ function readBody(req: Request): Promise<Buffer> {
 }
 
 /** Which employees a permission reaches: yourself (OWN), your team and everyone reporting to you (TEAM), your department or branch, or everyone. */
-async function reach(tx: Tx, perm: string): Promise<Prisma.EmployeeWhereInput> {
+export async function reach(tx: Tx, perm: string): Promise<Prisma.EmployeeWhereInput> {
   const a = auth();
   const scope = a.permissions[perm as never] as string | undefined;
   if (!scope) return { id: '__none__' };
