@@ -877,3 +877,19 @@ label.btn.disabled { opacity: .5; cursor: not-allowed; }
 .gal-body h2 { margin: 0; font-size: 17px; }
 .gal-body p { margin: 0; }
 .gal-price { margin: auto 0 6px; padding-top: 6px; font-size: 18px; }
+
+/* HR */
+.hr-modal { max-width: 720px; max-height: 92vh; overflow-y: auto; }
+.hr-sub { font-size: 14px; margin: 6px 0 10px; }
+.hr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(380px, 100%), 1fr)); gap: 16px; align-items: start; }
+.hr-row { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.hr-row > span:last-child { text-align: right; overflow-wrap: anywhere; min-width: 0; }
+.hr-row:last-of-type { border-bottom: 0; }
+.hr-task { display: flex; gap: 8px; align-items: flex-start; padding: 6px 0; font-size: 14px; }
+.hr-up { margin-bottom: 14px; }
+.hr-up ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; }
+tr.clickable { cursor: pointer; }
+@media (max-width: 640px) {
+  table[data-cards] td[data-label="Asset"], table[data-cards] td[data-label="Employee"] { display: block; text-align: left; }
+  table[data-cards] td[data-label="Asset"]::before, table[data-cards] td[data-label="Employee"]::before { display: none; }
+}

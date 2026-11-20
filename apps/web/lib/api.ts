@@ -53,7 +53,7 @@ type Opts = { method?: string; body?: unknown; tenant?: string; noWorkspace?: bo
 
 async function raw(url: string, init: RequestInit) {
   const res = await fetch(url, { ...init, credentials: 'include' });
-  if (res.headers.get('content-type')?.includes('text/csv')) return { res, body: await res.blob() };
+  if (/text\/csv|application\/pdf|image\/|octet-stream/.test(res.headers.get('content-type') ?? '')) return { res, body: await res.blob() };
   return { res, body: await res.json().catch(() => ({})) };
 }
 

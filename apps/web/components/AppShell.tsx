@@ -73,6 +73,10 @@ const NAV: NavGroup[] = [
     { href: '/app/expenses', label: 'Expenses', icon: 'list', perm: 'finance.expense.manage' },
     { href: '/app/pnl', label: 'Profit & loss', icon: 'trend', perm: 'finance.pnl.view' },
   ] },
+  { id: 'people', title: 'People', items: [
+    { href: '/app/hr', label: 'Employees', icon: 'hr', perm: 'hr.employee.view' },
+    { href: '/app/hr/assets', label: 'Assets', icon: 'tag', perm: 'hr.asset.manage' },
+  ] },
   { id: 'org', title: 'Organization', startClosed: true, items: [
     { href: '/app/setup', label: 'Setup Guide', icon: 'checklist', perm: 'org.workspace.manage' },
     { href: '/app/workspaces', label: 'Workspaces', icon: 'workspaces', perm: 'org.workspace.view' },
@@ -88,7 +92,6 @@ const NAV: NavGroup[] = [
     { href: '/app/billing', label: 'Billing & Licences', icon: 'receipt', perm: 'org.billing.manage' },
   ] },
   { id: 'soon', title: 'Coming soon', startClosed: true, items: [
-    { label: 'HR & People', icon: 'hr', phase: 3 },
     { label: 'AI Suite', icon: 'ai', phase: 4 },
   ] },
 ];

@@ -1,5 +1,6 @@
 import { CollectionsReminders } from './finance/collections';
 import { AccessReminders } from './packages/access';
+import { HrReminders } from './hr/hr.controller';
 import { ChatbotService } from './chatbot/chatbot.service';
 import { MailService } from './connected/mail.service';
 import { notifyTicketBreaches } from './support/tickets.controller';
@@ -38,7 +39,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private running = false;
 
   private lastPurge = 0;
-  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService, private collections: CollectionsReminders, private access: AccessReminders) {}
+  constructor(private db: DbService, private mailer: Mailer, private intake: IntakeService, private calling: CallingService, private mail: MailService, private chatbot: ChatbotService, private collections: CollectionsReminders, private access: AccessReminders, private hr: HrReminders) {}
 
   onModuleInit() {
     if (process.env.SCHEDULER_DISABLED === 'true') return;
@@ -65,6 +66,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
           await this.chatbot.sendDue(t.id).catch((e) => this.log.error(e instanceof Error ? e.message : e));
           await this.collections.run(t.name, !!onlyTenantId).catch((e) => this.log.error(e instanceof Error ? e.message : e));
           await this.access.run(t.name, !!onlyTenantId).catch((e) => this.log.error(e instanceof Error ? e.message : e));
+          await this.hr.run(!!onlyTenantId).catch((e) => this.log.error(e instanceof Error ? e.message : e));
         });
       }
       if (!onlyTenantId) await dueSheetSyncs(this.db, this.intake).catch((e) => this.log.error(e instanceof Error ? e.message : e));

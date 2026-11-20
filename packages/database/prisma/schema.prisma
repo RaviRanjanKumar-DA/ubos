@@ -303,6 +303,7 @@ model Department {
   branch   Branch @relation(fields: [branchId], references: [id])
   name     String
   teams    Team[]
+  employees Employee[]
 }
 
 model Team {
@@ -1019,17 +1020,43 @@ model LeadForm {
 // ═════════════════════════ HRMS & Assets (organization level) ═════════════════════════
 
 model Employee {
-  id            String            @id @default(uuid())
-  tenantId      String
-  userId        String            @unique
-  user          User              @relation(fields: [userId], references: [id])
-  employeeCode  String
-  joiningDate   DateTime
-  probationEnd  DateTime?
-  exitDate      DateTime?
-  status        String            @default("onboarding") // onboarding | active | notice | exited
-  leaveRequests LeaveRequest[]
-  assets        AssetAssignment[]
+  id             String             @id @default(uuid())
+  tenantId       String
+  userId         String?            @unique // optional UBOS login
+  user           User?              @relation(fields: [userId], references: [id])
+  employeeCode   String
+  name           String             @default("")
+  mobile         String?
+  workEmail      String?
+  designation    String?
+  departmentId   String?
+  department     Department?        @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  employmentType String             @default("full_time") // full_time | part_time | contract | intern
+  workLocation   String?
+  joiningDate    DateTime
+  probationEnd   DateTime?
+  exitDate       DateTime?
+  exitReason     String?
+  status         String             @default("onboarding") // onboarding | active | notice | exited
+  dateOfBirth    DateTime?
+  personalEmail  String?
+  address        String?
+  emergencyName  String?
+  emergencyPhone String?
+  panEncrypted   String?
+  panLast4       String?
+  bankEncrypted  String?            // account number and IFSC, encrypted together
+  bankLast4      String?
+  ctcPaise       Int?
+  noticeDays     Int                @default(30)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @default(now()) @updatedAt
+  leaveRequests  LeaveRequest[]
+  assets         AssetAssignment[]
+  tasks          EmployeeTask[]
+  documents      EmployeeDocument[]
+
+  @@unique([tenantId, employeeCode])
 }
 
 model LeaveRequest {
@@ -1048,12 +1075,20 @@ model Asset {
   id          String            @id @default(uuid())
   tenantId    String
   tag         String
+  name        String            @default("")
   category    String            // laptop, mobile, sim, headset...
   serialNo    String?
   costPaise   Int?
+  purchasedAt DateTime?
   warrantyEnd DateTime?
   condition   String            @default("good")
+  status      String            @default("available") // available | assigned | repair | retired
+  notes       String?
+  isArchived  Boolean           @default(false)
+  createdAt   DateTime          @default(now())
   assignments AssetAssignment[]
+
+  @@unique([tenantId, tag])
 }
 
 model AssetAssignment {
@@ -2111,4 +2146,57 @@ model CustomerAccess {
 
   @@index([tenantId, workspaceId, expiresAt])
   @@index([tenantId, customerId])
+}
+
+model EmployeeTask {
+  id         String    @id @default(uuid())
+  tenantId   String
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  kind       String    // onboarding | exit
+  title      String
+  position   Int       @default(0)
+  doneAt     DateTime?
+  doneById   String?
+  createdAt  DateTime  @default(now())
+
+  @@index([tenantId, employeeId])
+}
+
+/** Stored encrypted through common/storage. Archived, never deleted. */
+model EmployeeDocument {
+  id           String    @id @default(uuid())
+  tenantId     String
+  employeeId   String
+  employee     Employee  @relation(fields: [employeeId], references: [id])
+  docType      String
+  fileName     String
+  fileKey      String
+  mimeType     String
+  sizeBytes    Int
+  expiresAt    DateTime?
+  isArchived   Boolean   @default(false)
+  uploadedById String
+  createdAt    DateTime  @default(now())
+
+  @@index([tenantId, employeeId])
+}
+
+model HrSetting {
+  id              String   @id @default(uuid())
+  tenantId        String   @unique
+  onboardingTasks Json
+  exitTasks       Json
+  docTypes        Json
+  updatedAt       DateTime @default(now()) @updatedAt
+}
+
+/** Marks a reminder as sent, so daily jobs send each one once. */
+model ReminderMark {
+  id        String   @id @default(uuid())
+  tenantId  String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, key])
 }

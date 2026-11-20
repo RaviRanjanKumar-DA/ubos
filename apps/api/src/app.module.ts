@@ -1,3 +1,4 @@
+import { HrController, HrReminders } from './modules/hr/hr.controller';
 import { AccessController, AccessReminders } from './modules/packages/access';
 import { GalleryController, PublicGalleryController } from './modules/packages/gallery';
 import { ExpensesController } from './modules/finance/expenses.controller';
@@ -77,6 +78,7 @@ class HealthController {
 @Module({
   imports: [JwtModule.register({})],
   controllers: [
+    HrController,
     AccessController,
     GalleryController,
     PublicGalleryController,
@@ -109,6 +111,7 @@ class HealthController {
     RazorpayWebhooks,
     CollectionsReminders,
     AccessReminders,
+    HrReminders,
     AutomationService,
     PlatformGuard,
     { provide: APP_GUARD, useClass: TenantAuthGuard },
