@@ -41,6 +41,7 @@ type NavGroup = { id: string; title?: string; startClosed?: boolean; items: (Nav
 const NAV: NavGroup[] = [
   { id: 'work', items: [
     { href: '/app/dashboard', label: 'Dashboard', icon: 'dashboard', perm: 'dashboard.view' },
+    { href: '/app/reports', label: 'Reports', icon: 'trend', perm: 'dashboard.view' },
     { href: '/app/leads', label: 'Leads', icon: 'funnel', perm: 'crm.lead.view' },
     { href: '/app/customers', label: 'Customers', icon: 'hr', perm: 'crm.customer.view' },
     { href: '/app/calendar', label: 'Calendar & Tasks', icon: 'calendar', perm: 'crm.lead.view' },

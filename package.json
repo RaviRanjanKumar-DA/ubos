@@ -49,7 +49,8 @@
     "verify:attendance": "node scripts/verify-attendance.mjs",
     "verify:billing": "node scripts/verify-billing.mjs",
     "verify:payments": "node scripts/verify-payments.mjs",
-    "verify:flows": "node scripts/verify-flows.mjs"
+    "verify:flows": "node scripts/verify-flows.mjs",
+    "verify:reports": "node scripts/verify-reports.mjs"
   },
   "engines": {
     "node": ">=20"

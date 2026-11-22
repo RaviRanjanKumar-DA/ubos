@@ -127,7 +127,7 @@ export async function loadLookups(tx: Tx, tenantId: string): Promise<Lookups> {
 }
 
 /** Deal value of a lead from its business line's value field (0 when there is none). */
-function dealValue(L: Lookups, workspaceId: string, cf: unknown) {
+export function dealValue(L: Lookups, workspaceId: string, cf: unknown) {
   const key = L.workspaces.get(workspaceId)?.valueFieldKey;
   if (!key || !cf || typeof cf !== 'object') return 0;
   const v = Number((cf as Record<string, unknown>)[key]);
@@ -140,7 +140,7 @@ export interface Ctx { tx: Tx; L: Lookups; scope: Prisma.LeadWhereInput; filters
 /** Thrown for audit metrics when the viewer has no organization-wide audit access. */
 export class AuditAccessError extends Error {}
 
-function leadWhere(c: Ctx): Prisma.LeadWhereInput {
+export function leadWhere(c: Ctx): Prisma.LeadWhereInput {
   const f = c.filters;
   return {
     AND: [

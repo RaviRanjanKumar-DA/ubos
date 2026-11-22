@@ -42,6 +42,7 @@ import { LeadWorkController } from './modules/lead-work.controller';
 import { LeadImportController } from './modules/lead-import.controller';
 import { SetupGuideController } from './modules/setup-guide.controller';
 import { AnalyticsController } from './modules/analytics/analytics.controller';
+import { ReportsController } from './modules/analytics/reports.controller';
 import { LabelsScriptsController } from './modules/labels-scripts.controller';
 import { ViewsTasksController } from './modules/views-tasks.controller';
 import { NotificationsSettingsController } from './modules/notifications-settings.controller';
@@ -85,6 +86,7 @@ class HealthController {
     HrController,
     AttendanceController,
     FlowsController,
+    ReportsController,
     SignupController,
     PlatformBillingController,
     PlatformRazorpayWebhook,

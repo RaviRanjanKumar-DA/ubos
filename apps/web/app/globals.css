@@ -1002,3 +1002,15 @@ tr.clickable { cursor: pointer; }
 .flow-head { flex: 1; min-width: 0; }
 .flow-head .flow-name { flex: 1; min-width: 0; width: 100%; }
 @media (max-width: 640px) { .flow-head { flex-basis: 100%; } }
+
+/* Reports hub */
+.report-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 12px; }
+.report-card { display: flex; flex-direction: column; gap: 6px; padding: 16px; color: var(--ink); text-decoration: none; transition: border-color .15s, transform .15s; }
+a.report-card:hover { border-color: var(--brand); transform: translateY(-1px); }
+.report-card.soon { opacity: .6; }
+.report-ic { width: 34px; height: 34px; border-radius: 10px; background: var(--brand-50); color: var(--brand); display: grid; place-items: center; }
+.report-ic .ic { width: 18px; height: 18px; }
+.report-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 12px 14px; margin-bottom: 12px; }
+.report-filters .input { width: auto; max-width: 100%; }
+.report-table th.num, .report-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-table tfoot td { border-top: 2px solid var(--line); background: #faf9fd; }
