@@ -16,3 +16,4 @@ export * from './attendance';
 export * from './lifecycle';
 export * from './flow';
 export * from './reports';
+export * from './schedules';

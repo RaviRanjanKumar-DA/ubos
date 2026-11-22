@@ -2425,3 +2425,49 @@ model AutomationFlowRun {
   @@index([status, nextAt])
 }
 
+/** A report emailed as a CSV on a schedule (IST). It runs with the creator's own permissions. */
+model ReportSchedule {
+  id            String    @id @default(uuid())
+  tenantId      String
+  name          String
+  reportKey     String
+  range         String    @default("yesterday")
+  workspaceId   String?
+  ownerFilterId String?
+  source        String?
+  frequency     String    // daily | weekly | monthly
+  weekday       Int?      // weekly: 0 = Sunday
+  monthDay      Int?      // monthly: 1–28
+  time          String    // HH:MM, IST
+  recipientIds  String[]  @default([])
+  createdById   String
+  isActive      Boolean   @default(true)
+  isArchived    Boolean   @default(false)
+  nextRunAt     DateTime
+  lastRunAt     DateTime?
+  lastStatus    String?
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, nextRunAt])
+}
+
+/** A saved outgoing HTTP call with {placeholders}, used by the "Call an API" action. Headers are encrypted. */
+model ApiTemplate {
+  id           String    @id @default(uuid())
+  tenantId     String
+  workspaceId  String?   // null = every business line
+  name         String
+  method       String    @default("POST")
+  url          String
+  headersEnc   String?
+  body         String?
+  isArchived   Boolean   @default(false)
+  createdById  String
+  lastStatus   Int?
+  lastCalledAt DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+
+  @@index([tenantId, workspaceId])
+}
+

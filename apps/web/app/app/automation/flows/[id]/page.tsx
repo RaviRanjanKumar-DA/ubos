@@ -11,7 +11,7 @@ import { Icon } from '@/components/Icon';
 import { findStep, insertStep, moveStep, newId, removeStep, updateStep, waitLabel, type Slot } from '@/components/flow/tree';
 
 interface Opt { value: string; label: string }
-interface Options { canManage: boolean; triggers: Opt[]; actions: Opt[]; ops: Opt[]; fields: Opt[]; stages: Opt[]; statuses: Opt[]; sources: Opt[]; labels: Opt[]; users: Opt[]; templates: Opt[]; sequences: Opt[] }
+interface Options { canManage: boolean; triggers: Opt[]; actions: Opt[]; ops: Opt[]; fields: Opt[]; stages: Opt[]; statuses: Opt[]; sources: Opt[]; labels: Opt[]; users: Opt[]; templates: Opt[]; sequences: Opt[]; apiTemplates?: Opt[] }
 interface Flow { id: string; name: string; trigger: string; idleDays: number | null; stopWhenClosed: boolean; isActive: boolean; graph: { steps: FlowNode[] } }
 interface Run { id: string; leadId: string; leadName: string; status: string; nodeId: string | null; nextAt: string | null; error: string | null; createdAt: string; log: { nodeId: string; at: string; result: string }[] }
 type Cond = { field: string; op: string; value?: string };
@@ -20,7 +20,7 @@ const RUN_TONE: Record<string, [string, string]> = { running: ['ok', 'Running'],
 const when = (d: string) => new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'short' });
 
 type Drag = { kind: 'new'; node: 'action' | 'wait' | 'condition'; action?: string } | { kind: 'move'; id: string } | { kind: 'trigger'; value: string };
-const ACTION_ICON: Record<string, string> = { assign: 'leads', change_stage: 'board', set_status: 'flag', add_label: 'tag', create_task: 'checklist', add_remark: 'edit', send_template: 'chat', notify_owner: 'bell', enroll_sequence: 'list' };
+const ACTION_ICON: Record<string, string> = { assign: 'leads', change_stage: 'board', set_status: 'flag', add_label: 'tag', create_task: 'checklist', add_remark: 'edit', send_template: 'chat', notify_owner: 'bell', enroll_sequence: 'list', call_api: 'code' };
 const TRIGGER_ICON: Record<string, string> = { 'lead.created': 'plus', 'lead.updated': 'refresh', 'lead.stage_changed': 'board', 'lead.won': 'star', 'lead.lost': 'close', 'call.logged': 'phone', 'whatsapp.received': 'chat', 'payment.received': 'receipt', 'quote.accepted': 'tick', 'process.completed': 'checklist', 'lead.idle': 'clock' };
 
 export default function FlowBuilder() {
@@ -61,7 +61,7 @@ export default function FlowBuilder() {
     if (n.type === 'wait') return ['Time delay', waitLabel(n.hours)];
     if (n.type === 'condition') return ['Check lead', n.conditions.map((c) => `${label(o.fields, c.field)} ${label(o.ops, c.op)}${NO_VALUE.includes(c.op) ? '' : ` ${label(c.field === 'stage' ? o.stages : c.field === 'status' ? o.statuses : c.field === 'source' ? o.sources : c.field === 'owner' ? o.users : [], c.value) || c.value}`}`).join(' and ')];
     const a = n.action;
-    const detail = a.type === 'assign' ? (a.userId && a.userId !== 'rules' ? label(o.users, a.userId) : 'next person in turn') : a.type === 'change_stage' ? label(o.stages, a.stageId) : a.type === 'set_status' ? label(o.statuses, a.status) : a.type === 'add_label' ? label(o.labels, a.labelId) : a.type === 'send_template' ? label(o.templates, a.templateId) : a.type === 'enroll_sequence' ? label(o.sequences, a.sequenceId) : a.type === 'create_task' ? `${a.title} (due in ${a.dueHours ?? 24} h)` : a.text ?? '';
+    const detail = a.type === 'assign' ? (a.userId && a.userId !== 'rules' ? label(o.users, a.userId) : 'next person in turn') : a.type === 'change_stage' ? label(o.stages, a.stageId) : a.type === 'set_status' ? label(o.statuses, a.status) : a.type === 'add_label' ? label(o.labels, a.labelId) : a.type === 'send_template' ? label(o.templates, a.templateId) : a.type === 'enroll_sequence' ? label(o.sequences, a.sequenceId) : a.type === 'call_api' ? label(o.apiTemplates ?? [], a.apiTemplateId) : a.type === 'create_task' ? `${a.title} (due in ${a.dueHours ?? 24} h)` : a.text ?? '';
     return [label(o.actions, a.type), detail];
   };
   const change = (steps: FlowNode[]) => { setF({ ...f, graph: { steps } }); setDirty(true); setPath(null); };
@@ -95,7 +95,7 @@ export default function FlowBuilder() {
     }
     const node = blank(d.node, d.action);
     // Steps that need details open their settings; the rest drop straight in.
-    if (d.node === 'action' && ['add_remark', 'notify_owner', 'create_task', 'change_stage', 'set_status', 'add_label', 'send_template', 'enroll_sequence'].includes(d.action ?? '') || d.node !== 'action') setEdit({ node, slot });
+    if (d.node === 'action' && ['add_remark', 'notify_owner', 'create_task', 'change_stage', 'set_status', 'add_label', 'send_template', 'enroll_sequence', 'call_api'].includes(d.action ?? '') || d.node !== 'action') setEdit({ node, slot });
     else change(insertStep(f.graph.steps, slot, node));
   };
   const slotKey = (s: Slot) => `${s.parentId ?? 'root'}:${s.branch ?? ''}:${s.index}`;
@@ -289,6 +289,7 @@ function StepEditor({ o, node, isNew, onClose, onSave, onDelete }: { o: Options;
               {a.type === 'add_label' && <div className="field"><label>Label</label>{pick(o.labels, a.labelId, (v) => set({ labelId: v }), 'Label')}</div>}
               {a.type === 'send_template' && <div className="field"><label>Template</label>{pick(o.templates, a.templateId, (v) => set({ templateId: v }), 'Template')}</div>}
               {a.type === 'enroll_sequence' && <div className="field"><label>Sequence</label>{pick(o.sequences, a.sequenceId, (v) => set({ sequenceId: v }), 'Sequence')}</div>}
+              {a.type === 'call_api' && <div className="field"><label>API template</label>{pick(o.apiTemplates ?? [], a.apiTemplateId, (v) => set({ apiTemplateId: v }), 'API template')}{!(o.apiTemplates ?? []).length && <span className="small muted">Add one under Automations → API templates.</span>}</div>}
               {a.type === 'create_task' && <div className="grid cols-2"><div className="field"><label htmlFor="se-tt">Task</label><input id="se-tt" className="input" required value={a.title ?? ''} onChange={(e) => set({ title: e.target.value })} placeholder="e.g. Call {name}" /></div><div className="field"><label htmlFor="se-td">Due after (hours)</label><input id="se-td" className="input" type="number" min={0} value={a.dueHours ?? 24} onChange={(e) => set({ dueHours: Number(e.target.value) })} /></div></div>}
               {(a.type === 'add_remark' || a.type === 'notify_owner') && <div className="field"><label htmlFor="se-tx">Text</label><input id="se-tx" className="input" required value={a.text ?? ''} onChange={(e) => set({ text: e.target.value })} placeholder="Use {name} for the customer's name" /></div>}
             </>

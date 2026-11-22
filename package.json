@@ -51,7 +51,8 @@
     "verify:payments": "node scripts/verify-payments.mjs",
     "verify:flows": "node scripts/verify-flows.mjs",
     "verify:reports": "node scripts/verify-reports.mjs",
-    "verify:bulk": "node scripts/verify-bulk.mjs"
+    "verify:bulk": "node scripts/verify-bulk.mjs",
+    "verify:automations": "node scripts/verify-automations.mjs"
   },
   "engines": {
     "node": ">=20"

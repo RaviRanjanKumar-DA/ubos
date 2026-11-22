@@ -8,9 +8,9 @@ import { api, ApiError } from '@/lib/api';
 import { useShell } from '@/components/AppShell';
 
 interface Opt { value: string; label: string }
-interface Options { canManage: boolean; triggers: Opt[]; actions: Opt[]; ops: Opt[]; fields: Opt[]; stages: Opt[]; statuses: Opt[]; sources: Opt[]; labels: Opt[]; users: Opt[]; templates: Opt[]; sequences: Opt[] }
+interface Options { canManage: boolean; triggers: Opt[]; actions: Opt[]; ops: Opt[]; fields: Opt[]; stages: Opt[]; statuses: Opt[]; sources: Opt[]; labels: Opt[]; users: Opt[]; templates: Opt[]; sequences: Opt[]; apiTemplates?: Opt[] }
 interface Cond { field: string; op: string; value?: string }
-interface Act { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string }
+interface Act { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string; apiTemplateId?: string }
 interface Rule { id: string; name: string; trigger: string; idleDays: number | null; conditions: Cond[]; actions: Act[]; isActive: boolean; runCount: number; lastRunAt: string | null }
 interface Run { id: string; ruleName: string; event: string; leadId: string | null; leadName: string | null; status: string; detail: string | null; createdAt: string }
 interface Seq { id: string; name: string; stopOnReply: boolean; steps: { delayHours: number; templateId: string }[]; counts: Record<string, number> }
@@ -42,7 +42,7 @@ export default function AutomationPage() {
   if (!ws) return <><div className="page-head"><h1>Automation</h1></div><PickWorkspace text="Automation belongs to a business line." /></>;
   if (!o) return <><div className="page-head"><h1>Automation</h1></div><div className="card muted">Automation is not available on this plan or for your role.</div></>;
   const label = (list: Opt[], v?: string | null) => list.find((x) => x.value === v)?.label ?? v ?? '';
-  const describeAct = (a: Act) => `${label(o.actions, a.type)}${a.type === 'assign' ? `: ${a.userId && a.userId !== 'rules' ? label(o.users, a.userId) : 'next person in turn'}` : a.stageId ? `: ${label(o.stages, a.stageId)}` : a.status ? `: ${label(o.statuses, a.status)}` : a.labelId ? `: ${label(o.labels, a.labelId)}` : a.templateId ? `: ${label(o.templates, a.templateId)}` : a.sequenceId ? `: ${label(o.sequences, a.sequenceId)}` : a.title ? `: ${a.title}` : ''}`;
+  const describeAct = (a: Act) => `${label(o.actions, a.type)}${a.type === 'assign' ? `: ${a.userId && a.userId !== 'rules' ? label(o.users, a.userId) : 'next person in turn'}` : a.stageId ? `: ${label(o.stages, a.stageId)}` : a.status ? `: ${label(o.statuses, a.status)}` : a.labelId ? `: ${label(o.labels, a.labelId)}` : a.templateId ? `: ${label(o.templates, a.templateId)}` : a.sequenceId ? `: ${label(o.sequences, a.sequenceId)}` : a.apiTemplateId ? `: ${label(o.apiTemplates ?? [], a.apiTemplateId)}` : a.title ? `: ${a.title}` : ''}`;
   const describeCond = (c: Cond) => `${label(o.fields, c.field)} ${label(o.ops, c.op)}${NO_VALUE.includes(c.op) ? '' : ` ${c.field === 'stage' ? label(o.stages, c.value) : c.field === 'owner' ? label(o.users, c.value) : c.field === 'status' ? label(o.statuses, c.value) : c.field === 'source' ? label(o.sources, c.value) : c.value}`}`;
   return (
     <>
@@ -128,6 +128,7 @@ function RuleForm({ o, d, set, onSave, onCancel }: { o: Options; d: Draft; set: 
           {a.type === 'add_label' && pick(o.labels, a.labelId, (v) => action(i, { labelId: v }), 'Label')}
           {a.type === 'send_template' && pick(o.templates, a.templateId, (v) => action(i, { templateId: v }), 'Template')}
           {a.type === 'enroll_sequence' && pick(o.sequences, a.sequenceId, (v) => action(i, { sequenceId: v }), 'Sequence')}
+          {a.type === 'call_api' && pick(o.apiTemplates ?? [], a.apiTemplateId, (v) => action(i, { apiTemplateId: v }), 'API template')}
           {a.type === 'create_task' && <><input className="input" value={a.title ?? ''} onChange={(e) => action(i, { title: e.target.value })} placeholder="Task title (use {name})" aria-label="Task title" required /><input className="input" style={{ maxWidth: 110 }} type="number" min={0} value={a.dueHours ?? 24} onChange={(e) => action(i, { dueHours: Number(e.target.value) })} aria-label="Due after hours" title="Due after this many hours" /></>}
           {(a.type === 'add_remark' || a.type === 'notify_owner') && <input className="input" value={a.text ?? ''} onChange={(e) => action(i, { text: e.target.value })} placeholder="Text (use {name})" aria-label="Text" required />}
           <button type="button" className="btn sm ghost" disabled={d.actions.length === 1} aria-label="Remove action" onClick={() => set({ ...d, actions: d.actions.filter((_, j) => j !== i) })}><Icon name="close" className="ic" /></button>

@@ -68,7 +68,7 @@ try {
   const incomplete = await rule({ ...base, actions: [{ type: 'change_stage' }] });
   const noVal = await rule({ ...base, conditions: [{ field: 'source', op: 'eq' }] });
   check('rules: managers only; triggers, idle days, actions and conditions are validated', rmR.status === 403 && badT.status === 400 && noDays.body.code === 'IDLE_DAYS_REQUIRED' && incomplete.body.code === 'ACTION_INCOMPLETE' && noVal.body.code === 'CONDITION_INCOMPLETE', [rmR.status, badT.status, noDays.body, incomplete.body, noVal.body]);
-  check('the builder gets triggers, actions, stages, statuses, fields', opts.canManage && opts.triggers.some((t) => t.value === 'lead.idle') && opts.actions.length === 9 && opts.stages.length > 4 && opts.fields.some((f) => f.value === 'cf:property_type'), Object.keys(opts));
+  check('the builder gets triggers, actions, stages, statuses, fields', opts.canManage && opts.triggers.some((t) => t.value === 'lead.idle') && opts.actions.length === 10 && opts.stages.length > 4 && opts.fields.some((f) => f.value === 'cf:property_type'), Object.keys(opts));
 
   // Condition + several actions
   const label = await call('/api/v1/labels', { token: admin, workspace: VASTU, method: 'POST', body: { name: 'From website', workspaceId: VASTU } });

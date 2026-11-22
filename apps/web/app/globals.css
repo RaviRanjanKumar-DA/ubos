@@ -1014,3 +1014,7 @@ a.report-card:hover { border-color: var(--brand); transform: translateY(-1px); }
 .report-filters .input { width: auto; max-width: 100%; }
 .report-table th.num, .report-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .report-table tfoot td { border-top: 2px solid var(--line); background: #faf9fd; }
+@media (max-width: 640px) {
+  table[data-cards] td[data-label="Schedule"], table[data-cards] td[data-label="Template"] { display: block; text-align: left; }
+  table[data-cards] td[data-label="Schedule"]::before, table[data-cards] td[data-label="Template"]::before { display: none; }
+}

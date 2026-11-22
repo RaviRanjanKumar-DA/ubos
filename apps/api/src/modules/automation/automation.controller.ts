@@ -12,14 +12,14 @@ import { AutomationService } from './automation.service';
 export const Condition = z.object({ field: z.string().regex(/^(source|status|stage|owner|score|city|cf:[a-z][a-z0-9_]*)$/), op: z.enum(Object.keys(CONDITION_OPS) as [ConditionOp, ...ConditionOp[]]), value: z.string().max(200).optional() });
 export const Action = z.object({
   type: z.enum(Object.keys(AUTOMATION_ACTIONS) as [AutomationAction, ...AutomationAction[]]), userId: z.string().max(40).optional(), stageId: z.string().uuid().optional(), status: z.string().max(60).optional(), labelId: z.string().uuid().optional(),
-  title: z.string().trim().max(150).optional(), dueHours: z.number().min(0).max(8760).optional(), text: z.string().trim().max(1000).optional(), templateId: z.string().uuid().optional(), sequenceId: z.string().uuid().optional(),
+  title: z.string().trim().max(150).optional(), dueHours: z.number().min(0).max(8760).optional(), text: z.string().trim().max(1000).optional(), templateId: z.string().uuid().optional(), sequenceId: z.string().uuid().optional(), apiTemplateId: z.string().uuid().optional(),
 });
 const RuleBody = z.object({
   name: z.string().trim().min(2).max(80), trigger: z.enum(Object.keys(AUTOMATION_TRIGGERS) as [AutomationTrigger, ...AutomationTrigger[]]), idleDays: z.number().int().min(0).max(365).nullable().optional(),
   conditions: z.array(Condition).max(10).default([]), actions: z.array(Action).min(1).max(10), isActive: z.boolean().default(true),
 });
 const SeqBody = z.object({ name: z.string().trim().min(2).max(80), stopOnReply: z.boolean().default(true), steps: z.array(z.object({ delayHours: z.number().min(0).max(8760), templateId: z.string().uuid() })).min(1).max(20) });
-const REQUIRED: Record<string, keyof z.infer<typeof Action>> = { change_stage: 'stageId', set_status: 'status', add_label: 'labelId', create_task: 'title', add_remark: 'text', send_template: 'templateId', notify_owner: 'text', enroll_sequence: 'sequenceId' };
+const REQUIRED: Record<string, keyof z.infer<typeof Action>> = { change_stage: 'stageId', set_status: 'status', add_label: 'labelId', create_task: 'title', add_remark: 'text', send_template: 'templateId', notify_owner: 'text', enroll_sequence: 'sequenceId', call_api: 'apiTemplateId' };
 
 /** Automation rules ("when, if, then") and message sequences of a business line. */
 @Controller('api/v1')
@@ -32,13 +32,14 @@ export class AutomationController {
   options() {
     const ws = this.ws();
     return this.db.tenant(async (tx) => {
-      const [pipelines, opts, labels, fields, templates, sequences] = await Promise.all([
+      const [pipelines, opts, labels, fields, templates, sequences, apiTemplates] = await Promise.all([
         tx.pipeline.findMany({ where: { workspaceId: ws }, include: { stages: { orderBy: { position: 'asc' } } } }),
         tx.workspaceOption.findMany({ where: { workspaceId: ws, isArchived: false } }),
         tx.label.findMany({ where: { isArchived: false, OR: [{ workspaceId: null }, { workspaceId: ws }] } }),
         tx.leadField.findMany({ where: { workspaceId: ws, isArchived: false } }),
         tx.messageTemplate.findMany({ where: { isArchived: false }, orderBy: { name: 'asc' } }),
         tx.sequence.findMany({ where: { workspaceId: ws, isArchived: false }, orderBy: { name: 'asc' } }),
+        tx.apiTemplate.findMany({ where: { isArchived: false, OR: [{ workspaceId: null }, { workspaceId: ws }] }, orderBy: { name: 'asc' }, select: { id: true, name: true, method: true } }),
       ]);
       const users = await tx.user.findMany({ where: { isActive: true, roles: { some: { OR: [{ workspaceId: ws }, { workspaceId: null }] } } }, select: { id: true, name: true }, orderBy: { name: 'asc' } });
       return {
@@ -49,7 +50,7 @@ export class AutomationController {
         stages: pipelines.flatMap((p) => p.stages.map((s) => ({ value: s.id, label: pipelines.length > 1 ? `${p.name} · ${s.name}` : s.name }))),
         statuses: opts.filter((o) => o.kind === 'lead_status').map((o) => ({ value: o.value, label: o.label })), sources: opts.filter((o) => o.kind === 'lead_source').map((o) => ({ value: o.value, label: o.label })),
         labels: labels.map((l) => ({ value: l.id, label: l.name })), users: users.map((u) => ({ value: u.id, label: u.name })),
-        templates: templates.map((t) => ({ value: t.id, label: `${t.channel === 'whatsapp' ? 'WhatsApp' : t.channel === 'sms' ? 'SMS' : 'Email'} · ${t.name}` })), sequences: sequences.map((s) => ({ value: s.id, label: s.name })),
+        templates: templates.map((t) => ({ value: t.id, label: `${t.channel === 'whatsapp' ? 'WhatsApp' : t.channel === 'sms' ? 'SMS' : 'Email'} · ${t.name}` })), sequences: sequences.map((s) => ({ value: s.id, label: s.name })), apiTemplates: apiTemplates.map((t) => ({ value: t.id, label: `${t.method} · ${t.name}` })),
       };
     });
   }

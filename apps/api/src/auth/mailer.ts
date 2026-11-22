@@ -12,9 +12,9 @@ export class Mailer {
     auth: process.env.SMTP_USER ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS } : undefined,
   });
 
-  async send(to: string, subject: string, text: string) {
+  async send(to: string, subject: string, text: string, attachments?: { filename: string; content: string; contentType?: string }[]) {
     try {
-      await this.transport.sendMail({ from: process.env.MAIL_FROM ?? 'UBOS <no-reply@ubos.local>', to, subject, text });
+      await this.transport.sendMail({ from: process.env.MAIL_FROM ?? 'UBOS <no-reply@ubos.local>', to, subject, text, ...(attachments?.length ? { attachments } : {}) });
     } catch (e) {
       this.log.error(`Mail to ${to} failed: ${e instanceof Error ? e.message : e}`);
       throw e;

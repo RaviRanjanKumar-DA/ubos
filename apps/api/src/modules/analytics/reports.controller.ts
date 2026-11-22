@@ -10,11 +10,12 @@ import { scopeFilter } from '../../common/scope';
 import { dealValue, leaderboard, leadWhere, loadLookups, resolveRange, type Ctx, type Range } from './engine';
 
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const Query_ = z.object({
+export const Query_ = z.object({
   range: z.enum(['today', 'yesterday', 'this_week', 'last_7_days', 'last_30_days', 'this_month', 'last_month', 'this_quarter', 'this_year', 'custom']).default('this_month'),
   from: day.optional(), to: day.optional(), workspaceId: z.string().uuid().optional(), ownerId: z.string().uuid().optional(), source: z.string().max(60).optional(),
 });
-const SHOW = 500, DOWNLOAD = 20_000;
+const SHOW = 500;
+export const DOWNLOAD = 20_000;
 const mins = (sec: number) => Math.round(sec / 60);
 
 /**
@@ -34,7 +35,7 @@ export class ReportsController {
 
   @Get(':key')
   show(@Param('key') key: string, @Query() q: unknown) {
-    return this.db.tenant((tx) => this.build(tx, key, parse(Query_, q), SHOW), { timeoutMs: 30_000 });
+    return this.db.tenant((tx) => ReportsController.build(tx, key, parse(Query_, q), SHOW), { timeoutMs: 30_000 });
   }
 
   @Get(':key/download')
@@ -44,7 +45,7 @@ export class ReportsController {
     if (def?.detail && !auth().permissions['crm.lead.export' as never]) throw new ForbiddenException({ code: 'PERMISSION_DENIED', message: 'Downloading lead lists needs "Export leads"' });
     const input = parse(Query_, q);
     return this.db.tenant(async (tx) => {
-      const r = await this.build(tx, key, input, DOWNLOAD);
+      const r = await ReportsController.build(tx, key, input, DOWNLOAD);
       await this.db.audit(tx, { entity: 'report', entityId: key, action: 'report.downloaded', newValue: { report: key, rows: r.rows.length, period: r.period.label, workspaceId: input.workspaceId ?? null, ownerId: input.ownerId ?? null } });
       const tz = 'Asia/Kolkata';
       // A BOM makes Excel read the rupee sign and Indian names correctly.
@@ -52,7 +53,8 @@ export class ReportsController {
     }, { timeoutMs: 60_000 });
   }
 
-  private async build(tx: Parameters<Parameters<DbService['tenant']>[0]>[0], key: string, q: z.infer<typeof Query_>, limit: number): Promise<ReportResult> {
+  /** Builds a report as the person in context (also used by scheduled report emails). */
+  static async build(tx: Parameters<Parameters<DbService['tenant']>[0]>[0], key: string, q: z.infer<typeof Query_>, limit: number): Promise<ReportResult> {
     const def = REPORTS.find((r) => r.key === key);
     if (!def) throw new BadRequestException({ code: 'UNKNOWN_REPORT', message: 'Unknown report' });
     if (!def.ready) throw new BadRequestException({ code: 'REPORT_COMING', message: `${def.title} is coming soon` });

@@ -44,6 +44,7 @@ import { SetupGuideController } from './modules/setup-guide.controller';
 import { AnalyticsController } from './modules/analytics/analytics.controller';
 import { ReportsController } from './modules/analytics/reports.controller';
 import { BulkToolsController } from './modules/bulk-tools.controller';
+import { AutomationsController, ReportScheduleRunner } from './modules/automation/automations.controller';
 import { LabelsScriptsController } from './modules/labels-scripts.controller';
 import { ViewsTasksController } from './modules/views-tasks.controller';
 import { NotificationsSettingsController } from './modules/notifications-settings.controller';
@@ -89,6 +90,7 @@ class HealthController {
     FlowsController,
     ReportsController,
     BulkToolsController,
+    AutomationsController,
     SignupController,
     PlatformBillingController,
     PlatformRazorpayWebhook,
@@ -114,6 +116,7 @@ class HealthController {
     TenantLoginService,
     Mailer,
     BillingLifecycle,
+    ReportScheduleRunner,
     SchedulerService,
     IntakeService,
     WebhookDispatcher,

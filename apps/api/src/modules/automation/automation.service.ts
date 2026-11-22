@@ -5,10 +5,11 @@ import { DbService } from '../../common/db.service';
 import { contextStore } from '../../common/context';
 import { activity, applyStageChange, assignmentAvailability, eligibleOwners, makeAssigner } from '../../common/lead-ops';
 import { notify } from '../../common/notify';
+import { callApiTemplate } from '../../common/api-templates';
 import { MessagingService } from '../messaging/messaging.service';
 import { WhatsAppService } from '../whatsapp/whatsapp.service';
 
-export interface RuleAction { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string }
+export interface RuleAction { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string; apiTemplateId?: string }
 interface Rule { id: string; tenantId: string; workspaceId: string; name: string; conditions: unknown; actions: unknown; createdById: string }
 interface Step { delayHours: number; templateId: string }
 interface Flow { id: string; tenantId: string; workspaceId: string; name: string; trigger: string; graph: unknown; stopWhenClosed: boolean; createdById: string; idleDays?: number | null }
@@ -204,6 +205,11 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
   /** Runs one action; returns a short description, throws with the reason if it cannot be done. */
   private async act(rule: Rule, leadId: string, a: RuleAction): Promise<string> {
     const actor = rule.createdById;
+    if (a.type === 'call_api') {
+      const r = await this.db.tenant((tx) => callApiTemplate(tx, a.apiTemplateId ?? '', leadId));
+      if (!r.ok) throw new Error(`${r.name} answered ${r.status}`);
+      return `called ${r.name} (${r.status})`;
+    }
     if (a.type === 'send_template') {
       const t = await this.db.tenant((tx) => tx.messageTemplate.findUnique({ where: { id: a.templateId ?? '' } }));
       if (!t) throw new Error('Template not found');

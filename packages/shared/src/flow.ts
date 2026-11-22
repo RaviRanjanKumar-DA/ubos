@@ -2,7 +2,7 @@
 // each path carries on to its own end. Waits pause a lead in the flow for hours or days.
 import { AUTOMATION_ACTIONS, type RuleCondition } from './automation';
 
-export interface FlowAction { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string }
+export interface FlowAction { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string; apiTemplateId?: string }
 export type FlowNode =
   | { id: string; type: 'action'; action: FlowAction }
   | { id: string; type: 'wait'; hours: number }
@@ -10,7 +10,7 @@ export type FlowNode =
 export interface FlowGraph { steps: FlowNode[] }
 
 export const FLOW_LIMITS = { nodes: 60, depth: 6, waitHoursMin: 0.25, waitHoursMax: 2160 };
-const REQUIRED: Record<string, keyof FlowAction> = { change_stage: 'stageId', set_status: 'status', add_label: 'labelId', create_task: 'title', add_remark: 'text', send_template: 'templateId', notify_owner: 'text', enroll_sequence: 'sequenceId' };
+const REQUIRED: Record<string, keyof FlowAction> = { change_stage: 'stageId', set_status: 'status', add_label: 'labelId', create_task: 'title', add_remark: 'text', send_template: 'templateId', notify_owner: 'text', enroll_sequence: 'sequenceId', call_api: 'apiTemplateId' };
 
 interface Place { node: FlowNode; list: FlowNode[]; index: number; parent: Place | null; branch: 'yes' | 'no' | null }
 

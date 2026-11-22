@@ -25,6 +25,7 @@ export const AUTOMATION_ACTIONS = {
   send_template: 'Send a template (WhatsApp / SMS / email)',
   notify_owner: 'Notify the lead owner',
   enroll_sequence: 'Start a sequence',
+  call_api: 'Call an API (API template)',
 } as const;
 export type AutomationAction = keyof typeof AUTOMATION_ACTIONS;
 
