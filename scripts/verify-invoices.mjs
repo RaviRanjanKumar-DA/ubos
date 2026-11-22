@@ -140,6 +140,17 @@ check('the register lists issued invoices', reg.status === 200 && rows.length ==
 check('a cancelled invoice counts as zero', rows.find((r) => r.includes(cur.number)).includes('0.00,0.00,0.00,0.00,0.00,0.00,Cancelled'), rows.find((r) => r.includes(cur.number)));
 check('tax columns are right', rows.find((r) => r.startsWith(i1.number)).includes('5000.00,450.00,450.00,0.00,0.00,5900.00,Issued'), rows.find((r) => r.startsWith(i1.number)));
 check('a date range outside finds nothing', String((await get('/api/v1/invoices/register.csv?from=2020-01-01&to=2020-01-31', manager)).body).split('\n').length === 1);
+// Merging customers moves their invoices (and undo moves them back)
+const dupLead = await mkLead();
+const dupInv = (await post('/api/v1/invoices', manager, { leadId: dupLead, items: [line], placeOfSupply: '27' })).body;
+const custOf = async (leadId) => { const l = (await call(`/api/v1/leads/${leadId}`, { token: admin })).body; return l.customerId ?? l.customer?.id; };
+const primaryCust = await custOf(lead1), dupCust = await custOf(dupLead);
+const merged = await post('/api/v1/customers/merge', admin, { primaryId: primaryCust, duplicateId: dupCust, reason: 'same person' });
+const invAfter = (await call(`/api/v1/invoices/${dupInv.id}`, { token: admin })).body;
+check('merging customers moves their invoices', merged.status === 200 && merged.body.otherMoved?.invoice === 1 && invAfter.customerId === primaryCust, { merged: merged.body, customerId: invAfter.customerId });
+await post(`/api/v1/customers/merges/${merged.body.mergeId}/undo`, admin, {});
+check('undoing the merge moves the invoice back', (await call(`/api/v1/invoices/${dupInv.id}`, { token: admin })).body.customerId === dupCust);
+
 const audit = JSON.stringify((await call('/api/v1/audit-logs', { token: admin })).body);
 check('issuing and cancelling are audited', audit.includes('invoice.issued') && audit.includes('invoice.cancelled'));
 

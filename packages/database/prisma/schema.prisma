@@ -501,6 +501,7 @@ model CustomerMerge {
   movedLeadIds    String[]
   movedPackageIds String[]
   movedAccessIds  String[] @default([])
+  movedOther      Json     @default("{}") // { invoice: [ids], quote: [...], payment, ticket, call, conversation, processRun }
   filledFields    Json      // fields copied from the duplicate onto the primary (reverted on undo)
   reason          String?
   mergedById      String

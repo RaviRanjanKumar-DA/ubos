@@ -27,6 +27,12 @@ const DismissBody = z.object({ aId: z.string().uuid(), bId: z.string().uuid() })
 
 type Pair = { a: string; b: string; reason: string };
 
+/** Records that belong to a customer and follow it through a merge (and back on undo). */
+const FOLLOWERS = ['invoice', 'quote', 'payment', 'ticket', 'call', 'conversation', 'processRun'] as const;
+type Follower = (typeof FOLLOWERS)[number];
+type Mover = { findMany(a: { where: object; select: { id: true } }): Promise<{ id: string }[]>; updateMany(a: { where: object; data: { customerId: string } }): Promise<{ count: number }> };
+const mover = (tx: Tx, k: Follower) => (tx as unknown as Record<Follower, Mover>)[k];
+
 /** Customer Master: one record per person across all business lines, duplicates, merge and Customer 360°. */
 @Controller('api/v1/customers')
 @RequireFeature('module.crm')
@@ -274,6 +280,12 @@ export class CustomersController {
       await tx.customerAccess.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
       await tx.lead.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
       await tx.customerPackage.updateMany({ where: { customerId: d.id }, data: { customerId: p.id } });
+      // Invoices, quotes, payments, tickets, calls, conversations and process runs move too (issued invoices keep their printed name).
+      const movedOther: Record<string, string[]> = {};
+      for (const k of FOLLOWERS) {
+        const rows = await mover(tx, k).findMany({ where: { customerId: d.id }, select: { id: true } });
+        if (rows.length) { movedOther[k] = rows.map((r) => r.id); await mover(tx, k).updateMany({ where: { customerId: d.id }, data: { customerId: p.id } }); }
+      }
 
       const filled: Record<string, unknown> = {};
       const pData: Prisma.CustomerUpdateInput = {};
@@ -293,15 +305,15 @@ export class CustomersController {
       const record = await tx.customerMerge.create({
         data: {
           tenantId: tenantId(), primaryId: p.id, duplicateId: d.id, reason: reason ?? null, mergedById: auth().userId,
-          movedLeadIds: leads.map((l) => l.id), movedPackageIds: packages.map((x) => x.id), movedAccessIds: accessRows.map((x) => x.id), filledFields: filled as Prisma.InputJsonObject,
+          movedLeadIds: leads.map((l) => l.id), movedPackageIds: packages.map((x) => x.id), movedAccessIds: accessRows.map((x) => x.id), movedOther: movedOther as Prisma.InputJsonObject, filledFields: filled as Prisma.InputJsonObject,
         },
       });
       await this.db.audit(tx, {
         entity: 'customer', entityId: p.id, action: 'customer.merged',
         oldValue: { duplicate: { id: d.id, code: d.code, name: d.name } },
-        newValue: { leadsMoved: leads.length, filled: Object.keys(filled), reason: reason ?? null },
+        newValue: { leadsMoved: leads.length, otherMoved: Object.fromEntries(Object.entries(movedOther).map(([k, v]) => [k, v.length])), filled: Object.keys(filled), reason: reason ?? null },
       });
-      return { mergeId: record.id, primaryId: p.id, leadsMoved: leads.length };
+      return { mergeId: record.id, primaryId: p.id, leadsMoved: leads.length, otherMoved: Object.fromEntries(Object.entries(movedOther).map(([k, v]) => [k, v.length])) };
     });
   }
 
@@ -335,6 +347,9 @@ export class CustomersController {
       await tx.lead.updateMany({ where: { id: { in: m.movedLeadIds }, customerId: p.id }, data: { customerId: d.id } });
       await tx.customerPackage.updateMany({ where: { id: { in: m.movedPackageIds }, customerId: p.id }, data: { customerId: d.id } });
       await tx.customerAccess.updateMany({ where: { id: { in: m.movedAccessIds }, customerId: p.id }, data: { customerId: d.id } });
+      for (const [k, ids] of Object.entries((m.movedOther ?? {}) as Record<string, string[]>)) {
+        if ((FOLLOWERS as readonly string[]).includes(k) && ids.length) await mover(tx, k as Follower).updateMany({ where: { id: { in: ids }, customerId: p.id }, data: { customerId: d.id } });
+      }
       await tx.customerMerge.update({ where: { id: m.id }, data: { undoneAt: new Date(), undoneById: auth().userId } });
       await this.db.audit(tx, { entity: 'customer', entityId: p.id, action: 'customer.merge_undone', newValue: { restored: { id: d.id, code: d.code, name: d.name } } });
       return { ok: true, restoredId: d.id };
