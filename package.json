@@ -47,7 +47,8 @@
     "verify:packages": "node scripts/verify-packages.mjs",
     "verify:hr": "node scripts/verify-hr.mjs",
     "verify:attendance": "node scripts/verify-attendance.mjs",
-    "verify:billing": "node scripts/verify-billing.mjs"
+    "verify:billing": "node scripts/verify-billing.mjs",
+    "verify:payments": "node scripts/verify-payments.mjs"
   },
   "engines": {
     "node": ">=20"

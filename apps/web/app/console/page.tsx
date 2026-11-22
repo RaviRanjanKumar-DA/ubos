@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiError, platformApi, rupees } from '@/lib/api';
 import { Icon } from '@/components/Icon';
+import { GST_STATES } from '@ubos/shared';
 import { Pricing } from '@/components/console/Pricing';
 import { BusinessLinePicker, PickedLine } from '@/components/console/BusinessLinePicker';
 
@@ -100,13 +101,13 @@ export default function ConsolePage() {
         </div>
         {error && <div className="error">{error}</div>}
         <div className="dash-tabs" role="tablist">
-          {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices'], ['signup', 'Signup & trials']] as const).map(([k, l]) => (
+          {([['tenants', 'Organizations'], ['orders', 'Orders & payments'], ['pricing', 'Plans & prices'], ['signup', 'Signup & billing']] as const).map(([k, l]) => (
             <button key={k} role="tab" aria-selected={view === k} className={`dash-tab${view === k ? ' on' : ''}`} onClick={() => setView(k)}>{l}</button>
           ))}
         </div>
         {view === 'orders' && <Orders onChanged={load} />}
         {view === 'pricing' && <Pricing onChanged={load} />}
-        {view === 'signup' && <SignupSettings plans={plans} />}
+        {view === 'signup' && <><SignupSettings plans={plans} /><BillingSettings /></>}
         {view === 'tenants' && <>
         {metrics && (
           <div className="grid cols-4" style={{ marginBottom: 14 }}>
@@ -227,7 +228,7 @@ function Onboard({ plans, onClose, onDone }: { plans: Plan[]; onClose: () => voi
 }
 
 interface PlatformOrder {
-  id: string; number: string; cycle: string; status: 'pending' | 'paid' | 'cancelled'; totalPaise: number; createdAt: string; paidAt: string | null; paymentRef: string | null;
+  id: string; number: string; cycle: string; status: 'pending' | 'paid' | 'cancelled'; totalPaise: number; createdAt: string; paidAt: string | null; paymentRef: string | null; paidVia?: string | null; invoiceId?: string | null;
   items: { name: string; quantity: number; kind: string }[]; tenant: { id: string; name: string; slug: string } | null;
 }
 
@@ -277,7 +278,8 @@ function Orders({ onChanged }: { onChanged: () => void }) {
                   <td>{rupees(o.totalPaise)}</td>
                   <td>
                     <span className={`badge ${o.status === 'paid' ? 'ok' : o.status === 'pending' ? 'warn' : 'grey'}`}>{o.status}</span>
-                    {o.paymentRef && <div className="small muted">ref {o.paymentRef}</div>}
+                    {o.paymentRef && <div className="small muted">ref {o.paymentRef}{o.paidVia === 'online' ? ' · paid online' : ''}</div>}
+                    {o.invoiceId && <a className="small" href={`/print/ubos-invoice/${o.invoiceId}?console=1`} target="_blank" rel="noreferrer">Invoice</a>}
                   </td>
                   <td style={{ textAlign: 'right' }}>{o.status === 'pending' && <button className="btn sm" onClick={() => setPaying(o)}>Mark paid</button>}</td>
                 </tr>
@@ -366,6 +368,52 @@ function SignupSettings({ plans }: { plans: Plan[] }) {
         <div className="field"><label htmlFor="ss-g">Grace days after the end</label><input id="ss-g" className="input" type="number" min={0} max={60} required value={f.graceDays} onChange={(e) => setF({ ...f, graceDays: Number(e.target.value) })} /></div>
       </div>
       <p className="small muted">Admins get reminders 7, 3 and 1 day before a trial or paid period ends, when it ends, and when the account pauses. A paused account can still sign in and pay; nothing is deleted.</p>
+      <button className="btn">Save</button>
+    </form>
+  );
+}
+
+interface BillingCfg { sellerName: string | null; sellerGstin: string | null; sellerStateCode: string | null; sellerAddress: string | null; sellerEmail: string | null; invoicePrefix: string; razorpayKeyId: string | null; hasRazorpaySecret: boolean; hasWebhookSecret: boolean }
+/** UBOS's own invoice details and its Razorpay account for customers paying UBOS. Secrets are write-only. */
+function BillingSettings() {
+  const [f, setF] = useState<(BillingCfg & { razorpaySecret: string; razorpayWebhookSecret: string }) | null>(null);
+  const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  const load = () => platformApi<BillingCfg>('/platform/v1/settings').then((s) => setF({ ...s, razorpaySecret: '', razorpayWebhookSecret: '' })).catch((e) => setMsg({ type: 'error', text: e.message }));
+  useEffect(() => { load(); }, []);
+  if (!f) return null;
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    try {
+      await platformApi('/platform/v1/settings/billing', { method: 'PUT', body: {
+        sellerName: f.sellerName ?? '', sellerGstin: f.sellerGstin || null, sellerStateCode: f.sellerStateCode ?? '', sellerAddress: f.sellerAddress ?? '', sellerEmail: f.sellerEmail || '', invoicePrefix: f.invoicePrefix,
+        razorpayKeyId: f.razorpayKeyId || null, ...(f.razorpaySecret ? { razorpaySecret: f.razorpaySecret } : {}), ...(f.razorpayWebhookSecret ? { razorpayWebhookSecret: f.razorpayWebhookSecret } : {}),
+      } });
+      setMsg({ type: 'notice', text: 'Saved.' });
+      load();
+    } catch (x) { setMsg({ type: 'error', text: x instanceof ApiError ? x.message : 'Failed' }); }
+  };
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
+  return (
+    <form className="card" style={{ maxWidth: 640, marginTop: 16 }} onSubmit={save}>
+      <h2>UBOS invoices and online payment</h2>
+      <p className="small muted" style={{ marginTop: -6 }}>Every paid order gets a tax invoice from these details. With Razorpay keys, customers can pay orders online and their licences start on their own.</p>
+      {msg && <div className={msg.type}>{msg.text}</div>}
+      <div className="grid cols-2">
+        <div className="field"><label htmlFor="bs-n">Legal name</label><input id="bs-n" className="input" required minLength={2} maxLength={160} value={f.sellerName ?? ''} onChange={set('sellerName')} /></div>
+        <div className="field"><label htmlFor="bs-g">GSTIN</label><input id="bs-g" className="input" maxLength={15} value={f.sellerGstin ?? ''} onChange={(e) => setF({ ...f, sellerGstin: e.target.value.toUpperCase(), sellerStateCode: e.target.value.length >= 2 && GST_STATES[e.target.value.slice(0, 2)] ? e.target.value.slice(0, 2) : f.sellerStateCode })} /></div>
+        <div className="field"><label htmlFor="bs-s">State</label><select id="bs-s" className="input" required value={f.sellerStateCode ?? ''} onChange={set('sellerStateCode')}><option value="">Choose</option>{Object.entries(GST_STATES).map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></div>
+        <div className="field"><label htmlFor="bs-p">Invoice prefix</label><input id="bs-p" className="input" required maxLength={6} value={f.invoicePrefix} onChange={(e) => setF({ ...f, invoicePrefix: e.target.value.toUpperCase() })} /><span className="small muted">Numbers look like {f.invoicePrefix || 'UB'}/26-27/0001</span></div>
+      </div>
+      <div className="field"><label htmlFor="bs-a">Address</label><textarea id="bs-a" className="input" required minLength={5} maxLength={500} style={{ height: 70, paddingTop: 8 }} value={f.sellerAddress ?? ''} onChange={set('sellerAddress')} /></div>
+      <div className="field"><label htmlFor="bs-e">Billing email (optional)</label><input id="bs-e" className="input" type="email" maxLength={160} value={f.sellerEmail ?? ''} onChange={set('sellerEmail')} /></div>
+      <h3 style={{ fontSize: 15, margin: '6px 0 8px' }}>Razorpay (UBOS&apos;s own account)</h3>
+      <div className="grid cols-2">
+        <div className="field"><label htmlFor="bs-k">Key ID</label><input id="bs-k" className="input" maxLength={60} placeholder="rzp_live_…" value={f.razorpayKeyId ?? ''} onChange={set('razorpayKeyId')} /></div>
+        <div className="field"><label htmlFor="bs-ks">Key secret</label><input id="bs-ks" className="input" type="password" autoComplete="new-password" maxLength={200} placeholder={f.hasRazorpaySecret ? 'Saved; type to replace' : ''} value={f.razorpaySecret} onChange={set('razorpaySecret')} /></div>
+        <div className="field"><label htmlFor="bs-w">Webhook secret</label><input id="bs-w" className="input" type="password" autoComplete="new-password" maxLength={200} placeholder={f.hasWebhookSecret ? 'Saved; type to replace' : ''} value={f.razorpayWebhookSecret} onChange={set('razorpayWebhookSecret')} /></div>
+      </div>
+      <p className="small muted">In Razorpay, add a webhook to <code>{'<API address>'}/public/v1/razorpay</code> for the payment link events (paid, expired, cancelled) with the same secret. Clearing the key ID turns online payment off.</p>
       <button className="btn">Save</button>
     </form>
   );

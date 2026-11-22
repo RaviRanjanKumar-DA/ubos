@@ -53,6 +53,9 @@ model Tenant {
   dbConnectionRef String?       // for dedicated databases
   createdAt     DateTime        @default(now())
   signedUpVia   String          @default("console") // console | self_serve | seed
+  billingName   String?         // who UBOS invoices are made out to
+  billingAddress String?
+  billingStateCode String?
   statusChangedAt DateTime?
   domains       TenantDomain[]
   subscriptions Subscription[]
@@ -94,16 +97,32 @@ model Subscription {
   invoices         PlatformInvoice[]
 }
 
+/** UBOS's GST tax invoice to a customer organization, one per paid order. */
 model PlatformInvoice {
-  id             String       @id @default(uuid())
-  subscriptionId String
-  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
-  number         String       @unique
-  amountPaise    Int
+  id             String        @id @default(uuid())
+  subscriptionId String?
+  subscription   Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+  tenantId       String
+  orderId        String        @unique
+  number         String        @unique // UB/26-27/0001
+  fy             String
+  seller         Json          // UBOS legal name, GSTIN, state, address
+  buyer          Json          // the organization's billing name, GSTIN, state, address
+  items          Json          // the order lines
+  placeOfSupply  String?
+  amountPaise    Int           // before GST
+  taxablePaise   Int
+  cgstPaise      Int           @default(0)
+  sgstPaise      Int           @default(0)
+  igstPaise      Int           @default(0)
   gstPaise       Int
-  status         String       // draft | issued | paid | overdue | void
+  totalPaise     Int
+  status         String        // draft | issued | paid | overdue | void
+  paymentRef     String?
   issuedAt       DateTime
   paidAt         DateTime?
+
+  @@index([tenantId])
 }
 
 model UsageRecord {
@@ -1348,6 +1367,11 @@ model TenantOrder {
   paidAt        DateTime?
   paymentRef    String?
   note          String?
+  paymentLinkId String?   @unique // Razorpay payment link on the UBOS account
+  paymentLinkUrl String?
+  paymentLinkExpiresAt DateTime?
+  paidVia       String?   // manual | online
+  invoiceId     String?
 
   @@index([tenantId, createdAt])
 }
@@ -2326,6 +2350,16 @@ model PlatformSetting {
   trialPlanCode String   @default("business")
   trialLicences Int      @default(5)
   graceDays     Int      @default(7) // after a trial or paid period ends, before the account pauses
+  sellerName      String? // UBOS's own invoice details
+  sellerGstin     String?
+  sellerStateCode String?
+  sellerAddress   String?
+  sellerEmail     String?
+  invoicePrefix   String   @default("UB")
+  razorpayKeyId   String? // UBOS's own Razorpay account for customers paying UBOS
+  razorpaySecretEnc        String?
+  razorpayWebhookSecretEnc String?
+  razorpayApiBase String? // test stand-in only
   updatedAt     DateTime @default(now())
 }
 

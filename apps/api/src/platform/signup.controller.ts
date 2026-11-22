@@ -1,9 +1,9 @@
 import { BadRequestException, Body, ConflictException, Controller, ForbiddenException, Get, HttpCode, NotFoundException, Param, Patch, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import type { Request } from 'express';
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 import { appendAudit, provisionTenant } from '@ubos/database';
-import { RESERVED_SLUGS, billingState, istClock, istInstant, isDay } from '@ubos/shared';
+import { GST_STATES, RESERVED_SLUGS, billingState, istClock, istInstant, isDay, validGstin } from '@ubos/shared';
 import { DbService } from '../common/db.service';
 import { ctx } from '../common/context';
 import { parse } from '../common/errors';
@@ -13,6 +13,10 @@ import { PasswordRule } from '../modules/auth.controller';
 import { rateLimit } from '../modules/integration-runtime';
 import { PlatformGuard } from './platform.controller';
 import { BillingLifecycle, platformSettings, usageMonth } from './billing-lifecycle';
+import { applyOrderPaid, platformGateway } from './billing-orders';
+import { invoiceView } from '../modules/billing.controller';
+import { encrypt } from '../auth/crypto';
+import { Logger } from '@nestjs/common';
 
 const Email = z.string().trim().toLowerCase().email().max(160);
 const Slug = z.string().trim().toLowerCase().regex(/^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/, 'Use 3–40 lowercase letters, numbers or dashes');
@@ -96,6 +100,13 @@ export class SignupController {
   }
 }
 
+const BillingBody = z.object({
+  sellerName: z.string().trim().min(2).max(160), sellerGstin: z.string().trim().toUpperCase().refine((g) => !g || validGstin(g), 'Enter a valid GSTIN').nullable().optional(),
+  sellerStateCode: z.string().refine((c) => c in GST_STATES, 'Choose the state'), sellerAddress: z.string().trim().min(5).max(500), sellerEmail: z.string().trim().email().max(160).nullable().optional().or(z.literal('')),
+  invoicePrefix: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{1,6}$/, 'Use up to 6 letters or digits'),
+  razorpayKeyId: z.string().trim().max(60).nullable().optional(), razorpaySecret: z.string().trim().max(200).optional(), razorpayWebhookSecret: z.string().trim().max(200).optional(),
+  razorpayApiBase: z.string().trim().url().max(200).nullable().optional().or(z.literal('')),
+});
 const SettingsBody = z.object({ signupEnabled: z.boolean(), trialDays: z.number().int().min(1).max(90), trialPlanCode: z.string().regex(/^[a-z0-9_]{2,40}$/), trialLicences: z.number().int().min(1).max(100), graceDays: z.number().int().min(0).max(60) });
 const SubBody = z.object({ planCode: z.string().regex(/^[a-z0-9_]{2,40}$/).optional(), licences: z.number().int().min(1).max(100_000).optional(), endsOn: z.string().refine(isDay, 'Enter a date').optional(), reason: z.string().trim().min(3).max(200) });
 
@@ -110,7 +121,41 @@ export class PlatformBillingController {
   }
 
   @Get('settings')
-  settings() { return platformSettings(this.db.platform); }
+  async settings() {
+    const { razorpaySecretEnc, razorpayWebhookSecretEnc, ...rest } = await platformSettings(this.db.platform);
+    return { ...rest, hasRazorpaySecret: !!razorpaySecretEnc, hasWebhookSecret: !!razorpayWebhookSecretEnc };
+  }
+
+  /** UBOS's own invoice details and Razorpay account. Secrets are write-only: blank keeps the saved one. */
+  @Put('settings/billing')
+  async saveBilling(@Body() body: unknown) {
+    const input = parse(BillingBody, body);
+    if (input.sellerGstin && input.sellerGstin.slice(0, 2) !== input.sellerStateCode) throw new BadRequestException({ code: 'GSTIN_STATE', message: 'The GSTIN belongs to a different state' });
+    const data = {
+      sellerName: input.sellerName, sellerGstin: input.sellerGstin || null, sellerStateCode: input.sellerStateCode, sellerAddress: input.sellerAddress, sellerEmail: input.sellerEmail || null, invoicePrefix: input.invoicePrefix,
+      razorpayKeyId: input.razorpayKeyId || null, razorpayApiBase: input.razorpayApiBase || null,
+      ...(input.razorpaySecret ? { razorpaySecretEnc: encrypt(input.razorpaySecret) } : {}), ...(input.razorpayWebhookSecret ? { razorpayWebhookSecretEnc: encrypt(input.razorpayWebhookSecret) } : {}),
+      ...(!input.razorpayKeyId ? { razorpaySecretEnc: null, razorpayWebhookSecretEnc: null } : {}), updatedAt: new Date(),
+    };
+    await this.db.platform.platformSetting.upsert({ where: { id: 'default' }, create: { id: 'default', ...data }, update: data });
+    const { razorpaySecret, razorpayWebhookSecret, ...shown } = input;
+    await this.audit('default', null, 'platform.billing_settings_saved', null, { ...shown, razorpaySecretChanged: !!razorpaySecret, webhookSecretChanged: !!razorpayWebhookSecret });
+    return this.settings();
+  }
+
+  @Get('invoices')
+  async invoices() {
+    const rows = await this.db.platform.platformInvoice.findMany({ orderBy: { issuedAt: 'desc' }, take: 300, select: { id: true, number: true, tenantId: true, totalPaise: true, gstPaise: true, issuedAt: true, status: true, orderId: true } });
+    const tenants = new Map((await this.db.platform.tenant.findMany({ where: { id: { in: [...new Set(rows.map((r) => r.tenantId))] } }, select: { id: true, name: true, slug: true } })).map((t) => [t.id, t]));
+    return rows.map((r) => ({ ...r, tenant: tenants.get(r.tenantId) ?? null }));
+  }
+
+  @Get('invoices/:id')
+  async invoice(@Param('id') id: string) {
+    const inv = await this.db.platform.platformInvoice.findUnique({ where: { id } });
+    if (!inv) throw new NotFoundException({ code: 'INVOICE_NOT_FOUND', message: 'Invoice not found' });
+    return invoiceView(inv);
+  }
 
   @Put('settings')
   async saveSettings(@Body() body: unknown) {
@@ -155,5 +200,38 @@ export class PlatformBillingController {
     const s = await platformSettings(p);
     const sub = t.subscriptions[0];
     return { month: m, usage: await usageMonth(p, id, m), billing: sub ? billingState(sub, s.graceDays) : null, signedUpVia: t.signedUpVia };
+  }
+}
+
+interface RzpEvent { event?: string; payload?: { payment_link?: { entity?: { id?: string } }; payment?: { entity?: { id?: string; amount?: number } } } }
+
+/** Razorpay webhooks for UBOS's own account: a paid link applies its order. Signed with the webhook secret; repeats change nothing. */
+@Controller('public/v1/razorpay')
+export class PlatformRazorpayWebhook {
+  private readonly log = new Logger('PlatformRazorpay');
+  constructor(private db: DbService) {}
+
+  @Post()
+  @HttpCode(200)
+  async receive(@Req() req: Request, @Body() body: RzpEvent) {
+    const g = await platformGateway(this.db.platform);
+    const raw = (req as { rawBody?: Buffer }).rawBody, sig = req.headers['x-razorpay-signature'];
+    const want = g?.webhookSecret && raw ? Buffer.from(createHmac('sha256', g.webhookSecret).update(raw).digest('hex')) : null;
+    const got = typeof sig === 'string' ? Buffer.from(sig) : null;
+    if (!want || !got || want.length !== got.length || !timingSafeEqual(want, got)) throw new BadRequestException({ code: 'BAD_SIGNATURE', message: 'Signature does not match' });
+    const linkId = body.payload?.payment_link?.entity?.id;
+    if (!linkId) return { ok: true, ignored: true };
+    const o = await this.db.platform.tenantOrder.findUnique({ where: { paymentLinkId: linkId } });
+    if (!o) return { ok: true, ignored: true };
+    if (body.event === 'payment_link.expired' || body.event === 'payment_link.cancelled') {
+      await this.db.platform.tenantOrder.updateMany({ where: { id: o.id, status: 'pending', paymentLinkId: linkId }, data: { paymentLinkId: null, paymentLinkUrl: null, paymentLinkExpiresAt: null } });
+      return { ok: true };
+    }
+    if (body.event !== 'payment_link.paid') return { ok: true, ignored: true };
+    const pay = body.payload?.payment?.entity;
+    if (!pay?.id || !pay.amount) return { ok: true, ignored: true };
+    if (pay.amount < o.totalPaise) { this.log.warn(`Order ${o.number}: paid ${pay.amount} of ${o.totalPaise}; not applied`); return { ok: true, ignored: true }; }
+    const r = await this.db.platform.$transaction((tx) => applyOrderPaid(tx, o.id, { paymentRef: pay.id!, via: 'online', actor: { type: 'system' } }));
+    return { ok: true, applied: r.applied };
   }
 }

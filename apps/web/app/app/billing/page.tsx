@@ -4,6 +4,7 @@ import { Icon } from '@/components/Icon';
 import { askConfirm } from '@/components/Dialogs';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError, rupees } from '@/lib/api';
+import { GST_STATES } from '@ubos/shared';
 import { useShell } from '@/components/AppShell';
 
 type Cycle = 'quarterly' | 'annual';
@@ -16,17 +17,19 @@ interface Catalog {
 interface OrderItem { productCode: string; name: string; kind: string; quantity: number; unitPaise: number; amountPaise: number }
 interface Order {
   id: string; number: string; cycle: string; items: OrderItem[]; subtotalPaise: number; gstPaise: number; totalPaise: number;
-  status: 'pending' | 'paid' | 'cancelled'; createdAt: string; paidAt: string | null; paymentRef: string | null; note: string | null;
+  status: 'pending' | 'paid' | 'cancelled'; createdAt: string; paidAt: string | null; paymentRef: string | null; note: string | null; paidVia: string | null; invoiceId: string | null;
 }
 const fmt = (d: string | null) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: '2-digit', month: 'short', year: 'numeric' }) : '—');
 const STATUS_BADGE: Record<Order['status'], string> = { pending: 'warn', paid: 'ok', cancelled: 'grey' };
 
 export default function BillingPage() {
   const { can } = useShell();
-  const [tab, setTab] = useState<'buy' | 'history' | 'usage'>('buy');
+  const [tab, setTab] = useState<'buy' | 'history' | 'usage' | 'details'>('buy');
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  // Back from Razorpay: show the order history with a thank-you note.
+  useEffect(() => { const n = new URLSearchParams(window.location.search).get('paid'); if (n) { setTab('history'); setNotice(`Thank you. Payment for order ${n} is being confirmed; it shows as paid here within a minute.`); } }, []);
 
   const loadCatalog = useCallback(() => api<Catalog>('/api/v1/billing/catalog', { noWorkspace: true }).then(setCatalog).catch((e) => setError(e.message)), []);
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
@@ -47,7 +50,7 @@ export default function BillingPage() {
         </div>
       </div>
       <div className="row" style={{ gap: 2, marginBottom: 14, borderBottom: '1px solid var(--line)' }}>
-        {([['buy', 'Buy licences'], ['usage', 'Usage'], ['history', 'Transaction history']] as const).map(([k, l]) => (
+        {([['buy', 'Buy licences'], ['usage', 'Usage'], ['history', 'Transaction history'], ['details', 'Invoice details']] as const).map(([k, l]) => (
           <button key={k} className="btn ghost" onClick={() => { setTab(k); setNotice(''); }}
             style={{ borderRadius: 0, borderBottom: tab === k ? '2px solid var(--brand)' : '2px solid transparent', color: tab === k ? 'var(--brand)' : undefined }}>{l}</button>
         ))}
@@ -57,6 +60,7 @@ export default function BillingPage() {
       {tab === 'buy' && catalog && <Buy catalog={catalog} onOrdered={(n) => { setNotice(`Order ${n} placed. It becomes active as soon as the payment is confirmed — see Transaction history.`); setTab('history'); loadCatalog(); }} />}
       {tab === 'history' && <History />}
       {tab === 'usage' && <Usage />}
+      {tab === 'details' && <InvoiceDetails />}
     </>
   );
 }
@@ -177,6 +181,9 @@ function History() {
   const [f, setF] = useState({ status: '', cycle: '', from: '', to: '' });
   const [open, setOpen] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [onlinePay, setOnlinePay] = useState(false);
+  useEffect(() => { api<{ onlinePay: boolean }>('/api/v1/billing/details', { noWorkspace: true }).then((d) => setOnlinePay(d.onlinePay)).catch(() => setOnlinePay(false)); }, []);
+  const pay = async (o: Order) => { setError(''); try { const r = await api<{ url: string }>(`/api/v1/billing/orders/${o.id}/pay`, { method: 'POST', noWorkspace: true }); window.open(r.url, '_blank', 'noopener'); } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed'); } };
   const load = useCallback(() => {
     const qs = new URLSearchParams(Object.entries(f).filter(([, v]) => v)).toString();
     api<Order[]>(`/api/v1/billing/orders${qs ? `?${qs}` : ''}`, { noWorkspace: true }).then(setOrders).catch((e) => setError(e.message));
@@ -217,7 +224,7 @@ function History() {
                   <td>{rupees(o.totalPaise)}</td>
                   <td><span className={`badge ${STATUS_BADGE[o.status]}`}>{o.status === 'pending' ? 'Pending payment' : o.status === 'paid' ? 'Paid' : 'Cancelled'}</span>
                     {o.paidAt && <div className="small muted">{fmt(o.paidAt)}</div>}</td>
-                  <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>{o.status === 'pending' && <button className="btn sm ghost" onClick={() => cancel(o)}>Cancel</button>}</td>
+                  <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }} onClick={(e) => e.stopPropagation()}>{o.status === 'pending' && onlinePay && <button className="btn sm" onClick={() => pay(o)}>Pay online</button>}{o.status === 'pending' && <button className="btn sm ghost" onClick={() => cancel(o)}>Cancel</button>}{o.invoiceId && <a className="btn sm ghost" href={`/print/ubos-invoice/${o.invoiceId}`} target="_blank" rel="noreferrer">Invoice</a>}</td>
                 </tr>,
                 open === o.id && (
                   <tr key={`${o.id}-d`}>
@@ -228,7 +235,8 @@ function History() {
                         </div>
                       ))}
                       <div className="row small" style={{ justifyContent: 'space-between', maxWidth: 520, marginTop: 4 }}><span>Subtotal · GST</span><span>{rupees(o.subtotalPaise)} · {rupees(o.gstPaise)}</span></div>
-                      {o.paymentRef && <div className="small muted">Payment reference: {o.paymentRef}</div>}
+                      {o.paymentRef && <div className="small muted">Payment reference: {o.paymentRef}{o.paidVia === 'online' ? ' (paid online)' : ''}</div>}
+                      {o.status === 'pending' && <div className="small muted">{onlinePay ? 'Pay online by card, UPI or net banking, or ' : ''}Pay by bank transfer or UPI and share the reference with us; we mark it paid and the licences start straight away.</div>}
                       {o.note && <div className="small muted">Note: {o.note}</div>}
                     </td>
                   </tr>
@@ -286,5 +294,32 @@ function Usage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/** Who UBOS invoices are made out to: legal name, GSTIN (if registered), state and address. */
+function InvoiceDetails() {
+  const [f, setF] = useState<{ billingName: string; gstin: string; billingStateCode: string; billingAddress: string } | null>(null);
+  const [msg, setMsg] = useState<{ type: 'error' | 'notice'; text: string } | null>(null);
+  useEffect(() => { api<{ billingName: string; gstin: string | null; billingStateCode: string | null; billingAddress: string | null }>('/api/v1/billing/details', { noWorkspace: true }).then((d) => setF({ billingName: d.billingName ?? '', gstin: d.gstin ?? '', billingStateCode: d.billingStateCode ?? '', billingAddress: d.billingAddress ?? '' })).catch((e) => setMsg({ type: 'error', text: e.message })); }, []);
+  if (!f) return msg ? <div className={msg.type}>{msg.text}</div> : null;
+  const save = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    try { await api('/api/v1/billing/details', { method: 'PUT', noWorkspace: true, body: { ...f, gstin: f.gstin.trim() || null } }); setMsg({ type: 'notice', text: 'Saved. New invoices use these details.' }); } catch (x) { setMsg({ type: 'error', text: x instanceof ApiError ? x.message : 'Failed' }); }
+  };
+  return (
+    <form className="card" style={{ maxWidth: 640 }} onSubmit={save}>
+      <h2>Invoice details</h2>
+      <p className="small muted" style={{ marginTop: -6 }}>UBOS invoices are made out to these details. With a GSTIN you can claim the GST back.</p>
+      {msg && <div className={msg.type}>{msg.text}</div>}
+      <div className="field"><label htmlFor="bd-n">Legal name</label><input id="bd-n" className="input" required minLength={2} maxLength={160} value={f.billingName} onChange={(e) => setF({ ...f, billingName: e.target.value })} /></div>
+      <div className="grid cols-2">
+        <div className="field"><label htmlFor="bd-g">GSTIN (optional)</label><input id="bd-g" className="input" maxLength={15} value={f.gstin} onChange={(e) => { const g = e.target.value.toUpperCase(); setF({ ...f, gstin: g, billingStateCode: g.length >= 2 && GST_STATES[g.slice(0, 2)] ? g.slice(0, 2) : f.billingStateCode }); }} /></div>
+        <div className="field"><label htmlFor="bd-s">State</label><select id="bd-s" className="input" required value={f.billingStateCode} onChange={(e) => setF({ ...f, billingStateCode: e.target.value })}><option value="">Choose</option>{Object.entries(GST_STATES).map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></div>
+      </div>
+      <div className="field"><label htmlFor="bd-a">Address</label><textarea id="bd-a" className="input" required minLength={5} maxLength={500} style={{ height: 80, paddingTop: 8 }} value={f.billingAddress} onChange={(e) => setF({ ...f, billingAddress: e.target.value })} /></div>
+      <button className="btn">Save</button>
+    </form>
   );
 }

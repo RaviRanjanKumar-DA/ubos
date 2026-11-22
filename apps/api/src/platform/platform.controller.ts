@@ -18,6 +18,7 @@ import { normalizeIp } from '../auth/ip';
 import { SessionService } from '../auth/sessions';
 import { authTransaction, CommitThenThrow } from '../auth/tx';
 import { setupGuide } from '../common/setup-guide';
+import { applyOrderPaid } from './billing-orders';
 
 /** Platform staff guard: separate cookies and signing secret, so tenant sessions can never reach these routes. */
 @Injectable()
@@ -380,35 +381,10 @@ export class PlatformController {
   markPaid(@Param('id') id: string, @Body() body: unknown) {
     const { paymentRef } = parse(z.object({ paymentRef: z.string().trim().min(2).max(100) }), body);
     return this.db.platform.$transaction(async (tx) => {
-      const o = await tx.tenantOrder.findUnique({ where: { id } });
-      if (!o) throw new NotFoundException({ code: 'ORDER_NOT_FOUND', message: 'Order not found' });
-      if (o.status !== 'pending') throw new ConflictException({ code: 'ORDER_NOT_PENDING', message: 'Only pending orders can be marked paid' });
-      const items = o.items as { kind: string; planCode?: string | null; quantity: number }[];
-      const licences = items.filter((i) => i.kind === 'licence');
-      if (licences.length) {
-        const plan = await tx.plan.findUniqueOrThrow({ where: { code: licences[0].planCode! } });
-        const qty = licences.reduce((n, i) => n + i.quantity, 0);
-        const sub = await tx.subscription.findFirst({ where: { tenantId: o.tenantId }, orderBy: { currentPeriodEnd: 'desc' } });
-        const start = sub && sub.status === 'active' && sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-        const end = new Date(start);
-        end.setMonth(end.getMonth() + (CYCLE_MONTHS[o.cycle] ?? 12));
-        if (sub) {
-          // A trial converts to the paid quantity; an active subscription adds the new licences.
-          await tx.subscription.update({
-            where: { id: sub.id },
-            data: { planId: plan.id, licences: sub.status === 'active' ? sub.licences + qty : qty, status: 'active', trialEndsAt: null, currentPeriodEnd: end, period: o.cycle },
-          });
-        } else {
-          await tx.subscription.create({ data: { tenantId: o.tenantId, planId: plan.id, period: o.cycle, licences: qty, status: 'active', currentPeriodEnd: end } });
-        }
-        await tx.tenant.update({ where: { id: o.tenantId }, data: { status: 'active' } });
-      }
-      await tx.tenantOrder.update({ where: { id }, data: { status: 'paid', paidAt: new Date(), paymentRef } });
-      await appendAudit(tx, {
-        tenantId: null, actorType: 'platform_user', actorId: ctx().platformUserId, ip: ctx().ip,
-        entity: 'order', entityId: id, action: 'platform.order_paid', newValue: { number: o.number, tenantId: o.tenantId, totalPaise: o.totalPaise, paymentRef },
-      });
-      return { ok: true };
+      const r = await applyOrderPaid(tx, id, { paymentRef, via: 'manual', actor: { type: 'platform_user', id: ctx().platformUserId, ip: ctx().ip } });
+      if (!r.applied && r.reason === 'ORDER_NOT_FOUND') throw new NotFoundException({ code: 'ORDER_NOT_FOUND', message: 'Order not found' });
+      if (!r.applied) throw new ConflictException({ code: 'ORDER_NOT_PENDING', message: 'Only pending orders can be marked paid' });
+      return { ok: true, invoiceNumber: r.invoiceNumber };
     });
   }
 

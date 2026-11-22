@@ -11,7 +11,10 @@ export type UsageMetric = (typeof USAGE_METRICS)[number];
 const GAUGES: UsageMetric[] = ['active_users', 'storage_mb'];
 
 export async function platformSettings(p: Pick<PrismaClient, 'platformSetting'>) {
-  return (await p.platformSetting.findUnique({ where: { id: 'default' } })) ?? { id: 'default', signupEnabled: true, trialDays: 14, trialPlanCode: 'business', trialLicences: 5, graceDays: 7, updatedAt: new Date() };
+  return (await p.platformSetting.findUnique({ where: { id: 'default' } })) ?? {
+    id: 'default', signupEnabled: true, trialDays: 14, trialPlanCode: 'business', trialLicences: 5, graceDays: 7, updatedAt: new Date(),
+    sellerName: null, sellerGstin: null, sellerStateCode: null, sellerAddress: null, sellerEmail: null, invoicePrefix: 'UB', razorpayKeyId: null, razorpaySecretEnc: null, razorpayWebhookSecretEnc: null, razorpayApiBase: null,
+  };
 }
 
 /** One organization's usage on one IST day, counted from its own records. */

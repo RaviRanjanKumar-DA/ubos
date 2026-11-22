@@ -31,7 +31,7 @@ import { OAuthController } from './auth/oauth.controller';
 import { SessionService } from './auth/sessions';
 import { TenantLoginService } from './auth/login.service';
 import { Mailer } from './auth/mailer';
-import { SignupController, PlatformBillingController } from './platform/signup.controller';
+import { SignupController, PlatformBillingController, PlatformRazorpayWebhook } from './platform/signup.controller';
 import { BillingLifecycle } from './platform/billing-lifecycle';
 import { UsersController } from './modules/users.controller';
 import { RolesController } from './modules/roles.controller';
@@ -85,6 +85,7 @@ class HealthController {
     AttendanceController,
     SignupController,
     PlatformBillingController,
+    PlatformRazorpayWebhook,
     AccessController,
     GalleryController,
     PublicGalleryController,
