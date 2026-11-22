@@ -29,7 +29,7 @@ export class ReportsController {
   @Get()
   catalog() {
     const canExport = !!auth().permissions['crm.lead.export' as never];
-    return { reports: REPORTS, canExport };
+    return { reports: REPORTS, canExport, canDelete: !!auth().permissions['crm.lead.delete' as never] };
   }
 
   @Get(':key')
@@ -132,7 +132,7 @@ export class ReportsController {
         const orgWide = auth().permissions['dashboard.view' as never] === 'ORGANIZATION';
         const tasks = all.filter((t) => (t.leadId ? visible.has(t.leadId) : orgWide || t.assigneeId === auth().userId)).slice(0, limit + 1);
         const leadNames = visible;
-        const rows = tasks.map((t) => ({ title: t.title, type: t.type, lead: t.leadId ? leadNames.get(t.leadId) ?? '' : '', assignee: user(t.assigneeId), dueAt: t.dueAt, state: t.doneAt ? (t.doneAt <= t.dueAt ? 'Done on time' : 'Done late') : t.dueAt < now ? 'Overdue' : 'Open', doneAt: t.doneAt, leadId: t.leadId }));
+        const rows = tasks.map((t) => ({ title: t.title, type: t.type, lead: t.leadId ? leadNames.get(t.leadId) ?? '' : '', assignee: user(t.assigneeId), dueAt: t.dueAt, state: t.cancelledAt ? 'Cancelled' : t.doneAt ? (t.doneAt <= t.dueAt ? 'Done on time' : 'Done late') : t.dueAt < now ? 'Overdue' : 'Open', doneAt: t.doneAt, leadId: t.leadId }));
         const count = (s: string) => rows.filter((x) => x.state === s).length;
         return out([{ key: 'title', label: 'Task' }, { key: 'type', label: 'Type' }, { key: 'lead', label: 'Lead' }, { key: 'assignee', label: 'Assigned to' }, { key: 'dueAt', label: 'Due (IST)', format: 'datetime' }, { key: 'state', label: 'State' }, { key: 'doneAt', label: 'Done (IST)', format: 'datetime' }], rows, { title: `${rows.length} tasks`, state: `${count('Done on time') + count('Done late')} done · ${count('Overdue')} overdue · ${count('Open')} open` });
       }
@@ -163,6 +163,13 @@ export class ReportsController {
         const answerKeys = [...new Set(leads.flatMap((l) => Object.keys((l.customFields ?? {}) as object)))].slice(0, 30);
         const rows = leads.map((l) => ({ createdAt: l.createdAt, name: l.customer.name, mobile: l.customer.mobile ?? '', email: l.customer.email ?? '', city: l.customer.city ?? '', businessLine: ws(l.workspaceId), source: label('lead_source', l.source), owner: user(l.ownerId), stage: stage(l.stageId), leadId: l.id, ...Object.fromEntries(answerKeys.map((k) => [`cf_${k}`, String(((l.customFields ?? {}) as Record<string, unknown>)[k] ?? '')])) }));
         return out([{ key: 'createdAt', label: 'Received (IST)', format: 'datetime' }, { key: 'name', label: 'Name' }, { key: 'mobile', label: 'Mobile' }, { key: 'email', label: 'Email' }, { key: 'city', label: 'City' }, { key: 'businessLine', label: 'Business line' }, { key: 'source', label: 'Source' }, { key: 'owner', label: 'Owner' }, { key: 'stage', label: 'Stage' }, ...answerKeys.map((k) => ({ key: `cf_${k}`, label: k.replace(/_/g, ' ') }))], rows);
+      }
+      case 'deleted': {
+        // The same scope as other reports, but only deleted leads; filtered by when they were deleted.
+        const scope = await scopeFilter(tx, 'dashboard.view', { deleted: true });
+        const leads = await tx.lead.findMany({ where: { AND: [leadWhere({ ...c, scope }), { deletedAt: range }] }, orderBy: { deletedAt: 'desc' }, take: limit + 1, include: { customer: { select: { name: true, mobile: true } } } });
+        const rows = leads.map((l) => ({ name: l.customer.name, mobile: l.customer.mobile ?? '', businessLine: ws(l.workspaceId), stage: stage(l.stageId), owner: user(l.ownerId), deletedAt: l.deletedAt, deletedBy: user(l.deletedById), reason: l.deleteReason ?? '', createdAt: l.createdAt, leadId: l.id }));
+        return out([{ key: 'name', label: 'Name' }, { key: 'mobile', label: 'Mobile' }, { key: 'businessLine', label: 'Business line' }, { key: 'stage', label: 'Stage' }, { key: 'owner', label: 'Owner' }, { key: 'deletedAt', label: 'Deleted (IST)', format: 'datetime' }, { key: 'deletedBy', label: 'Deleted by' }, { key: 'reason', label: 'Reason' }, { key: 'createdAt', label: 'Created (IST)', format: 'datetime' }], rows);
       }
     }
     throw new BadRequestException({ code: 'UNKNOWN_REPORT', message: 'Unknown report' });

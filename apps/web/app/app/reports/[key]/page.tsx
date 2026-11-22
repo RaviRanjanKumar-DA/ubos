@@ -30,6 +30,10 @@ export default function ReportPage() {
   const [people, setPeople] = useState<Opt[]>([]);
   const [r, setR] = useState<ReportResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const restorable = key === 'deleted' && can('crm.lead.delete');
+  const restore = async () => { try { const x = await api<{ restored: number }>('/api/v1/leads/restore', { method: 'POST', body: { leadIds: [...picked] } }); setPicked(new Set()); setErr(''); await load(); setNote(`${x.restored} lead(s) restored.`); } catch (e) { setErr(e instanceof ApiError ? e.message : 'Failed'); } };
+  const [note, setNote] = useState('');
   const [err, setErr] = useState('');
   const qs = useCallback(() => new URLSearchParams(Object.entries(f).filter(([k, v]) => v && (f.range === 'custom' || (k !== 'from' && k !== 'to')))).toString(), [f]);
   const load = useCallback(async () => {
@@ -69,23 +73,26 @@ export default function ReportPage() {
         {busy && <span className="small muted">Loading…</span>}
       </div>
       {err && <div className="error">{err}</div>}
+      {note && <div className="notice">{note}</div>}
+      {restorable && picked.size > 0 && <div className="bulkbar"><b>{picked.size} selected</b><span style={{ flex: 1 }} /><button className="btn sm" onClick={restore}>Restore</button><button className="btn sm" onClick={() => setPicked(new Set())}>Clear</button></div>}
       {r && (
         <div className="card" style={{ padding: 0 }}>
           <div className="table-wrap">
             <table className="table report-table">
-              <thead><tr>{r.columns.map((c) => <th key={c.key} className={['count', 'number', 'percent', 'currency', 'minutes'].includes(c.format ?? '') ? 'num' : ''}>{c.label}</th>)}</tr></thead>
+              <thead><tr>{restorable && <th style={{ width: 34 }} />}{r.columns.map((c) => <th key={c.key} className={['count', 'number', 'percent', 'currency', 'minutes'].includes(c.format ?? '') ? 'num' : ''}>{c.label}</th>)}</tr></thead>
               <tbody>
                 {r.rows.map((row, i) => (
                   <tr key={i}>
+                    {restorable && <td><input type="checkbox" aria-label={`Select ${String(row.name)}`} checked={picked.has(String(row.leadId))} onChange={() => { const s = new Set(picked); if (s.has(String(row.leadId))) s.delete(String(row.leadId)); else s.add(String(row.leadId)); setPicked(s); }} /></td>}
                     {r.columns.map((c, j) => {
                       const v = cell(row[c.key], c);
                       const num = ['count', 'number', 'percent', 'currency', 'minutes'].includes(c.format ?? '');
-                      return <td key={c.key} className={num ? 'num' : ''}>{j === 0 && LEAD_LINK.includes(key) && row.leadId ? <Link href={`/app/leads/${row.leadId}`}>{v}</Link> : v}</td>;
+                      return <td key={c.key} className={num ? 'num' : ''}>{j === 0 && LEAD_LINK.includes(key) && key !== 'deleted' && row.leadId ? <Link href={`/app/leads/${row.leadId}`}>{v}</Link> : v}</td>;
                     })}
                   </tr>
                 ))}
               </tbody>
-              {r.totals && r.rows.length > 0 && <tfoot><tr>{r.columns.map((c) => <td key={c.key} className={['count', 'number', 'currency', 'minutes'].includes(c.format ?? '') ? 'num' : ''}><b>{r.totals![c.key] !== undefined ? cell(r.totals![c.key], c) : ''}</b></td>)}</tr></tfoot>}
+              {r.totals && r.rows.length > 0 && <tfoot><tr>{restorable && <td />}{r.columns.map((c) => <td key={c.key} className={['count', 'number', 'currency', 'minutes'].includes(c.format ?? '') ? 'num' : ''}><b>{r.totals![c.key] !== undefined ? cell(r.totals![c.key], c) : ''}</b></td>)}</tr></tfoot>}
             </table>
             {!r.rows.length && <div className="empty">Nothing in this period.</div>}
           </div>

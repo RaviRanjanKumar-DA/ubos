@@ -7,14 +7,16 @@ import { auth } from './context';
  * Translates the user's data scope for `perm` into a Prisma filter on records that have
  * `workspaceId` and `ownerId` (leads today; tasks, deals etc. later).
  */
-export async function scopeFilter(tx: Tx, perm: PermissionKey): Promise<Prisma.LeadWhereInput> {
+export async function scopeFilter(tx: Tx, perm: PermissionKey, opts: { deleted?: boolean } = {}): Promise<Prisma.LeadWhereInput> {
   const a = auth();
   const scope = a.permissions[perm];
   if (!scope) return { id: '__none__' };
 
+  // Deleted leads drop out of every list, count and report, except Reports → Deleted leads.
+  const gone: Prisma.LeadWhereInput = opts.deleted ? { deletedAt: { not: null } } : { deletedAt: null };
   const where: Prisma.LeadWhereInput = a.workspaceId
-    ? { workspaceId: a.workspaceId }
-    : { workspaceId: { in: a.accessibleWorkspaceIds } };
+    ? { workspaceId: a.workspaceId, ...gone }
+    : { workspaceId: { in: a.accessibleWorkspaceIds }, ...gone };
 
   if (scope === 'WORKSPACE' || scope === 'ORGANIZATION') return where;
   // Besides their own leads, people see leads they were added to (lead team) and leads of colleagues they cover for.

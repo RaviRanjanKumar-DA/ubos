@@ -553,6 +553,9 @@ model Lead {
   labelIds        String[]   @default([])    // Label ids
   teamMembers     LeadTeamMember[]
   importId        String?
+  deletedAt       DateTime?  // deleted leads are kept (Reports → Deleted leads) and can be restored
+  deletedById     String?
+  deleteReason    String?
   followUps       FollowUp[]
   activities      LeadActivity[]
   campaignItems   CallCampaignItem[]
@@ -560,6 +563,7 @@ model Lead {
   @@index([tenantId, workspaceId, pipelineId, stageId])
   @@index([tenantId, ownerId])
   @@index([tenantId, nextFollowUpAt])
+  @@index([tenantId, deletedAt])
   invoices        Invoice[]
 }
 
@@ -1260,6 +1264,8 @@ model Task {
   createdById String
   mentionIds  String[]  @default([])
   doneAt      DateTime?
+  cancelledAt DateTime? // cancelled tasks are also marked done, so open-task lists leave them out
+  cancelledById String?
   remindedAt  DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt

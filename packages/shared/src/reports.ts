@@ -13,7 +13,7 @@ export const REPORTS: ReportDef[] = [
   { key: 'duplicates', title: 'Duplicate leads', group: 'Leads', description: 'Repeat enquiries from people already in UBOS, and customers with more than one open lead.', detail: true, ready: true },
   { key: 'facebook', title: 'Facebook data', group: 'Leads', description: 'Leads from Facebook and Instagram lead forms with every answer.', detail: true, ready: true },
   { key: 'sales', title: 'Sales', group: 'Sales', description: 'Leads won in the period with value, invoiced and received amounts.', detail: true, ready: true },
-  { key: 'deleted', title: 'Deleted leads', group: 'Leads', description: 'Leads that were deleted, who deleted them and when; restore them.', detail: true, ready: false },
+  { key: 'deleted', title: 'Deleted leads', group: 'Leads', description: 'Leads that were deleted, who deleted them and when; restore them.', detail: true, ready: true },
   { key: 'ai_insights', title: 'AI insights', group: 'AI', description: 'Plain-language findings about the pipeline and the team.', detail: false, ready: false },
   { key: 'call_summaries', title: 'Call summarization', group: 'AI', description: 'Short summaries of recorded calls.', detail: true, ready: false },
 ];

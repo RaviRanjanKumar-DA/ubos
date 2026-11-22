@@ -43,7 +43,7 @@ export async function intakeLead(tx: Tx, tenantId: string, workspaceId: string, 
   const match = await findCustomer(tx, { mobile, email, preferEmail: byEmail });
 
   if (match && mode !== 'new_lead') {
-    const leads = await tx.lead.findMany({ where: { customerId: match.customer.id, workspaceId }, orderBy: { createdAt: 'desc' } });
+    const leads = await tx.lead.findMany({ where: { customerId: match.customer.id, workspaceId, deletedAt: null }, orderBy: { createdAt: 'desc' } });
     const stages = await tx.leadStage.findMany({ where: { id: { in: leads.map((l) => l.stageId) } } });
     const open = leads.find((l) => { const st = stages.find((x) => x.id === l.stageId); return st && !st.isWon && !st.isLost; });
     if (open) {

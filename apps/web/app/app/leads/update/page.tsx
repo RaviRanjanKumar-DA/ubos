@@ -53,7 +53,7 @@ export default function DataToolsPage() {
       const idx = Object.fromEntries(Object.entries(cols).map(([k, names]) => [k, head.findIndex((h) => names.includes(h))]));
       // Any other column is a custom field (header = field key or label in "cf:key" form).
       const used = new Set([keyIdx, ...Object.values(idx)]);
-      const extra = head.map((h, i) => [h, i] as const).filter(([, i]) => !used.has(i) && data[0][i]);
+      const extra = head.map((h, i) => [h, i] as const).filter(([h, i]) => !used.has(i) && data[0][i] && !['name', 'customername', 'leadname'].includes(h));
       setRows(data.slice(1).map((r) => {
         const o: Record<string, unknown> = { key: r[keyIdx] ?? '' };
         for (const [k, i] of Object.entries(idx)) if (i >= 0 && r[i]) o[k] = r[i];
@@ -133,6 +133,7 @@ export default function DataToolsPage() {
             </label>
             <label className="btn outline">Choose CSV / Excel file<input type="file" accept=".csv,.xlsx,.txt" hidden onChange={(e) => e.target.files?.[0] && read(e.target.files[0])} /></label>
             <button className="btn ghost sm" onClick={template}>Download template</button>
+            {mode === 'update' && can('crm.lead.export') && <button className="btn ghost sm" onClick={async () => { try { const b = await api<Blob>(`/api/v1/leads/update-export?match=${match}`); const u = URL.createObjectURL(new Blob([b], { type: 'text/csv' })); Object.assign(document.createElement('a'), { href: u, download: 'my-leads-to-update.csv' }).click(); URL.revokeObjectURL(u); } catch (e) { setError(e instanceof ApiError ? e.message : 'Failed'); } }}>Download my leads in this format</button>}
             {file && <span className="small">{file} · {rows?.length} row(s)</span>}
           </div>
           {report && (

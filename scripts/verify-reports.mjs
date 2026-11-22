@@ -46,7 +46,7 @@ await call('/api/v1/tasks', { ...R, method: 'POST', body: { title: 'Report task'
 
 // ---- Catalogue and access ----
 const cat = (await call('/api/v1/reports', { token: admin })).body;
-check('the hub lists every report type, with the ones still coming marked', cat.reports.length >= 12 && cat.reports.filter((r) => r.ready).length === 9 && cat.reports.some((r) => r.key === 'ai_insights' && !r.ready) && cat.canExport === true, cat.reports?.map((r) => r.key));
+check('the hub lists every report type, with the ones still coming marked', cat.reports.length >= 12 && cat.reports.filter((r) => r.ready).length === 10 && cat.reports.some((r) => r.key === 'ai_insights' && !r.ready) && cat.canExport === true, cat.reports?.map((r) => r.key));
 check('a report that is coming says so', (await rep('ai_insights')).body.code === 'REPORT_COMING');
 check('an unknown report is refused', (await rep('nope')).body.code === 'UNKNOWN_REPORT');
 check('a plan or role without dashboards cannot open reports', [403].includes((await call('/api/v1/reports', { tenant: 'abc', token: abc })).status) || (await call('/api/v1/reports/leads', { tenant: 'abc', token: abc })).body.rows?.every((r) => !r.name?.startsWith('Report ')));

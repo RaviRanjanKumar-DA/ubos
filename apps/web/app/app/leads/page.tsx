@@ -190,7 +190,13 @@ function LeadsPage() {
     }
   }
 
-  const canBulk = can('crm.lead.update') || can('crm.lead.assign');
+  const canBulk = can('crm.lead.update') || can('crm.lead.assign') || can('crm.lead.delete');
+  const alertMsg = (t: string) => { void askConfirm(t, 'OK'); };
+  const removeSelected = async () => {
+    const reason = await askText(`Delete ${selected.size} lead(s)? They leave every list and report but are kept: restore them from Reports → Deleted leads. Reason:`);
+    if (!reason) return;
+    try { const r = await api<{ deleted: number; tasksCancelled: number }>('/api/v1/leads/delete', { method: 'POST', body: { leadIds: [...selected], reason } }); setSelected(new Set()); load(); alertMsg(`${r.deleted} lead(s) deleted.${r.tasksCancelled ? ` ${r.tasksCancelled} open task(s) cancelled.` : ''}`); } catch (e) { alertMsg(e instanceof ApiError ? e.message : 'Failed'); }
+  };
 
   return (
     <>
@@ -385,6 +391,7 @@ function LeadsPage() {
           {can('crm.lead.update') && labels.length > 0 && <button className="btn sm" onClick={() => setBulk('labels')}>Labels</button>}
           {can('crm.whatsapp.broadcast') && <button className="btn sm" onClick={() => setBroadcast('whatsapp')}>WhatsApp</button>}
           {can('crm.message.manage') && <button className="btn sm" onClick={() => setBroadcast('outreach')}>SMS / Email</button>}
+          {can('crm.lead.delete') && <button className="btn sm danger" onClick={removeSelected}>Delete</button>}
           <button className="btn sm" onClick={() => setSelected(new Set())}>Clear</button>
         </div>
       )}

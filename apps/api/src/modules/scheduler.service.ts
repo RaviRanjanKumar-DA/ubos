@@ -90,7 +90,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       const until = new Date(Date.now() + (settings?.reminderMinutes ?? 15) * 60_000);
       const since = new Date(Date.now() - 86_400_000);
       const tasks = await tx.task.findMany({ where: { doneAt: null, remindedAt: null, dueAt: { gte: since, lte: until } }, take: 500 });
-      const fus = await tx.followUp.findMany({ where: { doneAt: null, remindedAt: null, dueAt: { gte: since, lte: until } }, include: { lead: { select: { id: true, customer: { select: { name: true } } } } }, take: 500 });
+      const fus = await tx.followUp.findMany({ where: { doneAt: null, remindedAt: null, dueAt: { gte: since, lte: until }, lead: { deletedAt: null } }, include: { lead: { select: { id: true, customer: { select: { name: true } } } } }, take: 500 });
       const list = [
         ...tasks.map((t) => ({ kind: 'task' as const, id: t.id, userId: t.assigneeId, title: `${t.type === 'meeting' ? 'Meeting' : t.type === 'call' ? 'Call' : 'Task'}: ${t.title}`, dueAt: t.dueAt, link: t.leadId ? `/app/leads/${t.leadId}` : '/app/calendar' })),
         ...fus.map((f) => ({ kind: 'follow_up' as const, id: f.id, userId: f.userId, title: `Follow-up: ${f.lead.customer.name}${f.note ? ` — ${f.note}` : ''}`, dueAt: f.dueAt, link: `/app/leads/${f.lead.id}` })),

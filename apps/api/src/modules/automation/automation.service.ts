@@ -105,7 +105,7 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
   /** The values conditions are tested against. */
   async leadValues(leadId: string, data: Record<string, unknown> = {}) {
     const lead = await this.db.tenant((tx) => tx.lead.findUnique({ where: { id: leadId }, include: { customer: true } }));
-    if (!lead) return null;
+    if (!lead || lead.deletedAt) return null;
     const cf = Object.fromEntries(Object.entries((lead.customFields ?? {}) as Record<string, unknown>).map(([k, v]) => [`cf:${k}`, v]));
     return { lead, values: { ...cf, source: lead.source, status: lead.status, stage: data.to ?? lead.stageId, owner: lead.ownerId, score: lead.score, city: lead.customer.city } as Record<string, unknown> };
   }
@@ -184,7 +184,7 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
 
   private async apply(rule: Rule, leadId: string, event: string, data: Record<string, unknown>) {
     const lead = await this.db.tenant((tx) => tx.lead.findUnique({ where: { id: leadId }, include: { customer: true } }));
-    if (!lead || lead.workspaceId !== rule.workspaceId) return;
+    if (!lead || lead.deletedAt || lead.workspaceId !== rule.workspaceId) return;
     const cf = Object.fromEntries(Object.entries((lead.customFields ?? {}) as Record<string, unknown>).map(([k, v]) => [`cf:${k}`, v]));
     const values = { ...cf, source: lead.source, status: lead.status, stage: data.to ?? lead.stageId, owner: lead.ownerId, score: lead.score, city: lead.customer.city };
     if (!matchesConditions(rule.conditions as RuleCondition[], values)) return;
