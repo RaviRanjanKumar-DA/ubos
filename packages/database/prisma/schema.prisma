@@ -2376,3 +2376,46 @@ model SignupCode {
 
   @@index([email, createdAt])
 }
+
+/** A visual automation flow: a trigger, then actions, waits and if/else paths (FlowGraph in @ubos/shared). Off until switched on. */
+model AutomationFlow {
+  id             String              @id @default(uuid())
+  tenantId       String
+  workspaceId    String
+  name           String
+  trigger        String              // same triggers as rules
+  idleDays       Int?
+  graph          Json                // { steps: FlowNode[] }
+  stopWhenClosed Boolean             @default(true) // a lead that is won or lost leaves the flow
+  isActive       Boolean             @default(false)
+  isArchived     Boolean             @default(false)
+  runCount       Int                 @default(0)
+  lastRunAt      DateTime?
+  createdById    String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @default(now()) @updatedAt
+  runs           AutomationFlowRun[]
+
+  @@index([tenantId, workspaceId, trigger])
+}
+
+/** One lead's way through a flow: where it is, when it wakes up, and what happened at each step. */
+model AutomationFlowRun {
+  id        String         @id @default(uuid())
+  tenantId  String
+  flowId    String
+  flow      AutomationFlow @relation(fields: [flowId], references: [id])
+  leadId    String
+  event     String
+  nodeId    String?        // the next step to run (null = finished)
+  status    String         @default("running") // running | waiting | done | failed | stopped
+  nextAt    DateTime?
+  log       Json           @default("[]") // [{ nodeId, at, result }]
+  error     String?
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @default(now()) @updatedAt
+
+  @@index([tenantId, flowId, leadId])
+  @@index([status, nextAt])
+}
+

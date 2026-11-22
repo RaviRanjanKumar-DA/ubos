@@ -16,6 +16,9 @@ Your own company (Tenant #1) goes live first; beta customers join in Phase 3; co
 
 | Request | What it covers | Proposed phase |
 |---|---|---|
+| Reports hub with many report types (22 Nov 2026) | One Reports menu: Leaderboard, Leads, Tasks, Calls (call report), Sales, Actions, AI insights, Duplicate leads, Deleted leads, Facebook data, Call summarization, Report download (CSV/Excel), each with filters and IST dates | Next, after 3.9 (own slice) |
+| Bulk tools (22 Nov 2026) | Bulk edit, Excel bulk edit (download, change, upload back), bulk cancel tasks, bulk delete (archive), bulk user upload, users export, bulk add actions, list delete, bulk upload tasks; each previewed and audited | With the reports hub |
+| Automation menu (22 Nov 2026) | One Automations menu: Workflows (flows), Schedules, Salesform, API templates, Webhooks, Apps | With the reports hub (menu regroup) |
 | Product & Service Gallery per workspace | Catalogue of products / services / packages with photos, brochures, prices and offers; shareable on WhatsApp from a lead | Phase 3 (with Packages) |
 | Course / Software access & validity | Enrolments and licences per customer: start / end date, access status, licence keys, expiry reminders, renewal leads created automatically | Phase 3 (with Packages & Finance) |
 | Class video recordings | Recordings per course / batch (upload or Zoom / YouTube link), access only for enrolled, valid customers; watch tracking | Phase 4 |

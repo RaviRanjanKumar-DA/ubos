@@ -12,7 +12,9 @@ const MAX_RULE_CHAIN = 3;
 export async function emitEvent(tx: Tx, tenantId: string, workspaceId: string | null, event: WebhookEvent, data: Record<string, unknown>) {
   const depth = contextStore.getStore()?.automationDepth ?? 0;
   const scored = event.startsWith('lead.') && !!workspaceId && (await tx.scoreRule.count({ where: { workspaceId, isActive: true, isArchived: false } })) > 0;
-  if (depth < MAX_RULE_CHAIN && (scored || (await tx.automationRule.count({ where: { trigger: event, isActive: true, isArchived: false } })))) {
+  const listening = async () =>
+    (await tx.automationRule.count({ where: { trigger: event, isActive: true, isArchived: false } })) + (await tx.automationFlow.count({ where: { trigger: event, isActive: true, isArchived: false } }));
+  if (depth < MAX_RULE_CHAIN && (scored || (await listening()))) {
     await tx.automationEvent.create({ data: { tenantId, workspaceId, event, data: JSON.parse(JSON.stringify(data)), depth } });
   }
   const subs = await tx.webhookSubscription.findMany({

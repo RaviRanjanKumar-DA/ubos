@@ -1,6 +1,6 @@
 import { rescoreLead } from '../../common/lead-rules';
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
-import { matchesConditions, type RuleCondition, LIVE_TENANT_STATUSES } from '@ubos/shared';
+import { firstStep, locate, matchesConditions, nextStep, type FlowGraph, type RuleCondition, LIVE_TENANT_STATUSES } from '@ubos/shared';
 import { DbService } from '../../common/db.service';
 import { contextStore } from '../../common/context';
 import { activity, applyStageChange, assignmentAvailability, eligibleOwners, makeAssigner } from '../../common/lead-ops';
@@ -11,6 +11,11 @@ import { WhatsAppService } from '../whatsapp/whatsapp.service';
 export interface RuleAction { type: string; userId?: string; stageId?: string; status?: string; labelId?: string; title?: string; dueHours?: number; text?: string; templateId?: string; sequenceId?: string }
 interface Rule { id: string; tenantId: string; workspaceId: string; name: string; conditions: unknown; actions: unknown; createdById: string }
 interface Step { delayHours: number; templateId: string }
+interface Flow { id: string; tenantId: string; workspaceId: string; name: string; trigger: string; graph: unknown; stopWhenClosed: boolean; createdById: string; idleDays?: number | null }
+type LogEntry = { nodeId: string; at: string; result: string };
+const MAX_STEPS_PER_PASS = 25;
+// Length of an hour for flow waits; only tests shorten it (AUTOMATION_HOUR_MS).
+const HOUR_MS = Number(process.env.AUTOMATION_HOUR_MS ?? 3_600_000);
 
 /**
  * Runs automation in the background, a moment after the change that caused it, so a broken rule can never block
@@ -48,7 +53,9 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
       }
       const due = await this.db.platform.sequenceEnrollment.findMany({ where: { status: 'active', nextAt: { lte: new Date() } }, orderBy: { nextAt: 'asc' }, take: 50 });
       for (const en of due) await this.asTenant(en.tenantId, 1, () => this.step(en.id)).catch((e) => this.log.error(e instanceof Error ? e.message : e));
-      if (Date.now() - this.lastIdle > Number(process.env.AUTOMATION_IDLE_MS ?? 60_000)) { this.lastIdle = Date.now(); await this.idle(); }
+      const waking = await this.db.platform.automationFlowRun.findMany({ where: { status: 'waiting', nextAt: { lte: new Date() } }, orderBy: { nextAt: 'asc' }, take: 50 });
+      for (const r of waking) await this.asTenant(r.tenantId, 1, () => this.advance(r.id, {})).catch((e) => this.log.error(e instanceof Error ? e.message : e));
+      if (Date.now() - this.lastIdle > Number(process.env.AUTOMATION_IDLE_MS ?? 60_000)) { this.lastIdle = Date.now(); await this.idle(); await this.idleFlows(); }
     } finally { this.busy = false; }
   }
 
@@ -59,6 +66,8 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
     await this.db.tenant((tx) => rescoreLead(tx, leadId)); // first, so rules can test the new score
     const rules = await this.db.tenant((tx) => tx.automationRule.findMany({ where: { trigger: ev.event, isActive: true, isArchived: false, workspaceId: ev.workspaceId! }, orderBy: { createdAt: 'asc' } }));
     for (const r of rules) await this.apply(r, data.leadId, ev.event, data);
+    const flows = await this.db.tenant((tx) => tx.automationFlow.findMany({ where: { trigger: ev.event, isActive: true, isArchived: false, workspaceId: ev.workspaceId! }, orderBy: { createdAt: 'asc' } }));
+    for (const f of flows) await this.startFlow(f, leadId, ev.event, data);
   }
 
   /** Leads that have gone quiet: each rule fires once per quiet spell. */
@@ -75,6 +84,102 @@ export class AutomationService implements OnModuleInit, OnModuleDestroy {
         }
       }).catch((e) => this.log.error(e instanceof Error ? e.message : e));
     }
+  }
+
+  /** Quiet leads enter idle flows once per quiet spell. */
+  private async idleFlows() {
+    const flows = await this.db.platform.automationFlow.findMany({ where: { trigger: 'lead.idle', isActive: true, isArchived: false } });
+    for (const f of flows) {
+      await this.asTenant(f.tenantId, 1, async () => {
+        const open = (await this.db.tenant((tx) => tx.leadStage.findMany({ where: { isWon: false, isLost: false }, select: { id: true } }))).map((x) => x.id);
+        const cutoff = new Date(Date.now() - (f.idleDays ?? 7) * 86_400_000);
+        const leads = await this.db.tenant((tx) => tx.lead.findMany({ where: { workspaceId: f.workspaceId, stageId: { in: open }, OR: [{ lastActivityAt: { lte: cutoff } }, { lastActivityAt: null, createdAt: { lte: cutoff } }] }, take: 200, orderBy: { updatedAt: 'asc' } }));
+        for (const l of leads) {
+          const since = await this.db.tenant((tx) => tx.automationFlowRun.findFirst({ where: { flowId: f.id, leadId: l.id, createdAt: { gte: l.lastActivityAt ?? l.createdAt } } }));
+          if (!since) await this.startFlow(f, l.id, 'lead.idle', {});
+        }
+      }).catch((e) => this.log.error(e instanceof Error ? e.message : e));
+    }
+  }
+
+  /** The values conditions are tested against. */
+  async leadValues(leadId: string, data: Record<string, unknown> = {}) {
+    const lead = await this.db.tenant((tx) => tx.lead.findUnique({ where: { id: leadId }, include: { customer: true } }));
+    if (!lead) return null;
+    const cf = Object.fromEntries(Object.entries((lead.customFields ?? {}) as Record<string, unknown>).map(([k, v]) => [`cf:${k}`, v]));
+    return { lead, values: { ...cf, source: lead.source, status: lead.status, stage: data.to ?? lead.stageId, owner: lead.ownerId, score: lead.score, city: lead.customer.city } as Record<string, unknown> };
+  }
+
+  /** Puts a lead into a flow, unless it is already in it. */
+  async startFlow(f: Flow, leadId: string, event: string, data: Record<string, unknown>) {
+    const lead = await this.db.tenant((tx) => tx.lead.findUnique({ where: { id: leadId }, select: { workspaceId: true } }));
+    if (!lead || lead.workspaceId !== f.workspaceId) return null;
+    const first = firstStep(f.graph as FlowGraph);
+    if (!first) return null;
+    const run = await this.db.tenant(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`flow-run:${f.id}:${leadId}`}))`;
+      if (await tx.automationFlowRun.findFirst({ where: { flowId: f.id, leadId, status: { in: ['running', 'waiting'] } }, select: { id: true } })) return null;
+      const r = await tx.automationFlowRun.create({ data: { tenantId: f.tenantId, flowId: f.id, leadId, event, nodeId: first, status: 'running' } });
+      await tx.automationFlow.update({ where: { id: f.id }, data: { runCount: { increment: 1 }, lastRunAt: new Date() } });
+      return r;
+    });
+    if (run) await this.advance(run.id, data);
+    return run?.id ?? null;
+  }
+
+  /**
+   * Moves a lead through its flow until a wait, the end, or a failure. A step removed while a lead waited ends the run;
+   * a lead that is won or lost leaves the flow (unless the flow says otherwise).
+   */
+  async advance(runId: string, data: Record<string, unknown>) {
+    const run = await this.db.tenant((tx) => tx.automationFlowRun.findUnique({ where: { id: runId }, include: { flow: true } }));
+    if (!run || (run.status !== 'running' && run.status !== 'waiting')) return;
+    const f = run.flow;
+    const g = f.graph as unknown as FlowGraph;
+    const log = [...((run.log as unknown as LogEntry[]) ?? [])];
+    const save = (patch: { nodeId?: string | null; status: string; nextAt?: Date | null; error?: string | null }) => this.db.tenant((tx) => tx.automationFlowRun.update({ where: { id: runId }, data: { ...patch, log: log as never } }));
+    const note = (nodeId: string, result: string) => log.push({ nodeId, at: new Date().toISOString(), result });
+    let nodeId: string | null = run.nodeId === '__end__' ? null : run.nodeId;
+    if (f.isArchived) return void (await save({ status: 'stopped', error: 'flow archived', nodeId }));
+    for (let i = 0; i < MAX_STEPS_PER_PASS && nodeId; i++) {
+      const place = locate(g).get(nodeId);
+      if (!place) return void (await save({ status: 'stopped', error: 'the flow was changed and this step is gone', nodeId: null }));
+      const lv = await this.leadValues(run.leadId, i === 0 ? data : {});
+      if (!lv) return void (await save({ status: 'stopped', error: 'lead not found', nodeId }));
+      if (f.stopWhenClosed && f.trigger !== 'lead.won' && f.trigger !== 'lead.lost') {
+        const st = await this.db.tenant((tx) => tx.leadStage.findUnique({ where: { id: lv.lead.stageId }, select: { isWon: true, isLost: true } }));
+        if (st?.isWon || st?.isLost) return void (await save({ status: 'stopped', error: 'lead closed', nodeId }));
+      }
+      const node = place.node;
+      if (node.type === 'wait') {
+        note(node.id, `waiting ${node.hours} h`);
+        return void (await save({ status: 'waiting', nextAt: new Date(Date.now() + node.hours * HOUR_MS), nodeId: nextStep(g, node.id) ?? '__end__' }));
+      }
+      if (node.type === 'condition') {
+        const yes = matchesConditions(node.conditions, lv.values);
+        note(node.id, yes ? 'yes' : 'no');
+        nodeId = nextStep(g, node.id, yes);
+        continue;
+      }
+      const rule = { id: f.id, tenantId: f.tenantId, workspaceId: f.workspaceId, name: f.name, conditions: [], actions: [], createdById: f.createdById };
+      try {
+        const done = await this.act(rule, run.leadId, node.action as RuleAction);
+        note(node.id, done);
+        await this.db.tenant(async (tx) => {
+          const l = await tx.lead.findUniqueOrThrow({ where: { id: run.leadId } });
+          await tx.leadActivity.create({ data: activity(l, null, { type: 'automation', remark: `Flow “${f.name}”: ${done}`, data: { flowId: f.id } }) });
+        });
+      } catch (e) {
+        const why = `${node.action.type}: ${e instanceof Error ? e.message : e}`.slice(0, 300);
+        note(node.id, `failed: ${why}`);
+        return void (await save({ status: 'failed', error: why, nodeId }));
+      }
+      nodeId = nextStep(g, node.id);
+    }
+    if (nodeId === '__end__') nodeId = null;
+    await save(nodeId ? { status: 'running', nodeId } : { status: 'done', nodeId: null, nextAt: null });
+    // Very long flows continue on the next pass rather than holding the loop.
+    if (nodeId) await this.db.tenant((tx) => tx.automationFlowRun.update({ where: { id: runId }, data: { status: 'waiting', nextAt: new Date() } }));
   }
 
   private async apply(rule: Rule, leadId: string, event: string, data: Record<string, unknown>) {

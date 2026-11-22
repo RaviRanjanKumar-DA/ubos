@@ -48,7 +48,10 @@ export default function AutomationPage() {
     <>
       <div className="page-head">
         <div><h1>Automation</h1><p className="muted small" style={{ margin: 0 }}>Let UBOS do the routine work: when something happens, if it matches, then act. Rules run in the background within seconds.</p></div>
-        {o.canManage && tab === 'rules' && !draft && <button className="btn" onClick={() => setDraft(empty())}>+ New rule</button>}
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <Link className="btn outline" href="/app/automation/flows">Flows</Link>
+          {o.canManage && tab === 'rules' && !draft && <button className="btn" onClick={() => setDraft(empty())}>+ New rule</button>}
+        </div>
       </div>
       <div className="dash-tabs" role="tablist">{([['rules', `Rules (${rules.length})`], ['sequences', `Sequences (${seqs.length})`], ['log', 'Activity']] as [Tab, string][]).map(([k, l]) => <button key={k} role="tab" aria-selected={tab === k} className={`dash-tab ${tab === k ? 'on' : ''}`} onClick={() => setTab(k)}>{l}</button>)}</div>
       {msg && <div className={msg.type}>{msg.text}</div>}
@@ -67,6 +70,7 @@ export default function AutomationPage() {
                 {o.canManage && <span className="row" style={{ gap: 4 }}>
                   <button className="btn sm ghost" onClick={() => setDraft({ id: r.id, name: r.name, trigger: r.trigger, idleDays: r.idleDays, conditions: r.conditions, actions: r.actions, isActive: r.isActive })}>Edit</button>
                   <button className="btn sm ghost" onClick={() => act(() => api(`/api/v1/automation/rules/${r.id}`, { method: 'PATCH', body: { isActive: !r.isActive } }), r.isActive ? 'Rule paused.' : 'Rule switched on.')}>{r.isActive ? 'Pause' : 'Switch on'}</button>
+                  <button className="btn sm ghost" title="Copy this rule into a flow (switched off) to add waits and paths" onClick={async () => { try { const fl = await api<{ id: string }>(`/api/v1/automation/rules/${r.id}/to-flow`, { method: 'POST' }); window.location.href = `/app/automation/flows/${fl.id}`; } catch (e) { setMsg({ type: 'error', text: e instanceof ApiError ? e.message : 'Failed' }); } }}>Open as flow</button>
                   <button className="btn sm ghost" onClick={() => act(() => api(`/api/v1/automation/rules/${r.id}`, { method: 'PATCH', body: { isArchived: true } }), 'Rule archived.')}>Archive</button>
                 </span>}
               </div>

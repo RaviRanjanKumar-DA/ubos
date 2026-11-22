@@ -9,8 +9,8 @@ import { parse } from '../../common/errors';
 import { scopeFilter } from '../../common/scope';
 import { AutomationService } from './automation.service';
 
-const Condition = z.object({ field: z.string().regex(/^(source|status|stage|owner|score|city|cf:[a-z][a-z0-9_]*)$/), op: z.enum(Object.keys(CONDITION_OPS) as [ConditionOp, ...ConditionOp[]]), value: z.string().max(200).optional() });
-const Action = z.object({
+export const Condition = z.object({ field: z.string().regex(/^(source|status|stage|owner|score|city|cf:[a-z][a-z0-9_]*)$/), op: z.enum(Object.keys(CONDITION_OPS) as [ConditionOp, ...ConditionOp[]]), value: z.string().max(200).optional() });
+export const Action = z.object({
   type: z.enum(Object.keys(AUTOMATION_ACTIONS) as [AutomationAction, ...AutomationAction[]]), userId: z.string().max(40).optional(), stageId: z.string().uuid().optional(), status: z.string().max(60).optional(), labelId: z.string().uuid().optional(),
   title: z.string().trim().max(150).optional(), dueHours: z.number().min(0).max(8760).optional(), text: z.string().trim().max(1000).optional(), templateId: z.string().uuid().optional(), sequenceId: z.string().uuid().optional(),
 });

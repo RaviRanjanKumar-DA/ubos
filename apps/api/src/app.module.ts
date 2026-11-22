@@ -66,6 +66,7 @@ import { WhatsAppService } from './modules/whatsapp/whatsapp.service';
 import { MessagingController, UnsubscribeController } from './modules/messaging/messaging.controller';
 import { MessagingService } from './modules/messaging/messaging.service';
 import { AutomationController } from './modules/automation/automation.controller';
+import { FlowsController } from './modules/automation/flows.controller';
 import { AutomationService } from './modules/automation/automation.service';
 
 @Controller('health')
@@ -83,6 +84,7 @@ class HealthController {
   controllers: [
     HrController,
     AttendanceController,
+    FlowsController,
     SignupController,
     PlatformBillingController,
     PlatformRazorpayWebhook,
